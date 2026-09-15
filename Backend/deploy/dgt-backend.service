@@ -1,0 +1,20 @@
+[Unit]
+Description=DGT backend
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=dgt
+Group=dgt
+WorkingDirectory=/opt/dgt/current
+ExecStart=/usr/bin/java -Xms128m -Xmx768m -jar /opt/dgt/current/backend.jar --spring.config.additional-location=file:/etc/dgt/application-production.yml,file:/etc/dgt/application-secrets.yml
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,45 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://dgt-postgres.cdsqkuge0wp7.us-east-2.rds.amazonaws.com:5432/dgt?sslmode=verify-full&sslrootcert=/etc/dgt/global-bundle.pem
+    username: dgt_app
+    hikari:
+      maximum-pool-size: 10
+  flyway:
+    enabled: false
+server:
+  address: 127.0.0.1
+  port: 8080
+  forward-headers-strategy: framework
+app:
+  cors-origins: https://dgtinnovations.com,https://www.dgtinnovations.com
+  profile:
+    enabled: true
+  pricebook:
+    enabled: true
+  workweek:
+    enabled: true
+  billing:
+    enabled: true
+  daily-closing:
+    enabled: true
+  sales:
+    activity:
+      enabled: true
+  tender:
+    credit-card:
+      enabled: true
+    ebt:
+      enabled: true
+    fleet:
+      enabled: true
+  gas:
+    settings:
+      enabled: true
+    delivery:
+      enabled: true
+    adjustments:
+      enabled: true
+    price:
+      enabled: true
+    tank-report:
+      enabled: true

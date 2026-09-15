@@ -1,0 +1,17 @@
+package com.dgt.backend.identity.database;
+
+import java.util.List;
+import com.dgt.backend.common.database.Column;
+import com.dgt.backend.common.database.Table;
+public final class PermissionDatabase {
+    private PermissionDatabase() {}
+    public static final Table TABLE = new Table("permissions","permission_id","identity",false,List.of(
+        new Column("permission_id","int8",false,false,true,0,64,0),
+        new Column("module_id","int8",false,false,false,0,64,0),
+        new Column("user_role_id","int8",false,false,false,0,64,0),
+        new Column("is_active","bool",false,true,false,0,0,0),
+        new Column("created_at","timestamptz",false,true,true,0,0,0),
+        new Column("updated_at","timestamptz",false,true,true,0,0,0),
+        new Column("can_view","bool",false,true,false,0,0,0),
+        new Column("can_edit","bool",false,true,false,0,0,0)));
+}

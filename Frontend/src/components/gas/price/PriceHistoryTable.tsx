@@ -1,0 +1,19 @@
+import { useState } from "react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { usePagination } from "@/hooks/use-pagination";
+import { TablePagination } from "@/components/ui/table-pagination";
+import {type PriceData,localDateTime,priceText,reasons} from './gasPriceData';
+import {request} from '@/lib/backend';
+import {Button} from '@/components/ui/button';
+export const PriceHistoryTable = ({data,path,onSaved}:{data:PriceData;path:string;onSaved:(data:PriceData)=>void}) => {
+ const [busy,setBusy]=useState(false),[error,setError]=useState('');
+ async function cancel(id:string,version:string){setBusy(true);setError('');try{onSaved(await request<PriceData>(path+'/'+id+'/cancel',{method:'POST',headers:{'If-Match':id+':'+version}}));}catch(e){setError(e instanceof Error?e.message:'Could not cancel schedule');}finally{setBusy(false);}}
+ const [pageSize,setPageSize]=useState(10);
+ const rows=data.history.flatMap(p=>[{p,kind:'Cash',old:p.oldCash,value:p.cash},{p,kind:'Credit',old:p.oldCredit,value:p.credit}]).filter(r=>r.p.status==='SCHEDULED'||r.p.status==='CANCELLED'||r.old==null||Number(r.old)!==Number(r.value));
+ const {paginated,page,totalPages,totalItems,hasPrev,hasNext,prevPage,nextPage}=usePagination(rows,pageSize);
+ return <>{error&&<p role="alert" className="text-sm text-destructive">{error}</p>}<div className="border border-border rounded-lg overflow-hidden"><Table><TableHeader><TableRow className="bg-muted/50">{['Date & Time','Fuel Type','Old Price','New Price','Change (±)','Source','Reason','Reference','Status','Actions'].map(h=><TableHead className="text-xs font-semibold" key={h}>{h}</TableHead>)}</TableRow></TableHeader><TableBody>
+ {paginated.length===0&&<TableRow><TableCell colSpan={10} className="text-center text-xs text-muted-foreground py-8">No price changes recorded for this store.</TableCell></TableRow>}
+ {paginated.map(({p,kind,old,value})=>{const delta=old==null?null:Number(value)-Number(old);return <TableRow key={p.id+kind} className="text-xs"><TableCell className="font-medium">{localDateTime(p.effectiveFrom,data.timezone)}</TableCell><TableCell>{p.gradeName}<span className="block text-muted-foreground">{kind}</span></TableCell><TableCell className="font-mono">{priceText(old)}</TableCell><TableCell className="font-mono font-semibold">{priceText(value)}</TableCell><TableCell className={`font-mono ${delta!=null&&delta>0?'text-destructive':'text-emerald-600'}`}>{delta==null?'—':`${delta>0?'+':''}${delta.toFixed(3)}`}</TableCell><TableCell><Badge variant="outline" className="text-[10px] border-0 bg-orange-500/10 text-orange-600">{p.source}</Badge><span className="block text-muted-foreground">{p.actor}</span></TableCell><TableCell className="text-muted-foreground">{reasons[p.reason??'']||p.reason||'—'}{p.notes&&<span className="block max-w-48 break-words">{p.notes}</span>}</TableCell><TableCell className="font-mono text-muted-foreground">PRICE-{p.id}</TableCell><TableCell><Badge variant="outline" className={`text-[10px] ${p.status==='SCHEDULED'?'text-yellow-700 bg-yellow-500/10':p.status==='CANCELLED'?'text-destructive bg-destructive/10':p.current?'text-emerald-600 bg-emerald-500/10':''}`}>{p.status==='SCHEDULED'?'Scheduled':p.status==='CANCELLED'?'Cancelled':p.current?'Current':'Previous'}</Badge></TableCell><TableCell>{p.status==='SCHEDULED'&&<Button disabled={busy} variant="outline" size="sm" className="text-xs" aria-label={`Cancel schedule PRICE-${p.id} ${kind}`} onClick={()=>cancel(p.id,p.version)}>Cancel Schedule</Button>}</TableCell></TableRow>;})}
+ </TableBody></Table><TablePagination page={page} totalPages={totalPages} totalItems={totalItems} pageSize={pageSize} hasPrev={hasPrev} hasNext={hasNext} onPrev={prevPage} onNext={nextPage} onPageSizeChange={setPageSize}/></div></>;
+};

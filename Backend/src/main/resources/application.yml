@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: dgt-backend
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/dgt}
+    username: ${DB_USERNAME:dgt}
+    password: ${DB_PASSWORD}
+  flyway:
+    enabled: ${FLYWAY_ENABLED:false}
+    locations: classpath:db/migration
+    baseline-version: 1
+    baseline-on-migrate: false
+    clean-disabled: true
+    validate-on-migrate: true
+  sql:
+    init:
+      mode: never
+server:
+  port: ${PORT:8080}
+  error:
+    include-message: never
+    include-stacktrace: never
+app:
+  cors-origins: ${CORS_ORIGINS:http://localhost:5173,http://localhost:8081}
+  access:
+    administrator-emails: ${SCHEMA_ADMIN_EMAILS:}

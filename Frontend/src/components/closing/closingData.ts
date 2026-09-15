@@ -1,0 +1,13 @@
+import {reconciliationFields} from './store-edit/reconciliationFields';
+import {type ActivityData} from '@/components/live-counter/liveActivityData';
+export type ClosingDay={date:string;timezone:string;version:string;status:'OPEN'|'DRAFT'|'CLOSED';isSample:boolean;notes:string;openingCash:number|null;cashAdded:number;cashDrops:number;payouts:number;actualCash:number|null;expectedCash:number|null;variance:number|null;reconciliation:Record<string,number|boolean|null>;totalDeposits:number;expectedChecks:number|null;checkVariance:number|null;cashVariance:number|null;carryForwardDate?:string;source:Pick<ActivityData,'stats'|'tenders'|'departments'>&{closingDetails?:{fields:Record<string,number>;warnings:string[]};breakdown:{taxable:number;nonTaxable:number;gasSales:number;lottery:number}};sourceToken:string};
+export type ClosingMeta={today:string;timezone:string;latest:string|null;openingDefault:number|null};
+export const closingPath=(store:string)=>`/access/stores/${encodeURIComponent(store)}/daily-closing`;
+export const isFuel=(name:string)=>['fuel','gas'].includes(name.toLowerCase().trim());
+export const insideSales=(d:ClosingDay)=>d.source.departments.filter(x=>!isFuel(x.name)).reduce((s,x)=>s+Number(x.amount),0);
+export function exportClosing(days:ClosingDay[]){
+ const breakdownFields=['Grocery – Tax','Grocery – NonTax','Cigarette Pack','Cigarette Carton','Regular Volume','Plus Volume','Super Volume','Diesel Volume','Regular Amount Sold','Plus Amount Sold','Super Amount Sold','Diesel Amount Sold','EBT/Foodstamp Batch','Fleet Card Amount Sold','Fleet Card Volume Sold'];
+ const rows=[['Date','Status','Sample cash data','Sales incl tax','Tax','Fuel gallons','Opening cash','Net cash payments','Cash added','Payouts','Cash drops','Expected cash','Counted cash','Over/short','Bank deposits','Expected checks','Check variance',...Object.keys(reconciliationFields),...breakdownFields],
+ ...days.map(d=>[d.date,d.status,String(d.isSample),d.source.stats.netSales,d.source.stats.tax,d.source.stats.gasVolume,d.openingCash,d.source.tenders.filter(t=>t.code==='CASH').reduce((s,t)=>s+Number(t.amount),0),d.cashAdded,d.payouts,d.cashDrops,d.expectedCash,d.actualCash,d.variance,d.totalDeposits,d.expectedChecks,d.checkVariance,...Object.values(reconciliationFields).map(k=>d.reconciliation?.[k]),...breakdownFields.map(k=>d.source.closingDetails?.fields[k])])];
+ const url=URL.createObjectURL(new Blob([rows.map(r=>r.map(v=>'"'+String(v??'').split('"').join('""')+'"').join(',')).join('\r\n')],{type:'text/csv'}));const a=document.createElement('a');a.href=url;a.download='daily-closing.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}

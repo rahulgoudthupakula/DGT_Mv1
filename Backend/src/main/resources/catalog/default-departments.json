@@ -1,0 +1,615 @@
+[
+  {
+    "name": "Grocery",
+    "subDepartments": [
+      "Fresh Produce",
+      "Packaged Produce",
+      "Fresh Fruit",
+      "Fresh Vegetables",
+      "Herbs",
+      "Bakery",
+      "Bread & Buns",
+      "Cakes & Desserts",
+      "Deli",
+      "Prepared Foods",
+      "Meat",
+      "Beef",
+      "Pork",
+      "Chicken & Poultry",
+      "Seafood",
+      "Dairy",
+      "Milk",
+      "Eggs",
+      "Cheese",
+      "Yogurt",
+      "Butter & Margarine",
+      "Frozen Foods",
+      "Frozen Meals",
+      "Frozen Pizza",
+      "Frozen Vegetables",
+      "Frozen Desserts",
+      "Ice Cream",
+      "Pantry",
+      "Rice & Grains",
+      "Pasta & Noodles",
+      "Flour & Baking",
+      "Canned Foods",
+      "Soups",
+      "Sauces & Condiments",
+      "Spices & Seasonings",
+      "Breakfast & Cereal",
+      "Snacks",
+      "Chips",
+      "Crackers",
+      "Cookies",
+      "Candy",
+      "Nuts & Seeds",
+      "Beverages",
+      "Soft Drinks",
+      "Water",
+      "Juice",
+      "Sports Drinks",
+      "Energy Drinks",
+      "Coffee",
+      "Tea",
+      "International Foods",
+      "Organic & Natural Foods",
+      "Baby Food"
+    ]
+  },
+  {
+    "name": "Beer, Wine & Spirits",
+    "subDepartments": [
+      "Beer",
+      "Craft Beer",
+      "Imported Beer",
+      "Domestic Beer",
+      "Hard Seltzer",
+      "Malt Beverages",
+      "Wine",
+      "Red Wine",
+      "White Wine",
+      "Sparkling Wine",
+      "Spirits",
+      "Mixers"
+    ]
+  },
+  {
+    "name": "Tobacco & Nicotine",
+    "subDepartments": [
+      "Cigarettes",
+      "Cigars",
+      "Little Cigars",
+      "Pipe Tobacco",
+      "Smokeless Tobacco",
+      "Chewing Tobacco",
+      "Alternative Nicotine",
+      "Nicotine Pouches",
+      "Tobacco Accessories"
+    ]
+  },
+  {
+    "name": "Health & Wellness",
+    "subDepartments": [
+      "OTC Medicines",
+      "Pain Relief",
+      "Cold & Flu",
+      "Allergy",
+      "Digestive Health",
+      "First Aid",
+      "Vitamins & Supplements",
+      "Nutrition",
+      "Medical Supplies",
+      "Mobility Aids",
+      "Diabetes Care",
+      "Home Health Care",
+      "Family Planning",
+      "Eye Care",
+      "Ear Care",
+      "Foot Care"
+    ]
+  },
+  {
+    "name": "Pharmacy",
+    "subDepartments": [
+      "Prescription Pharmacy",
+      "Prescription Pickup",
+      "Pharmacy Services",
+      "Immunization Services"
+    ]
+  },
+  {
+    "name": "Beauty & Personal Care",
+    "subDepartments": [
+      "Skin Care",
+      "Hair Care",
+      "Shampoo & Conditioner",
+      "Hair Styling",
+      "Hair Color",
+      "Cosmetics",
+      "Makeup",
+      "Fragrances",
+      "Bath & Body",
+      "Soap & Body Wash",
+      "Deodorant",
+      "Oral Care",
+      "Toothpaste",
+      "Toothbrushes",
+      "Shaving",
+      "Men's Grooming",
+      "Feminine Care",
+      "Personal Hygiene",
+      "Nail Care",
+      "Beauty Tools"
+    ]
+  },
+  {
+    "name": "Baby",
+    "subDepartments": [
+      "Diapers",
+      "Wipes",
+      "Baby Food",
+      "Formula",
+      "Baby Feeding",
+      "Baby Bath",
+      "Baby Health",
+      "Baby Skin Care",
+      "Nursery",
+      "Car Seats",
+      "Strollers",
+      "Baby Furniture",
+      "Baby Clothing",
+      "Baby Toys"
+    ]
+  },
+  {
+    "name": "Household Essentials",
+    "subDepartments": [
+      "Paper Products",
+      "Toilet Paper",
+      "Paper Towels",
+      "Facial Tissue",
+      "Cleaning Supplies",
+      "Disinfectants",
+      "Floor Cleaners",
+      "Bathroom Cleaners",
+      "Kitchen Cleaners",
+      "Laundry",
+      "Detergent",
+      "Fabric Softener",
+      "Bleach",
+      "Dishwashing",
+      "Trash Bags",
+      "Food Storage",
+      "Disposable Tableware",
+      "Air Fresheners",
+      "Pest Control"
+    ]
+  },
+  {
+    "name": "Pet Supplies",
+    "subDepartments": [
+      "Dog Food",
+      "Dog Treats",
+      "Dog Supplies",
+      "Cat Food",
+      "Cat Treats",
+      "Cat Litter",
+      "Cat Supplies",
+      "Fish Supplies",
+      "Bird Supplies",
+      "Small Animal Supplies",
+      "Pet Grooming",
+      "Pet Health",
+      "Pet Toys"
+    ]
+  },
+  {
+    "name": "Electronics",
+    "subDepartments": [
+      "TVs",
+      "Home Theater",
+      "Streaming Devices",
+      "Computers",
+      "Laptops",
+      "Desktops",
+      "Monitors",
+      "Tablets",
+      "Computer Accessories",
+      "Networking",
+      "Printers",
+      "Ink & Toner",
+      "Cell Phones",
+      "Prepaid Phones",
+      "Phone Accessories",
+      "Chargers & Cables",
+      "Headphones",
+      "Speakers",
+      "Cameras",
+      "Smart Home",
+      "Wearable Technology",
+      "Video Games",
+      "Gaming Consoles",
+      "Gaming Accessories",
+      "Batteries"
+    ]
+  },
+  {
+    "name": "Home",
+    "subDepartments": [
+      "Furniture",
+      "Living Room",
+      "Bedroom",
+      "Dining",
+      "Mattresses",
+      "Bedding",
+      "Sheets",
+      "Pillows",
+      "Blankets",
+      "Bath",
+      "Towels",
+      "Shower Accessories",
+      "Home D\u00e9cor",
+      "Rugs",
+      "Curtains",
+      "Lighting",
+      "Storage & Organization",
+      "Kitchen",
+      "Cookware",
+      "Bakeware",
+      "Dinnerware",
+      "Drinkware",
+      "Kitchen Utensils",
+      "Small Appliances",
+      "Major Appliances"
+    ]
+  },
+  {
+    "name": "Clothing & Apparel",
+    "subDepartments": [
+      "Men's Clothing",
+      "Women's Clothing",
+      "Boys' Clothing",
+      "Girls' Clothing",
+      "Baby Clothing",
+      "Activewear",
+      "Sleepwear",
+      "Underwear",
+      "Socks",
+      "Workwear",
+      "Seasonal Clothing",
+      "Maternity"
+    ]
+  },
+  {
+    "name": "Shoes",
+    "subDepartments": [
+      "Men's Shoes",
+      "Women's Shoes",
+      "Boys' Shoes",
+      "Girls' Shoes",
+      "Baby Shoes",
+      "Athletic Shoes",
+      "Work Boots",
+      "Sandals",
+      "Slippers"
+    ]
+  },
+  {
+    "name": "Jewelry & Accessories",
+    "subDepartments": [
+      "Jewelry",
+      "Watches",
+      "Handbags",
+      "Wallets",
+      "Belts",
+      "Sunglasses",
+      "Hats",
+      "Scarves",
+      "Hair Accessories",
+      "Fashion Accessories"
+    ]
+  },
+  {
+    "name": "Automotive",
+    "subDepartments": [
+      "Motor Oil & Additives",
+      "Transmission Fluids",
+      "Coolants & Antifreeze",
+      "Windshield Washer Fluid",
+      "Automotive Chemicals",
+      "Car Cleaning",
+      "Car Appearance Products",
+      "Wax & Polish",
+      "Tires",
+      "Wheels",
+      "Batteries",
+      "Wiper Blades",
+      "Filters",
+      "Automotive Lighting",
+      "Replacement Parts",
+      "Interior Accessories",
+      "Exterior Accessories",
+      "Car Electronics",
+      "Tools",
+      "Emergency Equipment",
+      "Towing Accessories"
+    ]
+  },
+  {
+    "name": "Hardware & Home Improvement",
+    "subDepartments": [
+      "Hand Tools",
+      "Power Tools",
+      "Tool Accessories",
+      "Hardware",
+      "Fasteners",
+      "Screws & Nails",
+      "Electrical",
+      "Extension Cords",
+      "Plumbing",
+      "Paint",
+      "Painting Supplies",
+      "Adhesives",
+      "Sealants",
+      "Building Supplies",
+      "Safety Equipment",
+      "Locks",
+      "Home Security",
+      "Ladders"
+    ]
+  },
+  {
+    "name": "Lawn & Garden",
+    "subDepartments": [
+      "Gardening Tools",
+      "Plants",
+      "Seeds",
+      "Soil",
+      "Fertilizer",
+      "Lawn Care",
+      "Weed Control",
+      "Pest Control",
+      "Garden D\u00e9cor",
+      "Planters",
+      "Outdoor Power Equipment",
+      "Grills",
+      "Grilling Accessories",
+      "Patio Furniture",
+      "Outdoor Lighting",
+      "Watering Equipment"
+    ]
+  },
+  {
+    "name": "Sports & Outdoors",
+    "subDepartments": [
+      "Exercise & Fitness",
+      "Exercise Equipment",
+      "Fitness Accessories",
+      "Team Sports",
+      "Basketball",
+      "Football",
+      "Soccer",
+      "Baseball",
+      "Golf",
+      "Tennis",
+      "Pickleball",
+      "Cycling",
+      "Bikes",
+      "Bike Accessories",
+      "Camping",
+      "Hiking",
+      "Fishing",
+      "Hunting",
+      "Outdoor Recreation",
+      "Swimming",
+      "Water Sports",
+      "Winter Sports"
+    ]
+  },
+  {
+    "name": "Toys & Games",
+    "subDepartments": [
+      "Action Figures",
+      "Dolls",
+      "Building Sets",
+      "Educational Toys",
+      "Preschool Toys",
+      "Infant Toys",
+      "Vehicles",
+      "Remote Control Toys",
+      "Outdoor Toys",
+      "Board Games",
+      "Card Games",
+      "Puzzles",
+      "Arts & Crafts",
+      "Collectibles"
+    ]
+  },
+  {
+    "name": "Office & School Supplies",
+    "subDepartments": [
+      "Pens & Pencils",
+      "Markers",
+      "Paper",
+      "Notebooks",
+      "Binders",
+      "Folders",
+      "School Supplies",
+      "Office Supplies",
+      "Desk Accessories",
+      "Calendars",
+      "Filing",
+      "Mailing & Shipping",
+      "Calculators",
+      "Printer Supplies",
+      "Presentation Supplies"
+    ]
+  },
+  {
+    "name": "Books, Movies & Music",
+    "subDepartments": [
+      "Books",
+      "Children's Books",
+      "Magazines",
+      "Newspapers",
+      "Movies",
+      "Music",
+      "Educational Media"
+    ]
+  },
+  {
+    "name": "Arts, Crafts & Sewing",
+    "subDepartments": [
+      "Art Supplies",
+      "Painting",
+      "Drawing",
+      "Craft Supplies",
+      "Fabric",
+      "Sewing",
+      "Yarn",
+      "Knitting",
+      "Scrapbooking",
+      "Jewelry Making",
+      "Kids Crafts",
+      "Seasonal Crafts"
+    ]
+  },
+  {
+    "name": "Party & Celebrations",
+    "subDepartments": [
+      "Party Supplies",
+      "Balloons",
+      "Decorations",
+      "Disposable Tableware",
+      "Gift Bags",
+      "Gift Wrap",
+      "Greeting Cards",
+      "Birthday Supplies",
+      "Wedding Supplies",
+      "Event Supplies"
+    ]
+  },
+  {
+    "name": "Seasonal",
+    "subDepartments": [
+      "Christmas",
+      "Halloween",
+      "Thanksgiving",
+      "Easter",
+      "Valentine's Day",
+      "Back to School",
+      "Summer",
+      "Winter",
+      "Spring",
+      "Fall",
+      "Holiday Decorations",
+      "Seasonal Candy",
+      "Seasonal Clothing"
+    ]
+  },
+  {
+    "name": "Travel & Luggage",
+    "subDepartments": [
+      "Luggage",
+      "Backpacks",
+      "Travel Bags",
+      "Travel Accessories",
+      "Travel Containers",
+      "Locks",
+      "Travel Pillows"
+    ]
+  },
+  {
+    "name": "Convenience / Front End",
+    "subDepartments": [
+      "Candy",
+      "Gum",
+      "Mints",
+      "Single-Serve Beverages",
+      "Snacks",
+      "Batteries",
+      "Chargers",
+      "Travel Size Products",
+      "Impulse Products",
+      "Checkout Merchandise"
+    ]
+  },
+  {
+    "name": "Lottery",
+    "subDepartments": [
+      "Scratch-Off Lottery",
+      "Draw Games",
+      "Daily Games",
+      "Multi-State Games",
+      "Lottery Supplies"
+    ]
+  },
+  {
+    "name": "Fuel",
+    "subDepartments": [
+      "Regular Unleaded",
+      "Mid-Grade Unleaded",
+      "Premium Unleaded",
+      "Diesel",
+      "E85",
+      "Ethanol-Free",
+      "DEF",
+      "Other Fuel"
+    ]
+  },
+  {
+    "name": "Gift Cards & Prepaid",
+    "subDepartments": [
+      "Store Gift Cards",
+      "Restaurant Gift Cards",
+      "Entertainment Gift Cards",
+      "Gaming Gift Cards",
+      "Retail Gift Cards",
+      "Prepaid Wireless",
+      "Prepaid Debit",
+      "Digital Service Cards"
+    ]
+  },
+  {
+    "name": "Floral",
+    "subDepartments": [
+      "Fresh Flowers",
+      "Bouquets",
+      "Plants",
+      "Floral Arrangements",
+      "Vases",
+      "Floral Accessories",
+      "Seasonal Floral"
+    ]
+  },
+  {
+    "name": "Photo & Printing",
+    "subDepartments": [
+      "Photo Prints",
+      "Passport Photos",
+      "Photo Gifts",
+      "Canvas Prints",
+      "Posters",
+      "Printing Services",
+      "Photo Accessories"
+    ]
+  },
+  {
+    "name": "Services",
+    "subDepartments": [
+      "Money Services",
+      "Money Orders",
+      "Bill Pay",
+      "Check Cashing",
+      "Money Transfer",
+      "ATM",
+      "Pickup",
+      "Delivery",
+      "Customer Service",
+      "Returns",
+      "Installation Services",
+      "Automotive Services"
+    ]
+  }
+]
