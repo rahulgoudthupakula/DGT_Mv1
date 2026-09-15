@@ -7,6 +7,9 @@ DO $$
 DECLARE r oid;
 BEGIN
  SELECT oid INTO STRICT r FROM pg_roles WHERE rolname=current_setting('dgt.runtime_role');
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE oid=r AND (rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication OR rolbypassrls)) THEN
+  RAISE EXCEPTION 'Runtime role has elevated privileges; use the restricted application login';
+ END IF;
  IF EXISTS(SELECT 1 FROM pg_auth_members WHERE member=r) OR
     EXISTS(SELECT 1 FROM pg_class WHERE relowner=r) OR
     EXISTS(SELECT 1 FROM pg_namespace WHERE nspowner=r) OR
@@ -17,8 +20,8 @@ BEGIN
   RAISE EXCEPTION 'Review SECURITY DEFINER functions before granting runtime access';
  END IF;
 END $$;
-ALTER ROLE :"runtime_user" NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+REVOKE CREATE ON SCHEMA public FROM :"runtime_user";
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM PUBLIC;
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM :"runtime_user";
 REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM :"runtime_user";
