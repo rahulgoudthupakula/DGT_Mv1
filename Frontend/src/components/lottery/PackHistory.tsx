@@ -1,3 +1,5 @@
+import {useQuery} from '@tanstack/react-query';
+import {request} from '@/lib/backend';
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePagination } from "@/hooks/use-pagination";
@@ -59,7 +61,7 @@ interface PackRecord {
   packNumber: string;
   startTicket: string;
   endTicket: string;
-  currentStatus: "Received" | "Confirmed" | "Activated" | "Selling" | "Closed" | "Returned" | "Settled";
+  currentStatus: "Received" | "Confirmed" | "Activated" | "Selling" | "Closed" | "Returned" | "Settled" | "Verified" | "Not Verified" | "Rejected" | "Return Pending";
   ticketsSold: number;
   ticketsRemaining: number;
   grossSales: number;
@@ -69,134 +71,7 @@ interface PackRecord {
   timeline: TimelineEvent[];
 }
 
-const mockPacks: PackRecord[] = [
-  {
-    id: "1",
-    gameName: "Mega Millions",
-    packNumber: "MM-2025-001",
-    startTicket: "000",
-    endTicket: "299",
-    currentStatus: "Settled",
-    ticketsSold: 300,
-    ticketsRemaining: 0,
-    grossSales: 600.00,
-    commission: 36.00,
-    netAmount: 564.00,
-    lastActionDate: "2025-01-20",
-    timeline: [
-      { status: "Received", date: "2025-01-05", time: "09:15 AM", user: "John Smith", referenceId: "DEL-2025-001", referenceType: "delivery" },
-      { status: "Confirmed", date: "2025-01-05", time: "10:30 AM", user: "John Smith", referenceId: "DEL-2025-001", referenceType: "delivery" },
-      { status: "Activated", date: "2025-01-05", time: "11:00 AM", user: "John Smith", referenceId: "ACT-MM-001", referenceType: "activation" },
-      { status: "Sales Started", date: "2025-01-05", time: "11:05 AM", user: "System", referenceId: "N/A", referenceType: null },
-      { status: "Shift Closing", date: "2025-01-10", time: "10:00 PM", user: "Mary Johnson", referenceId: "SHF-2025-010", referenceType: "shift" },
-      { status: "Shift Closing", date: "2025-01-15", time: "10:00 PM", user: "John Smith", referenceId: "SHF-2025-015", referenceType: "shift" },
-      { status: "Closed", date: "2025-01-18", time: "10:00 PM", user: "Mary Johnson", referenceId: "SHF-2025-018", referenceType: "shift" },
-      { status: "Settled", date: "2025-01-20", time: "02:00 PM", user: "Admin", referenceId: "SET-2025-001", referenceType: "settlement" },
-    ],
-  },
-  {
-    id: "2",
-    gameName: "Powerball",
-    packNumber: "PB-2025-003",
-    startTicket: "000",
-    endTicket: "299",
-    currentStatus: "Selling",
-    ticketsSold: 145,
-    ticketsRemaining: 155,
-    grossSales: 290.00,
-    commission: 17.40,
-    netAmount: 272.60,
-    lastActionDate: "2025-01-25",
-    timeline: [
-      { status: "Received", date: "2025-01-15", time: "09:00 AM", user: "John Smith", referenceId: "DEL-2025-008", referenceType: "delivery" },
-      { status: "Confirmed", date: "2025-01-15", time: "09:45 AM", user: "John Smith", referenceId: "DEL-2025-008", referenceType: "delivery" },
-      { status: "Activated", date: "2025-01-15", time: "10:00 AM", user: "John Smith", referenceId: "ACT-PB-003", referenceType: "activation" },
-      { status: "Sales Started", date: "2025-01-15", time: "10:05 AM", user: "System", referenceId: "N/A", referenceType: null },
-      { status: "Shift Closing", date: "2025-01-20", time: "10:00 PM", user: "Mary Johnson", referenceId: "SHF-2025-020", referenceType: "shift" },
-    ],
-  },
-  {
-    id: "3",
-    gameName: "Lucky 7s",
-    packNumber: "L7-2025-002",
-    startTicket: "000",
-    endTicket: "149",
-    currentStatus: "Returned",
-    ticketsSold: 50,
-    ticketsRemaining: 100,
-    grossSales: 250.00,
-    commission: 17.50,
-    netAmount: 232.50,
-    lastActionDate: "2025-01-22",
-    timeline: [
-      { status: "Received", date: "2025-01-08", time: "09:30 AM", user: "Mary Johnson", referenceId: "DEL-2025-003", referenceType: "delivery" },
-      { status: "Confirmed", date: "2025-01-08", time: "10:00 AM", user: "Mary Johnson", referenceId: "DEL-2025-003", referenceType: "delivery" },
-      { status: "Activated", date: "2025-01-08", time: "10:30 AM", user: "Mary Johnson", referenceId: "ACT-L7-002", referenceType: "activation" },
-      { status: "Sales Started", date: "2025-01-08", time: "10:35 AM", user: "System", referenceId: "N/A", referenceType: null },
-      { status: "Shift Closing", date: "2025-01-15", time: "10:00 PM", user: "John Smith", referenceId: "SHF-2025-015", referenceType: "shift" },
-      { status: "Returned", date: "2025-01-22", time: "11:00 AM", user: "Admin", referenceId: "RET-2025-001", referenceType: "return" },
-    ],
-  },
-  {
-    id: "4",
-    gameName: "Cash Blast",
-    packNumber: "CB-2025-001",
-    startTicket: "000",
-    endTicket: "099",
-    currentStatus: "Activated",
-    ticketsSold: 0,
-    ticketsRemaining: 100,
-    grossSales: 0,
-    commission: 0,
-    netAmount: 0,
-    lastActionDate: "2025-01-24",
-    timeline: [
-      { status: "Received", date: "2025-01-23", time: "09:00 AM", user: "John Smith", referenceId: "DEL-2025-012", referenceType: "delivery" },
-      { status: "Confirmed", date: "2025-01-23", time: "09:30 AM", user: "John Smith", referenceId: "DEL-2025-012", referenceType: "delivery" },
-      { status: "Activated", date: "2025-01-24", time: "10:00 AM", user: "John Smith", referenceId: "ACT-CB-001", referenceType: "activation" },
-    ],
-  },
-  {
-    id: "5",
-    gameName: "Mega Millions",
-    packNumber: "MM-2025-005",
-    startTicket: "000",
-    endTicket: "299",
-    currentStatus: "Confirmed",
-    ticketsSold: 0,
-    ticketsRemaining: 300,
-    grossSales: 0,
-    commission: 0,
-    netAmount: 0,
-    lastActionDate: "2025-01-25",
-    timeline: [
-      { status: "Received", date: "2025-01-25", time: "09:00 AM", user: "Mary Johnson", referenceId: "DEL-2025-015", referenceType: "delivery" },
-      { status: "Confirmed", date: "2025-01-25", time: "09:45 AM", user: "Mary Johnson", referenceId: "DEL-2025-015", referenceType: "delivery" },
-    ],
-  },
-  {
-    id: "6",
-    gameName: "Quick Pick",
-    packNumber: "QP-2025-001",
-    startTicket: "000",
-    endTicket: "499",
-    currentStatus: "Received",
-    ticketsSold: 0,
-    ticketsRemaining: 500,
-    grossSales: 0,
-    commission: 0,
-    netAmount: 0,
-    lastActionDate: "2025-01-26",
-    timeline: [
-      { status: "Received", date: "2025-01-26", time: "09:00 AM", user: "John Smith", referenceId: "DEL-2025-018", referenceType: "delivery" },
-    ],
-  },
-];
-
-const games = ["All Games", "Mega Millions", "Powerball", "Lucky 7s", "Cash Blast", "Quick Pick"];
-const statuses = ["All Statuses", "Received", "Confirmed", "Activated", "Selling", "Closed", "Returned", "Settled"];
-const users = ["All Users", "John Smith", "Mary Johnson", "Admin", "System"];
-
+const statuses=["All Statuses","Received","Confirmed","Verified","Not Verified","Rejected","Activated","Selling","Closed","Return Pending","Returned","Settled"];
 const getStatusColor = (status: string) => {
   switch (status) {
     case "Received":
@@ -218,8 +93,11 @@ const getStatusColor = (status: string) => {
   }
 };
 
-export function PackHistory() {
-  const [packs] = useState<PackRecord[]>(mockPacks);
+export function PackHistory({storeId}:{storeId:string}) {
+  const q=useQuery({queryKey:['lottery-pack-history',storeId],queryFn:()=>request<{packs:PackRecord[]}>(`/access/stores/${encodeURIComponent(storeId)}/lottery-pack-history`),enabled:!!storeId,retry:false});
+  const packs=q.data?.packs??[];
+  const games=['All Games',...new Set(packs.map(p=>p.gameName))];
+  const users=['All Users',...new Set(packs.flatMap(p=>p.timeline.map(e=>e.user)))];
   const [selectedPack, setSelectedPack] = useState<PackRecord | null>(null);
   const [isTimelineOpen, setIsTimelineOpen] = useState(false);
   const [pageSize, setPageSize] = useState(10);
@@ -266,7 +144,7 @@ export function PackHistory() {
       pack.lastActionDate,
     ]);
     
-    const csvContent = [headers, ...rows].map((row) => row.join(",")).join("\n");
+    const csvContent = [headers, ...rows].map((row) => row.map(value=>{let text=String(value??'');if(/^\s*[=+@-]/.test(text))text="'"+text;return '"'+text.replace(/"/g,'""')+'"';}).join(",")).join("\n");
     const blob = new Blob([csvContent], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -298,6 +176,8 @@ export function PackHistory() {
 
   const { paginated: paginatedPacks, page, totalPages, totalItems, hasPrev, hasNext, prevPage, nextPage } = usePagination(filteredPacks, pageSize);
 
+  if(q.isPending)return <p>Loading pack history…</p>;
+  if(q.error)return <p role="alert">{q.error.message}<Button onClick={()=>void q.refetch()}>Retry</Button></p>;
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -565,20 +445,7 @@ export function PackHistory() {
                           <ArrowRight className="h-3 w-3 text-muted-foreground" />
                         </div>
                         {event.referenceType && event.referenceId !== "N/A" && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 text-xs"
-                            onClick={() => {
-                              toast({
-                                title: "Reference",
-                                description: `Opening ${event.referenceId}...`,
-                              });
-                            }}
-                          >
-                            <ExternalLink className="h-3 w-3 mr-1" />
-                            {event.referenceId}
-                          </Button>
+                          <span className="text-xs text-muted-foreground">{event.referenceId}</span>
                         )}
                       </div>
                       

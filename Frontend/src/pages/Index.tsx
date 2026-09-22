@@ -124,7 +124,7 @@ const Index = ({ onLogout }: { onLogout: () => void }) => {
   const [selectedStoreId, setSelectedStoreId] = useState<string>(initial?.selectedStoreId ?? "");
 
   const storeAccess = useStoreAccess(selectedStoreId);
-  const connectedPage = (!activeProfilePage && activeNav === "Lottery" && ["Received and confirm delivery","Verify and activate packs"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Sales and Performance Reports" && activeSubNav === "POS report") || (!activeProfilePage && activeNav === "Tender Types" && ["Credit card","EBT/Foodstamps","Fleet cards","Reports"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Everyday Closing Reports" && ["Dashboard","Store","Reports"].includes(activeSubNav??"")) || showLiveCounter || !showLiveCounter && ((!activeProfilePage && activeNav === "Gas" && ["Dashboard","Settings","Delivery","Gas price","Inventory adjustment","Tank report"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Grocery" && ["Dashboard","Purchase Orders","Customized order guide","Edit & view invoices","Inventory adjustment","Settings","Reports"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Inventory Valuation" && activeSubNav === "Current stock") || (!activeProfilePage && activeNav === "Price Book" && ["Statistics","New arrivals","Items","Vendor management","Rebate management","Promotions","Discounts","Bulk update","Price groups","Inventory by item (current stock)"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Workweek" && ["Employees","Week Schedule","Time Off Request","Time Off Approvals"].includes(activeSubNav??"")) || ["Store Account Overview","Access & Integrations","User Profile Management","Subscriptions & Billing"].includes(activeProfilePage ?? ""));
+  const connectedPage = (!activeProfilePage && activeNav === "Lottery" && ["Received and confirm delivery","Verify and activate packs","Day/shift closing","Settle and return packs","Games","Pack history","Settings"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Sales and Performance Reports" && activeSubNav === "POS report") || (!activeProfilePage && activeNav === "Tender Types" && ["Credit card","EBT/Foodstamps","Fleet cards","Reports"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Everyday Closing Reports" && ["Dashboard","Store","Reports"].includes(activeSubNav??"")) || showLiveCounter || !showLiveCounter && ((!activeProfilePage && activeNav === "Gas" && ["Dashboard","Settings","Delivery","Gas price","Inventory adjustment","Tank report"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Grocery" && ["Dashboard","Purchase Orders","Customized order guide","Edit & view invoices","Inventory adjustment","Settings","Reports"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Inventory Valuation" && activeSubNav === "Current stock") || (!activeProfilePage && activeNav === "Price Book" && ["Statistics","New arrivals","Items","Vendor management","Rebate management","Promotions","Discounts","Bulk update","Price groups","Inventory by item (current stock)"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Workweek" && ["Employees","Week Schedule","Time Off Request","Time Off Approvals"].includes(activeSubNav??"")) || ["Store Account Overview","Access & Integrations","User Profile Management","Subscriptions & Billing"].includes(activeProfilePage ?? ""));
   const layoutOnly = !connectedPage && storeAccess.data?.admin === true;
 
   const storesQuery = useQuery({ queryKey: ["backend-stores"], queryFn: listStores });
@@ -536,17 +536,17 @@ const Index = ({ onLogout }: { onLogout: () => void }) => {
           ) : showLotteryVerifyActivate ? (
             <VerifyActivatePacks key={selectedStoreId} storeId={selectedStoreId} />
           ) : showLotteryDayShiftClosing ? (
-            <DayShiftClosing />
+            <DayShiftClosing key={selectedStoreId} storeId={selectedStoreId} />
           ) : showLotterySettleReturn ? (
-            <SettleReturnPacks />
+            <SettleReturnPacks key={selectedStoreId} storeId={selectedStoreId} />
           ) : showLotteryGames ? (
-            <LotteryGames />
+            <LotteryGames key={selectedStoreId} storeId={selectedStoreId} />
           ) : showLotteryPackHistory ? (
-            <PackHistory />
+            <PackHistory key={selectedStoreId} storeId={selectedStoreId} />
           ) : showLotterySettlement ? (
             <LotterySettlement />
           ) : showLotterySettingsView ? (
-            <LotterySettings />
+            <LotterySettings key={selectedStoreId} storeId={selectedStoreId} />
           ) : showDayClosingDashboard ? (
             <StoreClosingPage key={selectedStoreId} storeId={selectedStoreId} />
           ) : showStoreClosing ? (

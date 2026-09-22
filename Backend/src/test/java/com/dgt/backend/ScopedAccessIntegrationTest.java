@@ -49,6 +49,9 @@ class ScopedAccessIntegrationTest {
  }
  @AfterAll void cleanup(){
   if(company==0)return;
+  db.update("DELETE FROM lottery_sales_links WHERE lottery_pack_inventory_id IN (SELECT lottery_pack_inventory_id FROM lottery_pack_inventory WHERE dgt_id IN (?,?,?))",store,second,foreign);
+  db.update("DELETE FROM lottery_pack_inventory_items WHERE lottery_pack_inventory_id IN (SELECT lottery_pack_inventory_id FROM lottery_pack_inventory WHERE dgt_id IN (?,?,?))",store,second,foreign);
+  db.update("DELETE FROM lottery_pack_inventory WHERE dgt_id IN (?,?,?)",store,second,foreign);
   db.update("DELETE FROM lottery_packs WHERE dgt_id IN (?,?,?)",store,second,foreign);
   db.update("DELETE FROM lottery_games WHERE dgt_id IN (?,?,?)",store,second,foreign);
   db.update("DELETE FROM rebate_claim_payments WHERE dgt_id IN (?,?,?)",store,second,foreign);
@@ -1877,7 +1880,8 @@ ok(call("admin","PUT",path+"/programs/"+id,form,program.get("version").asText(),
   var data=ok(req("admin","GET",path,null),200);assertThat(data.path("packs").size()).isEqualTo(2);
   assertThat(data.path("packs").toString()).contains("000123","000124","manager Test");
   assertThat(data.path("packs").get(0).path("packValue").decimalValue()).isEqualByComparingTo("250");
-  assertThat(data.path("packs").get(0).path("startTicket").asText()).isEqualTo("1");
+  assertThat(data.path("packs").get(0).path("startTicket").asText()).isEqualTo("0");
+  assertThat(data.path("packs").get(0).path("endTicket").asInt()).isEqualTo(data.path("packs").get(0).path("ticketsCount").asInt()-1);
   assertThat(ok(req("admin","GET","/access/stores/"+second+"/lottery-deliveries",null),200).path("packs").isEmpty()).isTrue();
   receipt.put("referenceNumber","Changed");ok(call("manager","POST",path,receipt,null,key),409);
   long invoiceCount=db.queryForObject("SELECT count(*) FROM invoices WHERE dgt_id=?",Long.class,store);
@@ -1938,6 +1942,118 @@ ok(call("admin","PUT",path+"/programs/"+id,form,program.get("version").asText(),
   var data=ok(req("manager","GET",path,null),200);assertThat(data.path("canVerify").asBoolean()).isFalse();assertThat(data.path("canActivate").asBoolean()).isTrue();
   assertThat(data.path("packs").toString()).contains("TERM-001","activated","manager Test");
   assertThat(db.queryForObject("SELECT count(*) FROM access_audit_events WHERE dgt_id=? AND target_id=? AND event_type='LOTTERY_VERIFICATION_NOT_VERIFIED' AND changes->>'reason'='Seal mismatch'",Long.class,store,first)).isEqualTo(1);
+ }
+ @Test @Order(9972) void lotteryClosingSupportsSharedAndSeparateCounters() throws Exception {
+  String path=access()+"/lottery-closing";ok(req("cashier","GET",path,null),403);ok(req("other","GET",path,null),403);ok(req("cashier","GET",path+"/settings",null),403);
+  var setting=ok(req("admin","GET",path+"/settings",null),200);
+  ok(req("admin","POST",path+"/open",Map.of("type","DAY")),400);
+  ok(req("admin","PUT",path+"/settings",Map.of("version",setting.path("version").asText(),"separateCounter",false)),200);
+  ok(req("admin","PUT",path+"/settings",Map.of("version",setting.path("version").asText(),"separateCounter",true)),409);
+  var opened=ok(req("admin","POST",path+"/open",Map.of("type","DAY")),200);long cid=opened.path("closing").path("lottery_pack_inventory_id").asLong();
+  assertThat(opened.path("closing").path("counter_separate").asBoolean()).isFalse();assertThat(opened.path("packs").isEmpty()).isFalse();
+  ok(req("admin","POST",path+"/open",Map.of("type","DAY")),409);
+  var lines=new ArrayList<Map<String,Object>>();for(var p:opened.path("packs"))lines.add(Map.of("id",p.path("id").asLong(),"recordedTickets",0,"lastSold",p.path("opening").asInt()-1));
+  long first=opened.path("packs").get(0).path("id").asLong();int opening=opened.path("packs").get(0).path("opening").asInt();lines.set(0,Map.of("id",first,"recordedTickets",3,"lastSold",opening+1));
+  long sale=db.queryForObject("INSERT INTO sales(store_id,cashier_id,terminal_id,receipt_no,transaction_id,transaction_type,sale_status,sale_datetime,total_amount) SELECT store_id,cashier_id,terminal_id,'LOTTERY-TEST',?,'SALE','COMPLETED',CURRENT_TIMESTAMP,6 FROM sales WHERE store_id=? AND receipt_no='LIVE-1' RETURNING sale_id",Long.class,"LOTTERY-"+tag,store);
+  long product=db.queryForObject("SELECT min(product_id) FROM products WHERE dgt_id=?",Long.class,store);
+  long item=db.queryForObject("INSERT INTO sales_items(sale_id,product_id,quantity,unit_price,line_total) VALUES (?,?,3,2,6) RETURNING sales_item_id",Long.class,sale,product);
+  String linkPath=path+"/"+cid+"/sales";
+  ok(req("cashier","PUT",linkPath,Map.of("salesItemId",item,"packId",first)),403);
+  ok(req("admin","PUT","/access/stores/"+second+"/lottery-closing/"+cid+"/sales",Map.of("salesItemId",item,"packId",first)),409);
+  assertThat(ok(req("admin","GET",linkPath+"?receipt=LOTTERY-TEST",null),200).size()).isEqualTo(1);
+  opened=ok(req("admin","PUT",linkPath,Map.of("salesItemId",item,"packId",first)),200);
+  assertThat(opened.path("packs").get(0).path("recordedTickets").asInt()).isEqualTo(3);
+  opened=ok(req("admin","POST",linkPath+"/"+item+"/unlink",null),200);
+  assertThat(opened.path("packs").get(0).path("recordedTickets").asInt()).isZero();
+  opened=ok(req("admin","PUT",linkPath,Map.of("salesItemId",item,"packId",first)),200);
+  var body=new HashMap<String,Object>(Map.of("version",opened.path("closing").path("version").asText(),"close",false,"packs",lines));
+  var draft=ok(req("admin","PUT",path+"/"+cid,body),200);ok(req("admin","PUT",path+"/"+cid,body),409);
+  var reload=ok(req("admin","GET",path,null),200);assertThat(reload.path("packs").get(0).path("lastSold").asInt()).isEqualTo(opening+1);
+  setting=ok(req("admin","GET",path+"/settings",null),200);ok(req("admin","PUT",path+"/settings",Map.of("version",setting.path("version").asText(),"separateCounter",true)),200);
+  body.put("version",draft.path("closing").path("version").asText());body.put("close",true);body.put("cashCounted",999);body.put("varianceNote","One more ticket recorded in POS than the last-ticket count");
+  ok(req("admin","PUT",path+"/"+cid,body),400);body.put("salesReviewed",true);
+  body.remove("varianceNote");ok(req("admin","PUT",path+"/"+cid,body),400);
+  body.put("varianceNote","One more ticket recorded in POS than the last-ticket count");
+  db.update("UPDATE sales_items SET quantity=4 WHERE sales_item_id=?",item);
+  ok(req("admin","PUT",path+"/"+cid,body),409);
+  db.update("UPDATE sales_items SET quantity=3 WHERE sales_item_id=?",item);
+  var closed=ok(req("admin","PUT",path+"/"+cid,body),200);assertThat(closed.path("closing").path("cash_counted").isNull()).isTrue();assertThat(closed.path("closing").path("variance_note").asText()).contains("One more ticket");
+  assertThat(closed.path("packs").get(0).path("recordedTickets").asInt()).isEqualTo(3);
+  db.update("UPDATE sales_items SET quantity=4 WHERE sales_item_id=?",item);
+  assertThat(ok(req("admin","GET",path+"?closingId="+cid,null),200).path("packs").get(0).path("recordedTickets").asInt()).isEqualTo(3);
+  ok(req("admin","POST",linkPath+"/"+item+"/unlink",null),409);
+  assertThat(closed.path("closing").path("counter_separate").asBoolean()).isFalse();ok(req("admin","PUT",path+"/"+cid,body),409);
+  ok(req("admin","GET","/access/stores/"+second+"/lottery-closing?closingId="+cid,null),404);
+  var next=ok(req("admin","POST",path+"/open",Map.of("type","SHIFT")),200);long nextId=next.path("closing").path("lottery_pack_inventory_id").asLong();assertThat(next.path("closing").path("counter_separate").asBoolean()).isTrue();assertThat(next.path("packs").get(0).path("opening").asInt()).isEqualTo(opening+2);
+  lines.clear();for(var p:next.path("packs"))lines.add(Map.of("id",p.path("id").asLong(),"recordedTickets",0,"lastSold",p.path("opening").asInt()-1));
+  body=new HashMap<>(Map.of("version",next.path("closing").path("version").asText(),"close",true,"packs",lines));ok(req("admin","PUT",path+"/"+nextId,body),400);
+  body.put("salesReviewed",true);body.put("cashCounted",1);ok(req("admin","PUT",path+"/"+nextId,body),400);body.put("varianceNote","Count difference");
+  var finish=ok(req("admin","PUT",path+"/"+nextId,body),200);assertThat(finish.path("packs").get(0).path("sales").decimalValue()).isEqualByComparingTo("0");assertThat(finish.path("closing").path("cash_counted").decimalValue()).isEqualByComparingTo("1");
+  assertThat(ok(req("admin","GET",path+"?closingId="+cid,null),200).path("closing").path("shift_closed_at").isNull()).isFalse();
+ }
+
+ JsonNode dispositionPack(JsonNode data,long id){for(var p:data.path("settlementPacks"))if(p.path("id").asLong()==id)return p;throw new AssertionError("Missing pack "+id);}
+ @Test @Order(9973) void lotteryReturnAndSettlementPersistAndLockPacks() throws Exception {
+  String path=access()+"/lottery-dispositions";
+  ok(req("cashier","GET",path,null),403);ok(req("other","GET",path,null),403);
+  long id=db.queryForObject("SELECT min(i.pack_id) FROM lottery_pack_inventory_items i JOIN lottery_pack_inventory h USING(lottery_pack_inventory_id) WHERE h.dgt_id=?",Long.class,store);
+  var data=ok(req("admin","GET",path,null),200);var pack=dispositionPack(data,id);
+  assertThat(pack.path("status").asText()).isEqualTo("blocked");
+  var selected=List.of(Map.of("id",Long.toString(id),"version",pack.path("version").asText()));
+  ok(req("admin","POST",path,Map.of("action","SETTLE","packs",selected)),409);
+  ok(req("cashier","POST",path,Map.of("action","REQUEST_RETURN","packs",selected,"returnType","partial","reason","Low sales","reference","RET-TEST")),403);
+  ok(req("admin","POST","/access/stores/"+second+"/lottery-dispositions",Map.of("action","REQUEST_RETURN","packs",selected,"returnType","partial","reason","Low sales","reference","RET-TEST")),409);
+  ok(req("admin","POST",path,Map.of("action","REQUEST_RETURN","packs",selected,"returnType","full","reason","Low sales","reference","RET-TEST")),409);
+  data=ok(req("admin","POST",path,Map.of("action","REQUEST_RETURN","packs",selected,"returnType","partial","reason","Low sales","reference","RET-TEST")),200);
+  pack=dispositionPack(data,id);assertThat(pack.path("return_status").asText()).isEqualTo("PENDING");
+  ok(req("admin","POST",path,Map.of("action","CONFIRM_RETURN","packs",selected)),409);
+  selected=List.of(Map.of("id",Long.toString(id),"version",pack.path("version").asText()));
+  data=ok(req("admin","POST",path,Map.of("action","CONFIRM_RETURN","packs",selected)),200);
+  pack=dispositionPack(data,id);assertThat(pack.path("status").asText()).isEqualTo("ready");
+  var selectedReady=Map.of("id",Long.toString(id),"version",pack.path("version").asText());
+  ok(req("admin","POST",path,Map.of("action","SETTLE","packs",List.of(selectedReady,Map.of("id","-1","version","0")))),409);
+  assertThat(dispositionPack(ok(req("admin","GET",path,null),200),id).path("status").asText()).isEqualTo("ready");
+  data=ok(req("admin","POST",path,Map.of("action","SETTLE","packs",List.of(selectedReady))),200);
+  pack=dispositionPack(data,id);assertThat(pack.path("status").asText()).isEqualTo("settled");assertThat(pack.path("settlementRef").asText()).startsWith("SET-");
+  assertThat(pack.path("grossSales").decimalValue()).isEqualByComparingTo("20");assertThat(pack.path("commission").decimalValue()).isEqualByComparingTo("1.40");assertThat(pack.path("netAmountDue").decimalValue()).isEqualByComparingTo("18.60");
+  ok(req("admin","POST",path,Map.of("action","SETTLE","packs",List.of(selectedReady))),409);
+  var closing=ok(req("admin","GET",access()+"/lottery-closing",null),200);for(var row:closing.path("packs"))assertThat(row.path("id").asLong()).isNotEqualTo(id);
+  long full=db.queryForObject("SELECT min(lottery_pack_id) FROM lottery_packs WHERE dgt_id=? AND delivery_decided_at IS NOT NULL AND pack_settlement_reference IS NULL AND status_id=(SELECT status_type_id FROM status_types WHERE status_name='APPROVED') AND lottery_pack_id NOT IN (SELECT pack_id FROM lottery_pack_inventory_items)",Long.class,store);
+  pack=dispositionPack(ok(req("admin","GET",path,null),200),full);
+  data=ok(req("admin","POST",path,Map.of("action","REQUEST_RETURN","packs",List.of(Map.of("id",Long.toString(full),"version",pack.path("version").asText())),"returnType","full","reason","Damaged","reference","FULL-RET")),200);
+  pack=dispositionPack(data,full);
+  data=ok(req("admin","POST",path,Map.of("action","CONFIRM_RETURN","packs",List.of(Map.of("id",Long.toString(full),"version",pack.path("version").asText())))),200);
+  assertThat(dispositionPack(data,full).path("netAmountDue").decimalValue()).isEqualByComparingTo("0");
+ }
+
+ @Test @Order(9974) void lotteryGamesAndHistoryAreScopedAndPersistent() throws Exception {
+  String path=access()+"/lottery-games";ok(req("cashier","GET",path,null),403);ok(req("other","GET",path,null),403);
+  var listed=ok(req("admin","GET",path,null),200);String today=listed.path("today").asText();
+  var form=new HashMap<String,Object>();form.put("gameName","Catalog Test");form.put("gameCode","CAT-"+tag);form.put("ticketPrice",2);form.put("ticketsPerPack",50);form.put("commissionPercent",5);form.put("startDate",today);form.put("status",true);
+  ok(req("cashier","POST",path,form),403);form.put("ticketsPerPack",1.5);ok(req("admin","POST",path,form),400);form.put("ticketsPerPack",50);var data=ok(req("admin","POST",path,form),200);
+  long id=db.queryForObject("SELECT lottery_game_id FROM lottery_games WHERE dgt_id=? AND game_code=?",Long.class,store,"CAT-"+tag);
+  JsonNode game=null;for(var g:data.path("games"))if(g.path("id").asLong()==id)game=g;
+  assertThat(game.path("packValue").decimalValue()).isEqualByComparingTo("100");
+  ok(req("admin","POST",path,form),400);form.put("version",game.path("version").asText());form.put("commissionPercent",7);
+  ok(req("admin","PUT",path+"/"+id,form),400);
+  String tomorrow=java.time.LocalDate.parse(today).plusDays(1).toString();form.put("commissionEffectiveDate",tomorrow);
+  data=ok(req("admin","PUT",path+"/"+id,form),200);
+  for(var g:data.path("games"))if(g.path("id").asLong()==id)game=g;
+  assertThat(game.path("commissionPercent").asDouble()).isEqualTo(5);assertThat(game.path("scheduledCommission").asDouble()).isEqualTo(7);
+  ok(req("admin","PUT",path+"/"+id,form),409);
+  ok(req("admin","PUT","/access/stores/"+second+"/lottery-games/"+id,form),404);
+  db.update("UPDATE lottery_games SET commission_effective_date=?::date WHERE lottery_game_id=?",today,id);
+  data=ok(req("admin","GET",path,null),200);for(var g:data.path("games"))if(g.path("id").asLong()==id)game=g;
+  assertThat(game.path("commissionPercent").asDouble()).isEqualTo(7);
+  long existing=db.queryForObject("SELECT min(lottery_game_id) FROM lottery_packs WHERE dgt_id=?",Long.class,store);
+  for(var g:data.path("games"))if(g.path("id").asLong()==existing)game=g;
+  form.put("version",game.path("version").asText());form.put("gameCode",game.path("gameCode").asText());form.put("ticketPrice",999);form.put("commissionPercent",game.path("commissionPercent").asDouble());
+  ok(req("admin","PUT",path+"/"+existing,form),400);
+  String history=access()+"/lottery-pack-history";ok(req("cashier","GET",history,null),403);ok(req("other","GET",history,null),403);
+  var report=ok(req("admin","GET",history,null),200);assertThat(report.path("packs").size()).isGreaterThan(0);
+  assertThat(report.toString()).contains("Settled","PACK SETTLE","CLOSING CLOSED","Received");
+  for(var pack:report.path("packs")){assertThat(pack.path("timeline").size()).isGreaterThan(0);assertThat(pack.path("ticketsRemaining").asInt()).isGreaterThanOrEqualTo(0);}
+  assertThat(ok(req("admin","GET","/access/stores/"+second+"/lottery-pack-history",null),200).path("packs").isEmpty()).isTrue();
  }
 
 }

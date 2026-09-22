@@ -1,302 +1,57 @@
-import { useState, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
-import {
-  Calendar,
-  Clock,
-  Save,
-  Lock,
-  AlertTriangle,
-  CheckCircle,
-  DollarSign,
-  Ticket,
-  FileText,
-  User,
-  Store,
-} from "lucide-react";
-import { toast } from "@/hooks/use-toast";
-import { format } from "date-fns";
-
-// Mock shift data
-const shiftInfo = {
-  store: "Marathon Mckeesport",
-  storeId: "34897",
-  shiftType: "day" as const,
-  openedBy: "John Doe",
-  openTime: "2026-01-26T06:00:00",
-  status: "open" as const,
+import {Badge} from '@/components/ui/badge';
+import {Label} from '@/components/ui/label';
+import {Select,SelectTrigger,SelectValue,SelectContent,SelectItem} from '@/components/ui/select';
+import {Calendar, Clock, Store, User, Ticket, Save, Lock, AlertTriangle, DollarSign, FileText} from 'lucide-react';
+import {useState} from 'react';
+import {useQuery,useMutation,useQueryClient} from '@tanstack/react-query';
+import {request} from '@/lib/backend';
+import {Card,CardContent,CardHeader,CardTitle} from '@/components/ui/card';
+import {Button} from '@/components/ui/button';
+import {Input} from '@/components/ui/input';
+import {Textarea} from '@/components/ui/textarea';
+import {Table,TableHeader,TableHead,TableRow,TableBody,TableCell} from '@/components/ui/table';
+import {Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription,DialogFooter} from '@/components/ui/dialog';
+import {toast} from '@/hooks/use-toast';
+interface Pack {id:number;gameName:string;packNumber:string;startTicket:number;opening:number;endTicket:number;lastSold?:number|null;price:number;rate:number;recordedTickets?:number;}
+interface Closing {lottery_pack_inventory_id:number;version:string;sales_reviewed:boolean;sales_period_started_at:string|null;counter_separate:boolean;cash_counted:number|null;variance_note:string|null;closing_type:string;business_date:string;shift_opened_at:string;shift_closed_at:string|null;openedBy:string;closedBy:string;}
+interface Data {store:{name:string;timezone:string;separateCounter:boolean|null;today:string};closing:Closing|null;packs:Pack[];history:{id:number;date:string;type:string}[];}
+const money=(n:number)=>`$${n.toFixed(2)}`;
+export const DayShiftClosing=({storeId}:{storeId:string})=>{
+ const [historyId,setHistoryId]=useState('');const client=useQueryClient();
+ const path=`/access/stores/${encodeURIComponent(storeId)}/lottery-closing`;
+ const key=['lottery-closing',storeId,historyId];
+ const q=useQuery({queryKey:key,queryFn:()=>request<Data>(path+(historyId?`?closingId=${historyId}`:'')),enabled:!!storeId,retry:false});
+ if(!storeId)return <p>Select a store.</p>;
+ if(q.isPending)return <p>Loading lottery closing…</p>;
+ if(q.error)return <p role="alert">{q.error.message} <Button onClick={()=>void q.refetch()}>Retry</Button></p>;
+ return <ClosingForm key={`${historyId}:${q.data.closing?.lottery_pack_inventory_id??'new'}:${q.data.closing?.version??''}`} data={q.data} path={path} historyId={historyId} onHistory={setHistoryId} onData={d=>{client.setQueryData(key,d);}} onRefresh={()=>void q.refetch()}/>;
 };
-
-// Mock active packs data
-const mockActivePacks = [
-  {
-    id: "1",
-    gameName: "Powerball",
-    packNumber: "000001",
-    startTicket: 1,
-    endTicket: 50,
-    openingTicket: 1,
-    ticketPrice: 2,
-    commissionRate: 0.05,
-  },
-  {
-    id: "2",
-    gameName: "Powerball",
-    packNumber: "000002",
-    startTicket: 1,
-    endTicket: 50,
-    openingTicket: 15,
-    ticketPrice: 2,
-    commissionRate: 0.05,
-  },
-  {
-    id: "3",
-    gameName: "Mega Millions",
-    packNumber: "000003",
-    startTicket: 1,
-    endTicket: 50,
-    openingTicket: 1,
-    ticketPrice: 2,
-    commissionRate: 0.05,
-  },
-  {
-    id: "4",
-    gameName: "Cash 5",
-    packNumber: "000004",
-    startTicket: 1,
-    endTicket: 50,
-    openingTicket: 22,
-    ticketPrice: 1,
-    commissionRate: 0.05,
-  },
-  {
-    id: "5",
-    gameName: "Pick 3",
-    packNumber: "000005",
-    startTicket: 1,
-    endTicket: 50,
-    openingTicket: 1,
-    ticketPrice: 1,
-    commissionRate: 0.05,
-  },
-  {
-    id: "6",
-    gameName: "Scratch Off - $5",
-    packNumber: "000006",
-    startTicket: 1,
-    endTicket: 50,
-    openingTicket: 8,
-    ticketPrice: 5,
-    commissionRate: 0.05,
-  },
-];
-
-interface PackSalesEntry {
-  id: string;
-  gameName: string;
-  packNumber: string;
-  startTicket: number;
-  endTicket: number;
-  openingTicket: number;
-  lastSoldTicket: number | null;
-  ticketPrice: number;
-  commissionRate: number;
-  validationError?: string;
-}
-
-export const DayShiftClosing = () => {
-  const [packs, setPacks] = useState<PackSalesEntry[]>(() =>
-    mockActivePacks.map((pack) => ({
-      ...pack,
-      lastSoldTicket: null,
-    }))
-  );
-  const [cashCounted, setCashCounted] = useState<string>("");
-  const [varianceNote, setVarianceNote] = useState("");
-  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
-  const [isDraft, setIsDraft] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const currentUser = "John Doe";
-  const overShortLimit = 5; // $5 threshold for requiring notes
-
-  // Update last sold ticket for a pack
-  const updateLastSoldTicket = (packId: string, value: string) => {
-    const numValue = value === "" ? null : parseInt(value);
-    
-    setPacks((prev) =>
-      prev.map((pack) => {
-        if (pack.id !== packId) return pack;
-
-        let validationError: string | undefined;
-
-        if (numValue !== null) {
-          if (numValue < pack.openingTicket) {
-            validationError = `Must be ≥ ${pack.openingTicket} (opening ticket)`;
-          } else if (numValue > pack.endTicket) {
-            validationError = `Must be ≤ ${pack.endTicket} (end ticket)`;
-          }
-        }
-
-        return {
-          ...pack,
-          lastSoldTicket: numValue,
-          validationError,
-        };
-      })
-    );
-  };
-
-  // Calculate pack statistics
-  const getPackStats = (pack: PackSalesEntry) => {
-    if (pack.lastSoldTicket === null) {
-      return { ticketsSold: 0, ticketsRemaining: pack.endTicket - pack.openingTicket + 1, salesAmount: 0 };
-    }
-    const ticketsSold = pack.lastSoldTicket - pack.openingTicket + 1;
-    const ticketsRemaining = pack.endTicket - pack.lastSoldTicket;
-    const salesAmount = ticketsSold * pack.ticketPrice;
-    return { ticketsSold, ticketsRemaining, salesAmount };
-  };
-
-  // Calculate totals
-  const totals = useMemo(() => {
-    let totalSales = 0;
-    let totalTicketsSold = 0;
-
-    packs.forEach((pack) => {
-      const stats = getPackStats(pack);
-      totalSales += stats.salesAmount;
-      totalTicketsSold += stats.ticketsSold;
-    });
-
-    const commission = totalSales * 0.05; // 5% commission
-    const cashExpected = totalSales - commission;
-    const cashCountedNum = parseFloat(cashCounted) || 0;
-    const overShort = cashCountedNum - cashExpected;
-
-    return {
-      totalSales,
-      totalTicketsSold,
-      commission,
-      cashExpected,
-      cashCounted: cashCountedNum,
-      overShort,
-    };
-  }, [packs, cashCounted]);
-
-  // Validation
-  const validationErrors = useMemo(() => {
-    const errors: string[] = [];
-
-    // Check all packs are accounted for
-    const unaccountedPacks = packs.filter((p) => p.lastSoldTicket === null);
-    if (unaccountedPacks.length > 0) {
-      errors.push(`${unaccountedPacks.length} pack(s) have no last sold ticket entered`);
-    }
-
-    // Check for validation errors in packs
-    const packsWithErrors = packs.filter((p) => p.validationError);
-    if (packsWithErrors.length > 0) {
-      errors.push(`${packsWithErrors.length} pack(s) have validation errors`);
-    }
-
-    // Check cash counted
-    if (!cashCounted) {
-      errors.push("Cash counted is required");
-    }
-
-    // Check variance note if over/short exceeds limit
-    if (Math.abs(totals.overShort) > overShortLimit && !varianceNote.trim()) {
-      errors.push(`Variance exceeds $${overShortLimit} - note required`);
-    }
-
-    return errors;
-  }, [packs, cashCounted, varianceNote, totals.overShort]);
-
-  const canSubmit = validationErrors.length === 0;
-
-  const handleSaveDraft = () => {
-    setIsDraft(true);
-    toast({
-      title: "Draft Saved",
-      description: "Shift closing draft has been saved",
-    });
-  };
-
-  const handleSubmitClose = async () => {
-    if (!canSubmit) {
-      toast({
-        title: "Cannot Submit",
-        description: validationErrors[0],
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSubmitting(true);
-    setConfirmDialogOpen(false);
-
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
-    // Log audit trail
-    console.log("Shift Closed:", {
-      closedBy: currentUser,
-      closeTimestamp: new Date().toISOString(),
-      totalSales: totals.totalSales,
-      cashExpected: totals.cashExpected,
-      cashCounted: totals.cashCounted,
-      overShort: totals.overShort,
-      varianceNote: varianceNote || null,
-      packs: packs.map((p) => ({
-        packNumber: p.packNumber,
-        openingTicket: p.openingTicket,
-        lastSoldTicket: p.lastSoldTicket,
-        ticketsSold: getPackStats(p).ticketsSold,
-        salesAmount: getPackStats(p).salesAmount,
-      })),
-    });
-
-    setIsSubmitting(false);
-    setIsDraft(false);
-
-    toast({
-      title: "Shift Closed Successfully",
-      description: "The shift has been locked. No further edits allowed without admin override.",
-    });
-  };
-
-  const isLocked = !isDraft;
-
-  return (
-    <div className="space-y-6">
+function ClosingForm({data,path,historyId,onHistory,onData,onRefresh}:{data:Data;path:string;historyId:string;onHistory:(v:string)=>void;onData:(d:Data)=>void;onRefresh:()=>void}){
+ const c=data.closing;const locked=!!c?.shift_closed_at;const separate=c?.counter_separate??data.store.separateCounter;
+ const [reviewed,setReviewed]=useState(c?.sales_reviewed??false);const [salesOpen,setSalesOpen]=useState(false);
+ const [type,setType]=useState('DAY');const [cash,setCash]=useState(c?.cash_counted==null?'':String(c.cash_counted));const [note,setNote]=useState(c?.variance_note??'');const [confirm,setConfirm]=useState(false);
+ const [values,setValues]=useState<Record<number,string>>(Object.fromEntries(data.packs.map(p=>[p.id,p.lastSold==null?'':String(p.lastSold)])));
+ const stats=(p:Pack)=>{const raw=values[p.id]??'';const last=raw===''?null:Number(raw);const valid=last!==null&&Number.isInteger(last)&&last>=p.opening-1&&last<=p.endTicket;const sold=valid?last-p.opening+1:0;const sales=Math.round(sold*p.price*100)/100;return {valid,sold,sales,remaining:p.endTicket-p.opening+1-sold,commission:Math.round(sales*p.rate)/100};};
+ const gross=data.packs.reduce((n,p)=>n+Math.round(stats(p).sales*100),0)/100;const commission=data.packs.reduce((n,p)=>n+Math.round(stats(p).commission*100),0)/100;
+ const validCash=cash!==''&&/^\d+(\.\d{1,2})?$/.test(cash);const variance=validCash?Math.round((Number(cash)-gross)*100)/100:0;
+ const ticketVariance=data.packs.some(p=>stats(p).valid&&stats(p).sold!==(p.recordedTickets??0));
+ const dirty=data.packs.some(p=>(values[p.id]??'')!==(p.lastSold==null?'':String(p.lastSold)))||cash!==(c?.cash_counted==null?'':String(c.cash_counted))||note!==(c?.variance_note??'');
+ const canClose=reviewed&&(!ticketVariance||note.trim()!=='')&&!!c&&!locked&&data.packs.length>0&&data.packs.every(p=>stats(p).valid)&&(!separate||(validCash&&(variance===0||note.trim()!=='')));
+ const mutation=useMutation({mutationFn:({endpoint,method,body}:{endpoint:string;method:string;body:unknown})=>request<Data>(path+endpoint,{method,body:JSON.stringify(body)}),onSuccess:d=>{onData(d);setConfirm(false);toast({title:'Lottery closing saved'});},onError:e=>toast({title:'Not saved',description:e.message,variant:'destructive'})});
+ const save=(close:boolean)=>mutation.mutate({endpoint:`/${c!.lottery_pack_inventory_id}`,method:'PUT',body:{version:c!.version,close,cashCounted:separate&&cash!==''?Number(cash):null,varianceNote:note,salesReviewed:reviewed,packs:data.packs.map(p=>({id:p.id,recordedTickets:p.recordedTickets??0,lastSold:values[p.id]===''?null:Number(values[p.id])}))}});
+ const time=(value:string)=>new Date(value).toLocaleString('en-US',{timeZone:data.store.timezone});
+ const validationErrors:string[]=[];
+ const missing=data.packs.filter(p=>values[p.id]==='').length;
+ const invalid=data.packs.filter(p=>values[p.id]!==''&&!stats(p).valid).length;
+ if(!reviewed)validationErrors.push('Review recorded sales and confirm all lottery receipt lines are linked');
+ if(ticketVariance&&!note.trim())validationErrors.push('Explain the ticket variance in Variance Notes');
+ if(separate===null)validationErrors.push('Choose the counter type in Lottery Settings');
+ if(!c)validationErrors.push('Start the closing before entering ticket positions');
+ if(missing)validationErrors.push(`${missing} pack(s) have no last sold ticket entered`);
+ if(invalid)validationErrors.push(`${invalid} pack(s) have an invalid last sold ticket`);
+ if(separate===true&&!validCash)validationErrors.push('Cash counted is required');
+ if(separate===true&&validCash&&variance!==0&&!note.trim())validationErrors.push('A variance note is required');
+ return <fieldset disabled={mutation.isPending} className="space-y-6 min-w-0">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -309,20 +64,21 @@ export const DayShiftClosing = () => {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {isLocked ? (
+          {!c&&<Button disabled={separate===null||!data.packs.length} onClick={()=>mutation.mutate({endpoint:"/open",method:"POST",body:{type}})}>Start Closing</Button>}
+          {locked ? (
             <Badge variant="secondary" className="bg-muted">
               <Lock className="w-3 h-3 mr-1" />
               Shift Locked
             </Badge>
           ) : (
             <>
-              <Button variant="outline" onClick={handleSaveDraft} disabled={isSubmitting}>
+              <Button variant="outline" onClick={()=>save(false)} disabled={mutation.isPending||!c}>
                 <Save className="w-4 h-4 mr-1" />
                 Save Draft
               </Button>
-              <Button 
-                onClick={() => setConfirmDialogOpen(true)} 
-                disabled={!canSubmit || isSubmitting}
+              <Button
+                onClick={() => setConfirm(true)}
+                disabled={!canClose || mutation.isPending}
               >
                 <Lock className="w-4 h-4 mr-1" />
                 Submit & Close Shift
@@ -333,7 +89,7 @@ export const DayShiftClosing = () => {
       </div>
 
       {/* Validation Errors Banner */}
-      {validationErrors.length > 0 && !isLocked && (
+      {validationErrors.length > 0 && !locked && (
         <Card className="border-destructive/50 bg-destructive/5">
           <CardContent className="pt-4 pb-4">
             <div className="flex items-start gap-3">
@@ -363,18 +119,18 @@ export const DayShiftClosing = () => {
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Store</Label>
-              <p className="font-medium text-sm">{shiftInfo.store}</p>
-              <p className="text-xs text-muted-foreground">#{shiftInfo.storeId}</p>
+              <p className="font-medium text-sm">{data.store.name}</p>
+              <p className="text-xs text-muted-foreground">#{decodeURIComponent(path.split("/")[3])}</p>
             </div>
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Shift Type</Label>
-              <Select value={shiftInfo.shiftType} disabled={isLocked}>
+              <Select value={c?.closing_type??type} onValueChange={setType} disabled={!!c}>
                 <SelectTrigger className="h-9">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="z-50 bg-popover">
-                  <SelectItem value="day">Day Shift</SelectItem>
-                  <SelectItem value="night">Night Shift</SelectItem>
+                  <SelectItem value="DAY">Day Closing</SelectItem>
+                  <SelectItem value="SHIFT">Shift Closing</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -382,7 +138,7 @@ export const DayShiftClosing = () => {
               <Label className="text-xs text-muted-foreground">Opened By</Label>
               <div className="flex items-center gap-2">
                 <User className="w-4 h-4 text-muted-foreground" />
-                <p className="font-medium text-sm">{shiftInfo.openedBy}</p>
+                <p className="font-medium text-sm">{c?.openedBy??'—'}</p>
               </div>
             </div>
             <div className="space-y-1">
@@ -390,7 +146,7 @@ export const DayShiftClosing = () => {
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-muted-foreground" />
                 <p className="font-medium text-sm">
-                  {format(new Date(shiftInfo.openTime), "MMM dd, h:mm a")}
+                  {c?time(c.shift_opened_at):'Not started'}
                 </p>
               </div>
             </div>
@@ -399,7 +155,7 @@ export const DayShiftClosing = () => {
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-muted-foreground" />
                 <p className="font-medium text-sm">
-                  {isLocked ? format(new Date(), "MMM dd, h:mm a") : "Pending..."}
+                  {c?.shift_closed_at?time(c.shift_closed_at):'Pending...'}
                 </p>
               </div>
             </div>
@@ -431,49 +187,53 @@ export const DayShiftClosing = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {packs.map((pack) => {
-                const stats = getPackStats(pack);
+              {data.packs.length===0&&<TableRow><TableCell colSpan={9} className="py-10 text-center text-muted-foreground">No activated packs with remaining tickets.</TableCell></TableRow>}
+              {data.packs.map((pack) => {
+                const rowStats = stats(pack);
                 return (
                   <TableRow
                     key={pack.id}
-                    className={pack.validationError ? "bg-destructive/5" : ""}
+                    className={(values[pack.id]!==''&&!stats(pack).valid) ? "bg-destructive/5" : ""}
                   >
                     <TableCell className="font-medium">{pack.gameName}</TableCell>
                     <TableCell>{pack.packNumber}</TableCell>
                     <TableCell className="text-center">{pack.startTicket}</TableCell>
                     <TableCell className="text-center">{pack.endTicket}</TableCell>
                     <TableCell className="text-center">
-                      <Badge variant="outline">{pack.openingTicket}</Badge>
+                      <Badge variant="outline">{pack.opening}</Badge>
                     </TableCell>
                     <TableCell className="text-center">
                       <div className="flex flex-col items-center gap-1">
                         <Input
                           type="number"
-                          min={pack.openingTicket}
+                          min={pack.opening-1}
                           max={pack.endTicket}
-                          value={pack.lastSoldTicket ?? ""}
-                          onChange={(e) => updateLastSoldTicket(pack.id, e.target.value)}
-                          disabled={isLocked}
+                          value={values[pack.id]??''}
+                          onChange={(e) => setValues(v=>({...v,[pack.id]:e.target.value}))}
+                          disabled={locked||!c}
                           className={`w-20 h-8 text-center ${
-                            pack.validationError ? "border-destructive" : ""
+                            (values[pack.id]!==''&&!stats(pack).valid) ? "border-destructive" : ""
                           }`}
+                          title={`Enter ${pack.opening-1} for no sales`}
+                          aria-label={`Last sold ticket for pack ${pack.packNumber}`}
                           placeholder="—"
                         />
-                        {pack.validationError && (
-                          <span className="text-xs text-destructive">{pack.validationError}</span>
+                        {!locked&&<Button type="button" variant="ghost" size="sm" disabled={!c} onClick={()=>setValues(v=>({...v,[pack.id]:String(pack.opening-1)}))}>No sales</Button>}
+                        {(values[pack.id]!==''&&!stats(pack).valid) && (
+                          <span className="text-xs text-destructive">Enter {pack.opening-1}–{pack.endTicket}</span>
                         )}
                       </div>
                     </TableCell>
                     <TableCell className="text-center">
-                      <span className={stats.ticketsSold > 0 ? "font-medium" : "text-muted-foreground"}>
-                        {stats.ticketsSold}
+                      <span className={rowStats.sold > 0 ? "font-medium" : "text-muted-foreground"}>
+                        {rowStats.sold}
                       </span>
                     </TableCell>
                     <TableCell className="text-center">
-                      <span className="text-muted-foreground">{stats.ticketsRemaining}</span>
+                      <span className="text-muted-foreground">{rowStats.remaining}</span>
                     </TableCell>
                     <TableCell className="text-right font-medium">
-                      ${stats.salesAmount.toFixed(2)}
+                      ${rowStats.sales.toFixed(2)}
                     </TableCell>
                   </TableRow>
                 );
@@ -481,201 +241,48 @@ export const DayShiftClosing = () => {
               {/* Totals Row */}
               <TableRow className="bg-muted/50 font-semibold">
                 <TableCell colSpan={6}>Totals</TableCell>
-                <TableCell className="text-center">{totals.totalTicketsSold}</TableCell>
+                <TableCell className="text-center">{data.packs.reduce((n,p)=>n+stats(p).sold,0)}</TableCell>
                 <TableCell className="text-center">—</TableCell>
-                <TableCell className="text-right">${totals.totalSales.toFixed(2)}</TableCell>
+                <TableCell className="text-right">${gross.toFixed(2)}</TableCell>
               </TableRow>
             </TableBody>
           </Table>
         </CardContent>
       </Card>
 
-      {/* Cash & Liability Summary */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader className="pb-4">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <DollarSign className="w-5 h-5" />
-              Cash & Liability Summary
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-3">
-              <div className="flex justify-between items-center py-2 border-b">
-                <span className="text-muted-foreground">Total Ticket Sales</span>
-                <span className="font-semibold text-lg">${totals.totalSales.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between items-center py-2 border-b">
-                <span className="text-muted-foreground">Commission (5%)</span>
-                <span className="font-medium text-primary">-${totals.commission.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between items-center py-2 border-b bg-muted/30 px-2 rounded">
-                <span className="font-medium">Cash Expected</span>
-                <span className="font-bold text-lg">${totals.cashExpected.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between items-center py-2">
-                <Label htmlFor="cashCounted" className="text-muted-foreground">
-                  Cash Counted
-                </Label>
-                <Input
-                  id="cashCounted"
-                  type="number"
-                  step="0.01"
-                  value={cashCounted}
-                  onChange={(e) => setCashCounted(e.target.value)}
-                  disabled={isLocked}
-                  className="w-32 text-right font-semibold"
-                  placeholder="0.00"
-                />
-              </div>
-              <div
-                className={`flex justify-between items-center py-3 px-3 rounded-lg ${
-                  Math.abs(totals.overShort) > overShortLimit
-                    ? "bg-destructive/10 border border-destructive/30"
-                    : totals.overShort !== 0
-                    ? "bg-accent"
-                    : "bg-primary/10"
-                }`}
-              >
-                <span className="font-medium">Over / Short</span>
-                <span
-                  className={`font-bold text-lg ${
-                    totals.overShort > 0
-                      ? "text-primary"
-                      : totals.overShort < 0
-                      ? "text-destructive"
-                      : ""
-                  }`}
-                >
-                  {totals.overShort >= 0 ? "+" : ""}${totals.overShort.toFixed(2)}
-                </span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+   <Card aria-disabled={separate!==true} className={separate!==true?'opacity-50':''}>
+    <CardHeader className="pb-4"><CardTitle className="text-lg flex items-center gap-2"><DollarSign className="w-5 h-5"/>Cash &amp; Liability Summary</CardTitle></CardHeader>
+    <CardContent className="space-y-4">
+     <div className="space-y-3">
+      <div className="flex justify-between items-center py-2 border-b"><span className="text-muted-foreground">Total Ticket Sales</span><span className="font-semibold text-lg">{money(gross)}</span></div>
+      <div className="flex justify-between items-center py-2 border-b"><span className="text-muted-foreground">Commission</span><span className="font-medium text-primary">{money(commission)}</span></div>
+      <div className="flex justify-between items-center py-2 border-b bg-muted/30 px-2 rounded"><span className="font-medium">Cash Expected</span><span className="font-bold text-lg">{separate===true?money(gross):'—'}</span></div>
+      <div className="flex justify-between items-center py-2"><label htmlFor="cashCounted" className="text-muted-foreground">Cash Counted</label><Input id="cashCounted" className="w-32 text-right font-semibold" disabled={separate!==true||!c||locked} type="number" min="0" step="0.01" placeholder="0.00" value={separate===true?cash:''} onChange={e=>setCash(e.target.value)}/></div>
+      <div className={`flex justify-between items-center py-3 px-3 rounded-lg ${separate===true&&validCash&&variance!==0?'bg-destructive/10 border border-destructive/30':'bg-primary/10'}`}><span className="font-medium">Over / Short</span><span className={`font-bold text-lg ${variance<0?'text-destructive':''}`}>{separate===true&&validCash?`${variance>=0?'+':''}${money(variance)}`:'—'}</span></div>
+     </div>
+     <p className="text-sm text-muted-foreground">{separate===false?'Disabled: lottery uses the shared store counter.':separate===null?'Choose a counter type in Lottery Settings.':'Enter the collected lottery cash. Commission is retained revenue and does not reduce cash collected from ticket sales.'}</p>
+    </CardContent>
+   </Card>
+   <Card><CardHeader className="pb-4"><CardTitle className="text-lg flex items-center gap-2"><FileText className="w-5 h-5"/>Variance Notes &amp; Audit</CardTitle></CardHeader><CardContent className="space-y-4">
+    <div className="space-y-2"><label htmlFor="varianceNote">Variance Note {(ticketVariance||(separate===true&&validCash&&variance!==0))&&<span className="text-destructive">*</span>}</label><Textarea id="varianceNote" placeholder="Explain any cash variance or discrepancies..." rows={3} maxLength={2000} disabled={!c||locked} value={note} onChange={e=>setNote(e.target.value)}/></div>
+    <div className="pt-4 border-t space-y-2 text-sm"><h4 className="font-medium mb-3">Audit Trail</h4><div className="flex justify-between"><span className="text-muted-foreground">Closed By</span><span>{locked?c?.closedBy:'—'}</span></div><div className="flex justify-between"><span className="text-muted-foreground">Close Timestamp</span><span>{c?.shift_closed_at?time(c.shift_closed_at):'—'}</span></div><div className="flex justify-between"><span className="text-muted-foreground">Status</span><Badge variant="secondary">{locked?'Closed':c?'Draft':'Not started'}</Badge></div></div>
+   </CardContent></Card>
+  </div>
+  {data.history.length>0&&<div className="flex gap-3 items-center"><label className="text-sm text-muted-foreground">View closing <select className="border rounded p-2" value={historyId} onChange={e=>onHistory(e.target.value)}><option value="">Current / New closing</option>{data.history.map(h=><option key={h.id} value={h.id}>{h.date} · {h.type} · #{h.id}</option>)}</select></label>{locked&&!historyId&&<Button variant="outline" onClick={onRefresh}>Prepare Next Closing</Button>}</div>}
+  <Dialog open={confirm} onOpenChange={v=>{if(!mutation.isPending)setConfirm(v);}}><DialogContent><DialogHeader><DialogTitle>Close lottery {c?.closing_type.toLowerCase()}?</DialogTitle><DialogDescription>This saves ticket sales and locks the closing. Total sales: {money(gross)}.</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" disabled={mutation.isPending} onClick={()=>setConfirm(false)}>Cancel</Button><Button disabled={mutation.isPending||!canClose} onClick={()=>save(true)}>Confirm Close</Button></DialogFooter></DialogContent></Dialog>
+ </fieldset>;
+}
 
-        {/* Variance Notes & Audit */}
-        <Card>
-          <CardHeader className="pb-4">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <FileText className="w-5 h-5" />
-              Variance Notes & Audit
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {Math.abs(totals.overShort) > overShortLimit && (
-              <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/30 rounded-lg">
-                <AlertTriangle className="w-4 h-4 text-destructive mt-0.5" />
-                <div className="text-sm">
-                  <p className="font-medium text-destructive">Variance exceeds ${overShortLimit}</p>
-                  <p className="text-destructive/80">A note is required to explain the discrepancy.</p>
-                </div>
-              </div>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="varianceNote">
-                Variance Note {Math.abs(totals.overShort) > overShortLimit && <span className="text-destructive">*</span>}
-              </Label>
-              <Textarea
-                id="varianceNote"
-                placeholder="Explain any cash variance or discrepancies..."
-                value={varianceNote}
-                onChange={(e) => setVarianceNote(e.target.value)}
-                disabled={isLocked}
-                rows={3}
-              />
-            </div>
-
-            {/* Audit Trail Preview */}
-            <div className="pt-4 border-t">
-              <h4 className="text-sm font-medium mb-3">Audit Trail</h4>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Closed By</span>
-                  <span className="font-medium">{isLocked ? currentUser : "—"}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Close Timestamp</span>
-                  <span className="font-medium">
-                    {isLocked ? format(new Date(), "MMM dd, yyyy h:mm:ss a") : "—"}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Status</span>
-                  {isLocked ? (
-                    <Badge className="bg-primary text-primary-foreground">
-                      <CheckCircle className="w-3 h-3 mr-1" />
-                      Closed
-                    </Badge>
-                  ) : (
-                    <Badge variant="secondary">Draft</Badge>
-                  )}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Confirmation Dialog */}
-      <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Lock className="w-5 h-5 text-primary" />
-              Confirm Shift Closing
-            </DialogTitle>
-            <DialogDescription>
-              Once submitted, this shift will be locked and no further edits will be allowed 
-              without admin override.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4 space-y-4">
-            <div className="bg-muted rounded-lg p-4 space-y-2">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Total Sales:</span>
-                <span className="font-medium">${totals.totalSales.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Cash Expected:</span>
-                <span className="font-medium">${totals.cashExpected.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Cash Counted:</span>
-                <span className="font-medium">${totals.cashCounted.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between pt-2 border-t">
-                <span className="font-medium">Over/Short:</span>
-                <span
-                  className={`font-bold ${
-                    totals.overShort > 0
-                      ? "text-primary"
-                      : totals.overShort < 0
-                      ? "text-destructive"
-                      : ""
-                  }`}
-                >
-                  {totals.overShort >= 0 ? "+" : ""}${totals.overShort.toFixed(2)}
-                </span>
-              </div>
-            </div>
-            {varianceNote && (
-              <div className="text-sm">
-                <p className="text-muted-foreground mb-1">Variance Note:</p>
-                <p className="bg-muted p-2 rounded text-sm">{varianceNote}</p>
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSubmitClose} disabled={isSubmitting}>
-              {isSubmitting ? "Submitting..." : "Submit & Lock Shift"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-};
+interface ReceiptLine {id:number;receipt:string;soldAt:string;product:string;quantity:number;packId:number|null;closingId:number|null;}
+function SalesLinkDialog({open,onOpenChange,path,closingId,packs,onData}:{open:boolean;onOpenChange:(v:boolean)=>void;path:string;closingId?:number;packs:Pack[];onData:(d:Data)=>void}){
+ const [receipt,setReceipt]=useState('');const [search,setSearch]=useState('');const [chosen,setChosen]=useState<Record<number,string>>({});
+ const q=useQuery({queryKey:['lottery-sales-links',path,closingId,search,open],queryFn:()=>request<ReceiptLine[]>(`${path}/${closingId}/sales?receipt=${encodeURIComponent(search)}`),enabled:open&&!!closingId,retry:false});
+ const mutation=useMutation({mutationFn:({line,remove}:{line:ReceiptLine;remove?:boolean})=>request<Data>(`${path}/${closingId}/sales${remove?`/${line.id}/unlink`:''}`,{method:remove?'POST':'PUT',body:remove?undefined:JSON.stringify({salesItemId:line.id,packId:Number(chosen[line.id]??line.packId)})}),onSuccess:d=>{onData(d);onOpenChange(false);},onError:e=>toast({title:'Sales link not saved',description:e.message,variant:'destructive'})});
+ return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-w-3xl"><DialogHeader><DialogTitle>Link Recorded Sales</DialogTitle><DialogDescription>Search the exact POS receipt number. Link each lottery line to the pack it was sold from. The whole receipt-line quantity is used; split lines in the POS when tickets come from different packs.</DialogDescription></DialogHeader>
+ <div className="flex gap-2"><Input aria-label="Receipt number" placeholder="Receipt number" value={receipt} onChange={e=>setReceipt(e.target.value)}/><Button onClick={()=>setSearch(receipt.trim())}>Search</Button></div>
+ {q.error&&<p role="alert">{q.error.message}</p>}
+ <div className="max-h-96 overflow-auto"><Table><TableHeader><TableRow><TableHead>Receipt / Item</TableHead><TableHead>Tickets</TableHead><TableHead>Pack</TableHead><TableHead>Action</TableHead></TableRow></TableHeader><TableBody>
+ {q.isPending?<TableRow><TableCell colSpan={4}>Loading…</TableCell></TableRow>:!q.data?.length?<TableRow><TableCell colSpan={4}>No linked or matching completed sales.</TableCell></TableRow>:q.data.map(line=><TableRow key={line.id}><TableCell>{line.receipt}<br/>{line.product}</TableCell><TableCell>{line.quantity}</TableCell><TableCell><select aria-label={`Pack for sale item ${line.id}`} className="border rounded p-2" value={chosen[line.id]??line.packId??''} onChange={e=>setChosen(v=>({...v,[line.id]:e.target.value}))}><option value="">Select pack</option>{packs.map(p=><option key={p.id} value={p.id}>{p.gameName} · {p.packNumber}</option>)}</select></TableCell><TableCell><Button size="sm" disabled={mutation.isPending||!(chosen[line.id]??line.packId)} onClick={()=>mutation.mutate({line})}>Link</Button>{line.packId&&<Button size="sm" variant="ghost" disabled={mutation.isPending} onClick={()=>mutation.mutate({line,remove:true})}>Unlink</Button>}</TableCell></TableRow>)}
+ </TableBody></Table></div></DialogContent></Dialog>;
+}

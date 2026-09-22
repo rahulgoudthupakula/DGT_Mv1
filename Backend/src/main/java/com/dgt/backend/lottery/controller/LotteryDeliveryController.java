@@ -63,13 +63,15 @@ public class LotteryDeliveryController {
   for(Item item:in.items()){
    if(item==null||item.quantity()==null||item.quantity()<1||(total+=item.quantity())>1000||item.packNumber()==null||!item.packNumber().matches("[0-9]{1,50}"))throw bad("Each line needs a numeric book number and positive whole quantity; maximum 1,000 packs per receipt");
    long game=id(item.gameId());var games=a.db.queryForList("SELECT * FROM lottery_games WHERE lottery_game_id=? AND dgt_id=? AND upper(status)='ACTIVE' FOR SHARE",game,store);if(games.size()!=1)throw bad("Select an active game for this store");
-   var g=games.getFirst();int tickets=((Number)g.get("tickets_per_pack")).intValue();BigDecimal price=(BigDecimal)g.get("ticket_price");BigDecimal value=price.multiply(BigDecimal.valueOf(tickets));
+   var g=games.getFirst();
+   if((g.get("start_date")!=null&&in.deliveryDate().isBefore(((java.sql.Date)g.get("start_date")).toLocalDate()))||(g.get("end_date")!=null&&in.deliveryDate().isAfter(((java.sql.Date)g.get("end_date")).toLocalDate())))throw bad("Delivery date is outside this game's start/end dates");
+   int tickets=((Number)g.get("tickets_per_pack")).intValue();BigDecimal price=(BigDecimal)g.get("ticket_price");BigDecimal value=price.multiply(BigDecimal.valueOf(tickets));
    if(tickets<1||price.signum()<0||value.compareTo(new BigDecimal("9999999999.99"))>0)throw bad("Game ticket count or price is invalid");
    for(int i=0;i<item.quantity();i++){
     String number=new BigInteger(item.packNumber()).add(BigInteger.valueOf(i)).toString();if(number.length()>50)throw bad("Book number exceeds 50 digits");
     String pack="0".repeat(Math.max(0,item.packNumber().length()-number.length()))+number;
     if(!identities.add(game+":"+number)||!a.db.queryForList("SELECT lottery_pack_id FROM lottery_packs WHERE dgt_id=? AND lottery_game_id=? AND ltrim(pack_number,'0')=ltrim(?,'0')",store,game,pack).isEmpty())throw conflict("Duplicate book number "+pack+" for this game");
-    a.db.update("INSERT INTO lottery_packs(invoice_id,dgt_id,vendor_id,lottery_game_id,pack_number,start_ticket_number,end_ticket_number,total_tickets,status_id,performed_by,received_ticket_price,received_pack_value) VALUES (?,?,?,?,?,1,?,?,?,?,?,?)",invoice,store,vendor,game,pack,tickets,tickets,status("PENDING"),a.user(),price,value);
+    a.db.update("INSERT INTO lottery_packs(invoice_id,dgt_id,vendor_id,lottery_game_id,pack_number,start_ticket_number,end_ticket_number,total_tickets,status_id,performed_by,received_ticket_price,received_pack_value) VALUES (?,?,?,?,?,0,?,?,?,?,?,?)",invoice,store,vendor,game,pack,tickets-1,tickets,status("PENDING"),a.user(),price,value);
    }
   }
   a.audit(store,"LOTTERY_RECEIVED",Long.toString(invoice),json.writeValueAsString(Map.of("requestKey",key,"input",in,"receiptId",Long.toString(invoice),"packs",total)));

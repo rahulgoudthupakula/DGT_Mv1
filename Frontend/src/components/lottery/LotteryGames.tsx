@@ -1,3 +1,5 @@
+import {useQuery,useMutation,useQueryClient} from '@tanstack/react-query';
+import {request} from '@/lib/backend';
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,6 +38,7 @@ import { toast } from "@/hooks/use-toast";
 
 interface LotteryGame {
   id: string;
+  version:string; scheduledCommission:number|null; commissionEffectiveDate:string|null;
   gameName: string;
   gameCode: string;
   ticketPrice: number;
@@ -50,105 +53,6 @@ interface LotteryGame {
   lastSaleDate: string | null;
   hasExistingPacks: boolean;
 }
-
-const initialGames: LotteryGame[] = [
-  {
-    id: "1",
-    gameName: "Mega Millions",
-    gameCode: "MM-001",
-    ticketPrice: 2.00,
-    ticketsPerPack: 300,
-    packValue: 600.00,
-    commissionPercent: 6.0,
-    status: "Active",
-    startDate: "2024-01-01",
-    endDate: null,
-    activePacksCount: 12,
-    lastDeliveryDate: "2025-01-20",
-    lastSaleDate: "2025-01-25",
-    hasExistingPacks: true,
-  },
-  {
-    id: "2",
-    gameName: "Powerball",
-    gameCode: "PB-002",
-    ticketPrice: 2.00,
-    ticketsPerPack: 300,
-    packValue: 600.00,
-    commissionPercent: 6.0,
-    status: "Active",
-    startDate: "2024-01-01",
-    endDate: null,
-    activePacksCount: 8,
-    lastDeliveryDate: "2025-01-18",
-    lastSaleDate: "2025-01-25",
-    hasExistingPacks: true,
-  },
-  {
-    id: "3",
-    gameName: "Lucky 7s",
-    gameCode: "L7-003",
-    ticketPrice: 5.00,
-    ticketsPerPack: 150,
-    packValue: 750.00,
-    commissionPercent: 7.0,
-    status: "Active",
-    startDate: "2024-03-15",
-    endDate: null,
-    activePacksCount: 5,
-    lastDeliveryDate: "2025-01-15",
-    lastSaleDate: "2025-01-24",
-    hasExistingPacks: true,
-  },
-  {
-    id: "4",
-    gameName: "Cash Blast",
-    gameCode: "CB-004",
-    ticketPrice: 10.00,
-    ticketsPerPack: 100,
-    packValue: 1000.00,
-    commissionPercent: 8.0,
-    status: "Active",
-    startDate: "2024-06-01",
-    endDate: null,
-    activePacksCount: 3,
-    lastDeliveryDate: "2025-01-10",
-    lastSaleDate: "2025-01-23",
-    hasExistingPacks: true,
-  },
-  {
-    id: "5",
-    gameName: "Holiday Special",
-    gameCode: "HS-005",
-    ticketPrice: 20.00,
-    ticketsPerPack: 50,
-    packValue: 1000.00,
-    commissionPercent: 8.5,
-    status: "Discontinued",
-    startDate: "2024-11-01",
-    endDate: "2025-01-15",
-    activePacksCount: 1,
-    lastDeliveryDate: "2024-12-20",
-    lastSaleDate: "2025-01-10",
-    hasExistingPacks: true,
-  },
-  {
-    id: "6",
-    gameName: "Quick Pick",
-    gameCode: "QP-006",
-    ticketPrice: 1.00,
-    ticketsPerPack: 500,
-    packValue: 500.00,
-    commissionPercent: 5.0,
-    status: "Active",
-    startDate: "2024-02-01",
-    endDate: null,
-    activePacksCount: 0,
-    lastDeliveryDate: null,
-    lastSaleDate: null,
-    hasExistingPacks: false,
-  },
-];
 
 interface GameFormData {
   gameName: string;
@@ -174,8 +78,11 @@ const emptyFormData: GameFormData = {
   commissionEffectiveDate: "",
 };
 
-export function LotteryGames() {
-  const [games, setGames] = useState<LotteryGame[]>(initialGames);
+export function LotteryGames({storeId}:{storeId:string}) {
+  const client=useQueryClient(),key=['lottery-games',storeId],path=`/access/stores/${encodeURIComponent(storeId)}/lottery-games`;
+  const q=useQuery({queryKey:key,queryFn:()=>request<{games:LotteryGame[];canEdit:boolean;today:string}>(path),enabled:!!storeId,retry:false});
+  const games=q.data?.games??[];
+  const mutation=useMutation({mutationFn:()=>request(path+(editingGame?`/${editingGame.id}`:''),{method:editingGame?'PUT':'POST',body:JSON.stringify({...formData,version:editingGame?.version,ticketPrice:Number(formData.ticketPrice),ticketsPerPack:Number(formData.ticketsPerPack),commissionPercent:Number(formData.commissionPercent),startDate:formData.startDate||null,endDate:formData.endDate||null,commissionEffectiveDate:formData.commissionEffectiveDate||null})}),onSuccess:data=>{client.setQueryData(key,data);setIsDialogOpen(false);void client.invalidateQueries({queryKey:['lottery-deliveries',storeId]});toast({title:'Game saved'});},onError:e=>toast({title:'Not saved',description:e.message,variant:'destructive'})});
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isViewMode, setIsViewMode] = useState(false);
   const [editingGame, setEditingGame] = useState<LotteryGame | null>(null);
@@ -194,7 +101,7 @@ export function LotteryGames() {
 
   const handleAddGame = () => {
     setEditingGame(null);
-    setFormData(emptyFormData);
+    setFormData({...emptyFormData,startDate:q.data?.today??emptyFormData.startDate});
     setOriginalCommission(null);
     setIsViewMode(false);
     setIsDialogOpen(true);
@@ -250,7 +157,7 @@ export function LotteryGames() {
       toast({ title: "Error", description: "Valid ticket price is required", variant: "destructive" });
       return;
     }
-    if (!formData.ticketsPerPack || parseInt(formData.ticketsPerPack) <= 0) {
+    if (!formData.ticketsPerPack || (!Number.isInteger(Number(formData.ticketsPerPack)) || Number(formData.ticketsPerPack) <= 0)) {
       toast({ title: "Error", description: "Valid tickets per pack is required", variant: "destructive" });
       return;
     }
@@ -281,66 +188,24 @@ export function LotteryGames() {
       return;
     }
 
-    const packValue = parseFloat(formData.ticketPrice) * parseInt(formData.ticketsPerPack);
-
-    if (editingGame) {
-      // Update existing game
-      setGames(games.map((g) => 
-        g.id === editingGame.id
-          ? {
-              ...g,
-              gameName: formData.gameName,
-              gameCode: formData.gameCode,
-              // Only update price/tickets if no existing packs
-              ticketPrice: g.hasExistingPacks ? g.ticketPrice : parseFloat(formData.ticketPrice),
-              ticketsPerPack: g.hasExistingPacks ? g.ticketsPerPack : parseInt(formData.ticketsPerPack),
-              packValue: g.hasExistingPacks ? g.packValue : packValue,
-              commissionPercent: parseFloat(formData.commissionPercent),
-              startDate: formData.startDate,
-              endDate: formData.endDate || null,
-              status: formData.status ? "Active" : "Discontinued",
-            }
-          : g
-      ));
-      toast({ title: "Success", description: "Game updated successfully" });
-    } else {
-      // Add new game
-      const newGame: LotteryGame = {
-        id: Date.now().toString(),
-        gameName: formData.gameName,
-        gameCode: formData.gameCode,
-        ticketPrice: parseFloat(formData.ticketPrice),
-        ticketsPerPack: parseInt(formData.ticketsPerPack),
-        packValue: packValue,
-        commissionPercent: parseFloat(formData.commissionPercent),
-        status: formData.status ? "Active" : "Discontinued",
-        startDate: formData.startDate,
-        endDate: formData.endDate || null,
-        activePacksCount: 0,
-        lastDeliveryDate: null,
-        lastSaleDate: null,
-        hasExistingPacks: false,
-      };
-      setGames([...games, newGame]);
-      toast({ title: "Success", description: "Game added successfully" });
-    }
-
-    setIsDialogOpen(false);
+    mutation.mutate();
   };
 
   const commissionChanged = editingGame && 
     originalCommission !== null && 
     parseFloat(formData.commissionPercent) !== originalCommission;
 
+  if(q.isPending)return <p>Loading lottery games…</p>;
+  if(q.error)return <p role="alert">{q.error.message}<Button onClick={()=>void q.refetch()}>Retry</Button></p>;
   return (
-    <div className="space-y-6">
+    <fieldset disabled={mutation.isPending} className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Games</h1>
           <p className="text-muted-foreground">Manage lottery games and configurations</p>
         </div>
-        <Button onClick={handleAddGame}>
+        <Button disabled={!q.data?.canEdit} onClick={handleAddGame}>
           <Plus className="h-4 w-4 mr-2" />
           Add Game
         </Button>
@@ -406,6 +271,7 @@ export function LotteryGames() {
               </TableRow>
             </TableHeader>
             <TableBody>
+              {!games.length&&<TableRow><TableCell colSpan={10} className="py-10 text-center text-muted-foreground">No games added yet.</TableCell></TableRow>}
               {games.map((game) => (
                 <TableRow key={game.id}>
                   <TableCell className="font-medium">{game.gameName}</TableCell>
@@ -417,7 +283,7 @@ export function LotteryGames() {
                   <TableCell className="text-right">${game.ticketPrice.toFixed(2)}</TableCell>
                   <TableCell className="text-right">{game.ticketsPerPack}</TableCell>
                   <TableCell className="text-right font-medium">${game.packValue.toFixed(2)}</TableCell>
-                  <TableCell className="text-right">{game.commissionPercent}%</TableCell>
+                  <TableCell className="text-right">{game.commissionPercent}%{game.scheduledCommission!=null&&<span className="block text-xs text-muted-foreground">{game.scheduledCommission}% from {game.commissionEffectiveDate}</span>}</TableCell>
                   <TableCell>
                     <Badge variant={game.status === "Active" ? "default" : "secondary"}>
                       {game.status}
@@ -435,7 +301,7 @@ export function LotteryGames() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleEditGame(game)}
+                        disabled={!q.data?.canEdit} onClick={() => handleEditGame(game)}
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -642,13 +508,13 @@ export function LotteryGames() {
               {isViewMode ? "Close" : "Cancel"}
             </Button>
             {!isViewMode && (
-              <Button onClick={handleSaveGame}>
+              <Button disabled={mutation.isPending||!q.data?.canEdit} onClick={handleSaveGame}>
                 {editingGame ? "Update Game" : "Add Game"}
               </Button>
             )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </fieldset>
   );
 }

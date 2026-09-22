@@ -33,7 +33,7 @@ public class LotteryVerificationController {
  FROM lottery_packs p JOIN lottery_games g ON g.lottery_game_id=p.lottery_game_id AND g.dgt_id=p.dgt_id
  JOIN status_types s ON s.status_type_id=p.status_id
  LEFT JOIN users d ON d.user_id=p.delivery_decided_by LEFT JOIN users v ON v.user_id=p.verification_decided_by LEFT JOIN users u ON u.user_id=p.activation_recorded_by
- WHERE p.dgt_id=? AND s.status_name='APPROVED' AND p.delivery_decided_at IS NOT NULL ORDER BY p.lottery_pack_id DESC
+ WHERE p.dgt_id=? AND s.status_name='APPROVED' AND p.delivery_decided_at IS NOT NULL AND p.return_status IS NULL AND p.return_date IS NULL AND p.pack_settlement_reference IS NULL ORDER BY p.lottery_pack_id DESC
  """,store).stream().map(Rows::normalize).toList();return Map.of("packs",packs,"canVerify",verify,"canActivate",activate);
  }
  public record Selected(String id,String version,String reference){}
@@ -44,7 +44,7 @@ public class LotteryVerificationController {
   a.db.queryForObject("SELECT dgt_id FROM stores WHERE dgt_id=? FOR UPDATE",String.class,store);
   Set<Long> ids=new HashSet<>();List<Map<String,Object>> rows=new ArrayList<>();
   for(Selected p:selected){long id;try{id=Long.parseLong(p.id());}catch(Exception e){throw bad("Invalid pack identifier");}if(!ids.add(id))throw bad("Pack selected more than once");
-   var found=a.db.queryForList("SELECT p.*,p.xmin::text AS version,g.status AS game_status,EXISTS(SELECT 1 FROM lottery_pack_inventory_items x WHERE x.pack_id=p.lottery_pack_id AND x.last_sold_ticket_number IS NOT NULL) AS sold FROM lottery_packs p JOIN lottery_games g ON g.lottery_game_id=p.lottery_game_id AND g.dgt_id=p.dgt_id JOIN status_types s ON s.status_type_id=p.status_id WHERE p.lottery_pack_id=? AND p.dgt_id=? AND s.status_name='APPROVED' AND p.delivery_decided_at IS NOT NULL FOR UPDATE OF p FOR SHARE OF g",id,store);
+   var found=a.db.queryForList("SELECT p.*,p.xmin::text AS version,g.status AS game_status,EXISTS(SELECT 1 FROM lottery_pack_inventory_items x WHERE x.pack_id=p.lottery_pack_id AND x.last_sold_ticket_number IS NOT NULL) AS sold FROM lottery_packs p JOIN lottery_games g ON g.lottery_game_id=p.lottery_game_id AND g.dgt_id=p.dgt_id JOIN status_types s ON s.status_type_id=p.status_id WHERE p.lottery_pack_id=? AND p.dgt_id=? AND s.status_name='APPROVED' AND p.delivery_decided_at IS NOT NULL AND p.return_status IS NULL AND p.return_date IS NULL AND p.pack_settlement_reference IS NULL FOR UPDATE OF p FOR SHARE OF g",id,store);
    if(found.size()!=1||!Objects.equals(found.getFirst().get("version"),p.version()))throw conflict();
    if(found.getFirst().get("activation_reference")!=null)throw conflict();rows.add(found.getFirst());
   }return rows;

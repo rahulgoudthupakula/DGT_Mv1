@@ -1,3 +1,4 @@
+import {LotteryCounterSetting} from "./LotteryCounterSetting";
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -24,7 +25,7 @@ interface SettingChange {
 }
 
 
-export const LotterySettings = () => {
+const LotterySettingsPreview = () => {
   // Game & Pack Rules
   const [allowPartialReturns, setAllowPartialReturns] = useState(true);
   const [maxOpenPacks, setMaxOpenPacks] = useState("5");
@@ -50,13 +51,7 @@ export const LotterySettings = () => {
 
 
   // Audit Log
-  const [auditLog] = useState<SettingChange[]>([
-    { id: "1", setting: "Default Commission %", oldValue: "6.5%", newValue: "7.0%", changedBy: "John Admin", changedAt: "2024-01-20 14:30", section: "Commission" },
-    { id: "2", setting: "Variance Tolerance", oldValue: "$3.00", newValue: "$5.00", changedBy: "John Admin", changedAt: "2024-01-18 09:15", section: "Shift Controls" },
-    { id: "3", setting: "Max Open Packs", oldValue: "3", newValue: "5", changedBy: "Jane Manager", changedAt: "2024-01-15 16:45", section: "Game Rules" },
-    { id: "4", setting: "Return Eligibility Days", oldValue: "14", newValue: "30", changedBy: "John Admin", changedAt: "2024-01-10 11:20", section: "Returns" },
-    { id: "5", setting: "Settlement Frequency", oldValue: "Daily", newValue: "Weekly", changedBy: "John Admin", changedAt: "2024-01-05 08:00", section: "Commission" },
-  ]);
+  const [auditLog] = useState<SettingChange[]>([]);
 
 
   const handleSaveSettings = () => {
@@ -442,3 +437,5 @@ export const LotterySettings = () => {
     </div>
   );
 };
+
+export const LotterySettings=({storeId}:{storeId:string})=><div className="space-y-6"><LotteryCounterSetting storeId={storeId}/><p className="text-sm text-muted-foreground">The remaining lottery settings below are layout previews and are not connected yet.</p><fieldset disabled {...{inert:""}} className="min-w-0 opacity-60"><LotterySettingsPreview/></fieldset></div>;

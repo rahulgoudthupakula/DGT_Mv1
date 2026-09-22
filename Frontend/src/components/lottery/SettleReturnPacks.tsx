@@ -1,3 +1,5 @@
+import {useQuery,useMutation,useQueryClient} from '@tanstack/react-query';
+import {request} from '@/lib/backend';
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -42,6 +44,7 @@ import {
 } from "lucide-react";
 
 interface SettlementPack {
+  version:string; blockedReason:string;
   id: string;
   gameName: string;
   packNumber: string;
@@ -59,6 +62,7 @@ interface SettlementPack {
 }
 
 interface ReturnablePack {
+  version:string; blockedReason:string;
   id: string;
   gameName: string;
   packNumber: string;
@@ -66,7 +70,7 @@ interface ReturnablePack {
   lastSoldTicket: string;
   ticketsRemaining: number;
   packValue: number;
-  status: "eligible" | "pending" | "returned" | "settled";
+  status: "eligible" | "pending" | "returned" | "settled" | "blocked";
   returnType?: "full" | "partial";
   returnReason?: string;
   returnDate?: string;
@@ -75,123 +79,16 @@ interface ReturnablePack {
   linkedSettlementId?: string;
 }
 
-const mockSettlementPacks: SettlementPack[] = [
-  {
-    id: "1",
-    gameName: "Powerball",
-    packNumber: "PB-2024-001",
-    ticketsSold: 200,
-    ticketsUnsold: 0,
-    grossSales: 400,
-    commission: 28,
-    netAmountDue: 372,
-    status: "ready",
-    shiftClosed: true,
-    hasGaps: false,
-  },
-  {
-    id: "2",
-    gameName: "Mega Millions",
-    packNumber: "MM-2024-015",
-    ticketsSold: 180,
-    ticketsUnsold: 20,
-    grossSales: 360,
-    commission: 25.2,
-    netAmountDue: 334.8,
-    status: "ready",
-    shiftClosed: true,
-    hasGaps: false,
-  },
-  {
-    id: "3",
-    gameName: "Lucky 7s",
-    packNumber: "L7-2024-088",
-    ticketsSold: 150,
-    ticketsUnsold: 50,
-    grossSales: 750,
-    commission: 52.5,
-    netAmountDue: 697.5,
-    status: "blocked",
-    shiftClosed: false,
-    hasGaps: true,
-  },
-  {
-    id: "4",
-    gameName: "Cash Pop",
-    packNumber: "CP-2024-042",
-    ticketsSold: 100,
-    ticketsUnsold: 0,
-    grossSales: 200,
-    commission: 14,
-    netAmountDue: 186,
-    status: "settled",
-    shiftClosed: true,
-    hasGaps: false,
-    settlementRef: "SET-2024-0042",
-    settledAt: "2024-01-20 14:30",
-    settledBy: "John Doe",
-  },
-];
-
-const mockReturnablePacks: ReturnablePack[] = [
-  {
-    id: "1",
-    gameName: "Scratch & Win",
-    packNumber: "SW-2024-033",
-    startTicket: "001",
-    lastSoldTicket: "075",
-    ticketsRemaining: 125,
-    packValue: 625,
-    status: "eligible",
-  },
-  {
-    id: "2",
-    gameName: "Diamond Dazzle",
-    packNumber: "DD-2024-019",
-    startTicket: "001",
-    lastSoldTicket: "000",
-    ticketsRemaining: 200,
-    packValue: 2000,
-    status: "eligible",
-  },
-  {
-    id: "3",
-    gameName: "Lucky 7s",
-    packNumber: "L7-2024-055",
-    startTicket: "001",
-    lastSoldTicket: "120",
-    ticketsRemaining: 80,
-    packValue: 400,
-    status: "pending",
-    returnType: "partial",
-    returnReason: "Low sales",
-    returnDate: "2024-01-22",
-  },
-  {
-    id: "4",
-    gameName: "Gold Rush",
-    packNumber: "GR-2024-011",
-    startTicket: "001",
-    lastSoldTicket: "000",
-    ticketsRemaining: 150,
-    packValue: 750,
-    status: "returned",
-    returnType: "full",
-    returnReason: "Game discontinued",
-    returnDate: "2024-01-18",
-    distributorRef: "RET-2024-0018",
-    approvedBy: "Manager",
-    linkedSettlementId: "SET-2024-0039",
-  },
-];
-
-export const SettleReturnPacks = () => {
-  const { toast } = useToast();
-  const [settlementPacks, setSettlementPacks] = useState<SettlementPack[]>(mockSettlementPacks);
-  const [returnablePacks, setReturnablePacks] = useState<ReturnablePack[]>(mockReturnablePacks);
+interface DispositionData {settlementPacks:SettlementPack[];returnablePacks:ReturnablePack[];canSettle:boolean;canReturn:boolean;}
+export const SettleReturnPacks = ({storeId}:{storeId:string}) => {
+  const {toast}=useToast();const client=useQueryClient();
+  const path=`/access/stores/${encodeURIComponent(storeId)}/lottery-dispositions`,key=['lottery-dispositions',storeId];
+  const q=useQuery({queryKey:key,queryFn:()=>request<DispositionData>(path),enabled:!!storeId,retry:false});
+  const settlementPacks=q.data?.settlementPacks??[],returnablePacks=q.data?.returnablePacks??[];
+  const mutation=useMutation({mutationFn:(body:unknown)=>request<DispositionData>(path,{method:'POST',body:JSON.stringify(body)}),onSuccess:data=>{client.setQueryData(key,data);setSelectedSettlePacks([]);setReturnDialogOpen(false);void client.invalidateQueries({queryKey:['lottery-closing',storeId]});void client.invalidateQueries({queryKey:['lottery-verification',storeId]});toast({title:'Pack records saved'});},onError:e=>toast({title:'Not saved',description:e.message,variant:'destructive'})});
   const [selectedSettlePacks, setSelectedSettlePacks] = useState<string[]>([]);
   const [selectedReturnPacks, setSelectedReturnPacks] = useState<string[]>([]);
-  
+
   // Return dialog state
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [currentReturnPack, setCurrentReturnPack] = useState<ReturnablePack | null>(null);
@@ -199,123 +96,15 @@ export const SettleReturnPacks = () => {
   const [returnReason, setReturnReason] = useState<string>("");
   const [distributorRef, setDistributorRef] = useState<string>("");
 
-  const generateSettlementRef = () => {
-    return `SET-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`;
-  };
-
-  const handleSettlePack = (packId: string) => {
-    setSettlementPacks(prev => prev.map(pack => {
-      if (pack.id === packId && pack.status === "ready") {
-        return {
-          ...pack,
-          status: "settled" as const,
-          settlementRef: generateSettlementRef(),
-          settledAt: new Date().toLocaleString(),
-          settledBy: "Current User",
-        };
-      }
-      return pack;
-    }));
-    
-    toast({
-      title: "Pack Settled",
-      description: "Settlement has been finalized and pack is now locked.",
-    });
-  };
-
-  const handleBulkSettle = () => {
-    const eligiblePacks = selectedSettlePacks.filter(id => {
-      const pack = settlementPacks.find(p => p.id === id);
-      return pack?.status === "ready";
-    });
-
-    if (eligiblePacks.length === 0) {
-      toast({
-        title: "No Eligible Packs",
-        description: "Selected packs are not ready for settlement.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setSettlementPacks(prev => prev.map(pack => {
-      if (eligiblePacks.includes(pack.id)) {
-        return {
-          ...pack,
-          status: "settled" as const,
-          settlementRef: generateSettlementRef(),
-          settledAt: new Date().toLocaleString(),
-          settledBy: "Current User",
-        };
-      }
-      return pack;
-    }));
-
-    setSelectedSettlePacks([]);
-    toast({
-      title: "Bulk Settlement Complete",
-      description: `${eligiblePacks.length} pack(s) have been settled.`,
-    });
-  };
-
-  const handleInitiateReturn = (pack: ReturnablePack) => {
-    setCurrentReturnPack(pack);
-    setReturnType("");
-    setReturnReason("");
-    setDistributorRef("");
-    setReturnDialogOpen(true);
-  };
-
-  const handleConfirmReturn = () => {
-    if (!currentReturnPack || !returnType || !returnReason) {
-      toast({
-        title: "Missing Information",
-        description: "Please fill in all required fields.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setReturnablePacks(prev => prev.map(pack => {
-      if (pack.id === currentReturnPack.id) {
-        return {
-          ...pack,
-          status: "pending" as const,
-          returnType: returnType as "full" | "partial",
-          returnReason,
-          returnDate: new Date().toISOString().split('T')[0],
-          distributorRef: distributorRef || undefined,
-        };
-      }
-      return pack;
-    }));
-
-    setReturnDialogOpen(false);
-    toast({
-      title: "Return Initiated",
-      description: "Pack return has been initiated and is pending confirmation.",
-    });
-  };
-
-  const handleConfirmReturnStatus = (packId: string) => {
-    setReturnablePacks(prev => prev.map(pack => {
-      if (pack.id === packId && pack.status === "pending") {
-        return {
-          ...pack,
-          status: "returned" as const,
-          approvedBy: "Current User",
-          linkedSettlementId: generateSettlementRef(),
-        };
-      }
-      return pack;
-    }));
-
-    toast({
-      title: "Return Confirmed",
-      description: "Pack has been marked as returned and moved to settlement.",
-    });
-  };
-
+  const selected=(ids:string[])=>ids.map(id=>{const p=settlementPacks.find(p=>p.id===id)!;return {id,version:p.version};});
+  const handleSettlePack=(id:string)=>setSettleIds([id]);
+  const [settleIds,setSettleIds]=useState<string[]>([]);
+  const handleBulkSettle=()=>setSettleIds(selectedSettlePacks);
+  const handleInitiateReturn=(pack:ReturnablePack)=>{setCurrentReturnPack(pack);setReturnType('');setReturnReason('');setDistributorRef('');setReturnDialogOpen(true);};
+  const handleConfirmReturn=()=>{if(!currentReturnPack)return;mutation.mutate({action:'REQUEST_RETURN',packs:[{id:currentReturnPack.id,version:currentReturnPack.version}],returnType,reason:returnReason,reference:distributorRef});};
+  const handleConfirmReturnStatus=(id:string)=>setConfirmReturnId(id);
+  const [viewReturn,setViewReturn]=useState<ReturnablePack|null>(null);
+  const [confirmReturnId,setConfirmReturnId]=useState<string|null>(null);
   const getSettlementStatusBadge = (pack: SettlementPack) => {
     if (pack.status === "settled") {
       return <Badge className="bg-green-100 text-green-800">Settled</Badge>;
@@ -328,6 +117,7 @@ export const SettleReturnPacks = () => {
 
   const getReturnStatusBadge = (status: ReturnablePack["status"]) => {
     switch (status) {
+      case "blocked": return <Badge variant="destructive">Blocked</Badge>;
       case "eligible":
         return <Badge className="bg-blue-100 text-blue-800">Eligible</Badge>;
       case "pending":
@@ -340,10 +130,7 @@ export const SettleReturnPacks = () => {
   };
 
   const getBlockedReason = (pack: SettlementPack) => {
-    const reasons: string[] = [];
-    if (!pack.shiftClosed) reasons.push("Shift not closed");
-    if (pack.hasGaps) reasons.push("Missing ticket ranges");
-    return reasons.join(", ");
+    return pack.blockedReason;
   };
 
   const settlementStats = {
@@ -360,8 +147,10 @@ export const SettleReturnPacks = () => {
     returned: returnablePacks.filter(p => p.status === "returned").length,
   };
 
+  if(q.isPending)return <p>Loading settle and return packs…</p>;
+  if(q.error)return <p role="alert">{q.error.message} <Button onClick={()=>void q.refetch()}>Retry</Button></p>;
   return (
-    <div className="space-y-6">
+    <fieldset disabled={mutation.isPending} className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Settle & Return Packs</h1>
         <p className="text-muted-foreground">Finalize settlements and handle pack returns</p>
@@ -437,7 +226,7 @@ export const SettleReturnPacks = () => {
                   <span className="text-sm font-medium">
                     {selectedSettlePacks.length} pack(s) selected
                   </span>
-                  <Button onClick={handleBulkSettle} size="sm">
+                  <Button disabled={!q.data?.canSettle} onClick={handleBulkSettle} size="sm">
                     <DollarSign className="h-4 w-4 mr-2" />
                     Bulk Settle
                   </Button>
@@ -457,7 +246,7 @@ export const SettleReturnPacks = () => {
                   <TableRow>
                     <TableHead className="w-12">
                       <Checkbox
-                        checked={selectedSettlePacks.length === settlementPacks.filter(p => p.status === "ready").length}
+                        checked={selectedSettlePacks.length>0 && selectedSettlePacks.length === settlementPacks.filter(p => p.status === "ready").length}
                         onCheckedChange={(checked) => {
                           if (checked) {
                             setSelectedSettlePacks(settlementPacks.filter(p => p.status === "ready").map(p => p.id));
@@ -479,6 +268,7 @@ export const SettleReturnPacks = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
+                  {!settlementPacks.length&&<TableRow><TableCell colSpan={9} className="py-10 text-center text-muted-foreground">No packs available for settlement.</TableCell></TableRow>}
                   {settlementPacks.map((pack) => (
                     <TableRow key={pack.id}>
                       <TableCell>
@@ -514,7 +304,7 @@ export const SettleReturnPacks = () => {
                       </TableCell>
                       <TableCell>
                         {pack.status === "ready" && (
-                          <Button size="sm" onClick={() => handleSettlePack(pack.id)}>
+                          <Button size="sm" disabled={!q.data?.canSettle} onClick={() => handleSettlePack(pack.id)}>
                             <DollarSign className="h-4 w-4 mr-1" />
                             Settle
                           </Button>
@@ -611,6 +401,7 @@ export const SettleReturnPacks = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
+                  {!returnablePacks.length&&<TableRow><TableCell colSpan={9} className="py-10 text-center text-muted-foreground">No returnable packs.</TableCell></TableRow>}
                   {returnablePacks.map((pack) => (
                     <TableRow key={pack.id}>
                       <TableCell className="font-medium">{pack.gameName}</TableCell>
@@ -632,6 +423,7 @@ export const SettleReturnPacks = () => {
                       <TableCell>
                         <div className="space-y-1">
                           {getReturnStatusBadge(pack.status)}
+                          {pack.status==="blocked"&&<p className="text-xs text-destructive">{pack.blockedReason}</p>}
                           {pack.distributorRef && (
                             <p className="text-xs text-muted-foreground">Ref: {pack.distributorRef}</p>
                           )}
@@ -640,19 +432,19 @@ export const SettleReturnPacks = () => {
                       <TableCell>
                         <div className="flex gap-2">
                           {pack.status === "eligible" && (
-                            <Button size="sm" onClick={() => handleInitiateReturn(pack)}>
+                            <Button size="sm" disabled={!q.data?.canReturn} onClick={() => handleInitiateReturn(pack)}>
                               <RotateCcw className="h-4 w-4 mr-1" />
                               Initiate
                             </Button>
                           )}
                           {pack.status === "pending" && (
-                            <Button size="sm" variant="outline" onClick={() => handleConfirmReturnStatus(pack.id)}>
+                            <Button size="sm" variant="outline" disabled={!q.data?.canReturn} onClick={() => handleConfirmReturnStatus(pack.id)}>
                               <CheckCircle2 className="h-4 w-4 mr-1" />
                               Confirm
                             </Button>
                           )}
-                          {pack.status === "returned" && (
-                            <Button size="sm" variant="ghost" disabled>
+                          {(pack.status === "returned"||pack.status === "settled") && (
+                            <Button size="sm" variant="ghost" onClick={()=>setViewReturn(pack)}>
                               <FileText className="h-4 w-4 mr-1" />
                               View
                             </Button>
@@ -710,7 +502,7 @@ export const SettleReturnPacks = () => {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Distributor Reference # (Optional)</Label>
+              <Label>Distributor Reference # *</Label>
               <Input
                 value={distributorRef}
                 onChange={(e) => setDistributorRef(e.target.value)}
@@ -729,13 +521,16 @@ export const SettleReturnPacks = () => {
             <Button variant="outline" onClick={() => setReturnDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleConfirmReturn}>
+            <Button disabled={!returnType||!returnReason.trim()||!distributorRef.trim()||mutation.isPending} onClick={handleConfirmReturn}>
               <RotateCcw className="h-4 w-4 mr-2" />
               Initiate Return
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      <Dialog open={settleIds.length>0} onOpenChange={v=>{if(!v)setSettleIds([]);}}><DialogContent><DialogHeader><DialogTitle>Finalize pack settlement?</DialogTitle><DialogDescription>This locks the selected packs and records their sales and commission totals. It does not send payment to the distributor.</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" onClick={()=>setSettleIds([])}>Cancel</Button><Button disabled={mutation.isPending} onClick={()=>mutation.mutate({action:'SETTLE',packs:selected(settleIds)},{onSuccess:()=>setSettleIds([])})}>Finalize Settlement</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={!!confirmReturnId} onOpenChange={v=>{if(!v)setConfirmReturnId(null);}}><DialogContent><DialogHeader><DialogTitle>Confirm distributor accepted the return?</DialogTitle><DialogDescription>Confirm only after the remaining tickets have been returned and accepted. This records the return and makes the pack eligible for settlement.</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" onClick={()=>setConfirmReturnId(null)}>Cancel</Button><Button disabled={mutation.isPending} onClick={()=>{const p=returnablePacks.find(p=>p.id===confirmReturnId);if(p)mutation.mutate({action:'CONFIRM_RETURN',packs:[{id:p.id,version:p.version}]},{onSuccess:()=>setConfirmReturnId(null)});}}>Confirm Return</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={!!viewReturn} onOpenChange={v=>{if(!v)setViewReturn(null);}}><DialogContent><DialogHeader><DialogTitle>Return Record</DialogTitle><DialogDescription>{viewReturn?.gameName} · Pack {viewReturn?.packNumber}</DialogDescription></DialogHeader><dl className="space-y-3"><div><dt className="text-muted-foreground">Reason</dt><dd>{viewReturn?.returnReason}</dd></div><div><dt className="text-muted-foreground">Distributor Reference</dt><dd>{viewReturn?.distributorRef}</dd></div><div><dt className="text-muted-foreground">Confirmed By</dt><dd>{viewReturn?.approvedBy||'—'}</dd></div><div><dt className="text-muted-foreground">Return Date</dt><dd>{viewReturn?.returnDate||'—'}</dd></div><div><dt className="text-muted-foreground">Settlement Reference</dt><dd>{viewReturn?.linkedSettlementId||'Not settled'}</dd></div></dl></DialogContent></Dialog>
+    </fieldset>
   );
 };
