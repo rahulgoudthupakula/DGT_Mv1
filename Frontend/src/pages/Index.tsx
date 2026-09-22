@@ -124,7 +124,7 @@ const Index = ({ onLogout }: { onLogout: () => void }) => {
   const [selectedStoreId, setSelectedStoreId] = useState<string>(initial?.selectedStoreId ?? "");
 
   const storeAccess = useStoreAccess(selectedStoreId);
-  const connectedPage = (!activeProfilePage && activeNav === "Sales and Performance Reports" && activeSubNav === "POS report") || (!activeProfilePage && activeNav === "Tender Types" && ["Credit card","EBT/Foodstamps","Fleet cards","Reports"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Everyday Closing Reports" && ["Dashboard","Store","Reports"].includes(activeSubNav??"")) || showLiveCounter || !showLiveCounter && ((!activeProfilePage && activeNav === "Gas" && ["Settings","Delivery","Gas price","Inventory adjustment","Tank report"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Grocery" && ["Dashboard","Purchase Orders","Customized order guide","Edit & view invoices","Inventory adjustment","Settings","Reports"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Inventory Valuation" && activeSubNav === "Current stock") || (!activeProfilePage && activeNav === "Price Book" && ["Statistics","New arrivals","Items","Vendor management","Rebate management","Promotions","Discounts","Bulk update","Price groups","Inventory by item (current stock)"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Workweek" && ["Employees","Week Schedule","Time Off Request","Time Off Approvals"].includes(activeSubNav??"")) || ["Store Account Overview","Access & Integrations","User Profile Management","Subscriptions & Billing"].includes(activeProfilePage ?? ""));
+  const connectedPage = (!activeProfilePage && activeNav === "Lottery" && ["Received and confirm delivery","Verify and activate packs"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Sales and Performance Reports" && activeSubNav === "POS report") || (!activeProfilePage && activeNav === "Tender Types" && ["Credit card","EBT/Foodstamps","Fleet cards","Reports"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Everyday Closing Reports" && ["Dashboard","Store","Reports"].includes(activeSubNav??"")) || showLiveCounter || !showLiveCounter && ((!activeProfilePage && activeNav === "Gas" && ["Dashboard","Settings","Delivery","Gas price","Inventory adjustment","Tank report"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Grocery" && ["Dashboard","Purchase Orders","Customized order guide","Edit & view invoices","Inventory adjustment","Settings","Reports"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Inventory Valuation" && activeSubNav === "Current stock") || (!activeProfilePage && activeNav === "Price Book" && ["Statistics","New arrivals","Items","Vendor management","Rebate management","Promotions","Discounts","Bulk update","Price groups","Inventory by item (current stock)"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Workweek" && ["Employees","Week Schedule","Time Off Request","Time Off Approvals"].includes(activeSubNav??"")) || ["Store Account Overview","Access & Integrations","User Profile Management","Subscriptions & Billing"].includes(activeProfilePage ?? ""));
   const layoutOnly = !connectedPage && storeAccess.data?.admin === true;
 
   const storesQuery = useQuery({ queryKey: ["backend-stores"], queryFn: listStores });
@@ -532,9 +532,9 @@ const Index = ({ onLogout }: { onLogout: () => void }) => {
           ) : showLotteryDashboard ? (
             <LotteryDashboard />
           ) : showLotteryReceivedDelivery ? (
-            <ReceivedDelivery />
+            <ReceivedDelivery key={selectedStoreId} storeId={selectedStoreId} />
           ) : showLotteryVerifyActivate ? (
-            <VerifyActivatePacks />
+            <VerifyActivatePacks key={selectedStoreId} storeId={selectedStoreId} />
           ) : showLotteryDayShiftClosing ? (
             <DayShiftClosing />
           ) : showLotterySettleReturn ? (
@@ -590,7 +590,7 @@ const Index = ({ onLogout }: { onLogout: () => void }) => {
               <InventoryValuationReport storeId={selectedStoreId}/>
             </div>
           ) : showGasDashboard ? (
-            <GasDashboard />
+            <GasDashboard key={selectedStoreId} storeId={selectedStoreId} />
           ) : showGasStatistics ? (
             <GasStatisticsPage />
           ) : showGasDelivery ? (

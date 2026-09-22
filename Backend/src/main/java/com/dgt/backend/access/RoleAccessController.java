@@ -25,8 +25,8 @@ public class RoleAccessController {
   new Action("GROCERY_REDUCE_STOCK","Reduce stock","Grocery Permissions",true),new Action("GROCERY_CREATE_PO","Create PO","Grocery Permissions",true),
   new Action("GROCERY_APPROVE_PO","Approve PO","Grocery Permissions",true),new Action("GROCERY_RECEIVE_INVENTORY","Receive inventory","Grocery Permissions",false),
   new Action("GROCERY_APPROVE_INVOICE","Approve invoice","Grocery Permissions",false),new Action("GROCERY_SETTINGS","Change grocery settings","Grocery Permissions",true),
-  new Action("LOTTERY_RECEIVE_DELIVERY","Receive delivery","Lottery Permissions",false),new Action("LOTTERY_CONFIRM_PACKS","Confirm packs","Lottery Permissions",false),
-  new Action("LOTTERY_ACTIVATE_PACKS","Activate packs","Lottery Permissions",false),new Action("LOTTERY_CLOSE_SHIFT","Close shift","Lottery Permissions",false),
+  new Action("LOTTERY_RECEIVE_DELIVERY","Receive delivery","Lottery Permissions",true),new Action("LOTTERY_CONFIRM_PACKS","Confirm packs","Lottery Permissions",true),
+  new Action("LOTTERY_ACTIVATE_PACKS","Record completed pack activations","Lottery Permissions",true),new Action("LOTTERY_CLOSE_SHIFT","Close shift","Lottery Permissions",false),
   new Action("LOTTERY_RETURN_PACKS","Return packs","Lottery Permissions",false),new Action("LOTTERY_SETTLE_PACKS","Settle packs","Lottery Permissions",false),
   new Action("LOTTERY_VIEW_REPORTS","View lottery reports","Lottery Permissions",false),new Action("LOTTERY_SETTINGS","Change lottery settings","Lottery Permissions",false));
  @GetMapping public Object get(@PathVariable String store){access.requireAdmin(store);return Map.of("actions",ACTIONS,"roles",access.db.queryForList("SELECT role_type_id,role_type_name FROM role_types WHERE is_active AND role_type_name IN ('MANAGER','CASHIER','ACCOUNTANT') ORDER BY CASE role_type_name WHEN 'MANAGER' THEN 0 WHEN 'CASHIER' THEN 1 ELSE 2 END"),"permissions",access.db.queryForList("SELECT *,xmin::text AS version FROM store_role_permissions WHERE dgt_id=?",store).stream().map(com.dgt.backend.common.entity.Rows::normalize).toList());}

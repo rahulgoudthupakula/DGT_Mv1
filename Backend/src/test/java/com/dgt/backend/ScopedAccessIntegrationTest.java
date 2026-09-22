@@ -49,6 +49,8 @@ class ScopedAccessIntegrationTest {
  }
  @AfterAll void cleanup(){
   if(company==0)return;
+  db.update("DELETE FROM lottery_packs WHERE dgt_id IN (?,?,?)",store,second,foreign);
+  db.update("DELETE FROM lottery_games WHERE dgt_id IN (?,?,?)",store,second,foreign);
   db.update("DELETE FROM rebate_claim_payments WHERE dgt_id IN (?,?,?)",store,second,foreign);
   db.update("DELETE FROM rebate_claims WHERE dgt_id IN (?,?,?)",store,second,foreign);
   db.update("DELETE FROM rebate_program_items WHERE dgt_id IN (?,?,?)",store,second,foreign);
@@ -1842,4 +1844,100 @@ ok(call("admin","PUT",path+"/programs/"+id,form,program.get("version").asText(),
    });
   }
  }
+ @Test @Order(998) void gasDashboardReadsCurrentStoreStateOnly() throws Exception {
+  String path=access()+"/gas-prices/dashboard";
+  ok(req("other","GET",path,null),403);ok(req("cashier","GET",path,null),403);
+  long tank=db.queryForObject("INSERT INTO fuel_tanks(dgt_id,tank_number,capacity_gallons,safe_fill_capacity,low_level_percentage) VALUES (?,'DASH-LOW',1000,900,20) RETURNING tank_id",Long.class,store);
+  long empty=db.queryForObject("INSERT INTO fuel_tanks(dgt_id,tank_number,capacity_gallons,safe_fill_capacity) VALUES (?,'DASH-EMPTY',1000,900) RETURNING tank_id",Long.class,store);
+  db.update("INSERT INTO fuel_tank_readings(tank_id,volume_gallons,reading_datetime,created_by) VALUES (?,100,CURRENT_TIMESTAMP-interval '2 days',?),(?,900,CURRENT_TIMESTAMP+interval '1 day',?)",tank,users.get("admin"),tank,users.get("admin"));
+  db.update("UPDATE gas_settings SET low_tank_dashboard=true,missing_reading_dashboard=true WHERE dgt_id=?",store);
+  int before=db.queryForObject("SELECT count(*) FROM inventory_movements WHERE dgt_id=?",Integer.class,store);
+  var result=ok(req("admin","GET",path,null),200);
+  var rows=java.util.stream.StreamSupport.stream(result.path("tanks").spliterator(),false).toList();
+  var low=rows.stream().filter(t->t.path("id").asLong()==tank).findFirst().orElseThrow();
+  assertThat(low.path("currentGallons").asDouble()).isEqualTo(100);assertThat(low.path("threshold").asDouble()).isEqualTo(20);
+  assertThat(low.path("missingToday").asBoolean()).isTrue();assertThat(low.path("lowEnabled").asBoolean()).isTrue();
+  assertThat(rows.stream().filter(t->t.path("id").asLong()==empty).findFirst().orElseThrow().path("currentGallons").isNull()).isTrue();
+  for(var price:result.path("prices"))assertThat(price.path("status").asText()).isEqualTo("CURRENT");
+  var sibling=ok(req("admin","GET","/access/stores/"+second+"/gas-prices/dashboard",null),200);
+  for(var t:sibling.path("tanks"))assertThat(t.path("id").asLong()).isNotIn(tank,empty);
+  assertThat(db.queryForObject("SELECT count(*) FROM inventory_movements WHERE dgt_id=?",Integer.class,store)).isEqualTo(before);
+ } @Test @Order(997) void lotteryReceiptConfirmationPersistsAndEnforcesScope() throws Exception {
+  String path=access()+"/lottery-deliveries";
+  long vendor=db.queryForObject("INSERT INTO vendors(dgt_id,vendor_name) VALUES (?,?) RETURNING vendor_id",Long.class,store,"Lottery vendor "+tag);
+  long wrongVendor=db.queryForObject("INSERT INTO vendors(dgt_id,vendor_name) VALUES (?,?) RETURNING vendor_id",Long.class,second,"Lottery other "+tag);
+  long game=db.queryForObject("INSERT INTO lottery_games(dgt_id,game_code,game_name,ticket_price,tickets_per_pack,pack_value,commission_percent,status) VALUES (?,'LTEST','Lottery test',5,50,250,7,'ACTIVE') RETURNING lottery_game_id",Long.class,store);
+  var item=Map.of("gameId",Long.toString(game),"packNumber","000123","quantity",2,"key","ui-line-key");
+  var receipt=new HashMap<String,Object>(Map.of("distributorId",Long.toString(vendor),"deliveryDate","2026-06-01","referenceNumber","LOT-TEST-"+tag,"items",List.of(item)));
+  ok(req("other","GET",path,null),403);ok(req("cashier","GET",path,null),403);ok(req("cashier","POST",path,receipt),403);
+  long managerRole=db.queryForObject("SELECT role_type_id FROM role_types WHERE role_type_name='MANAGER'",Long.class);
+  db.update("INSERT INTO store_role_permissions(dgt_id,role_type_id,permission_code,allowed) VALUES (?,?,'LOTTERY_RECEIVE_DELIVERY',true)",store,managerRole);
+  String key=UUID.randomUUID().toString();var result=ok(call("manager","POST",path,receipt,null,key),200);
+  assertThat(ok(call("manager","POST",path,receipt,null,key),200)).isEqualTo(result);
+  var data=ok(req("admin","GET",path,null),200);assertThat(data.path("packs").size()).isEqualTo(2);
+  assertThat(data.path("packs").toString()).contains("000123","000124","manager Test");
+  assertThat(data.path("packs").get(0).path("packValue").decimalValue()).isEqualByComparingTo("250");
+  assertThat(data.path("packs").get(0).path("startTicket").asText()).isEqualTo("1");
+  assertThat(ok(req("admin","GET","/access/stores/"+second+"/lottery-deliveries",null),200).path("packs").isEmpty()).isTrue();
+  receipt.put("referenceNumber","Changed");ok(call("manager","POST",path,receipt,null,key),409);
+  long invoiceCount=db.queryForObject("SELECT count(*) FROM invoices WHERE dgt_id=?",Long.class,store);
+  ok(req("admin","POST",path,receipt),409);
+  receipt.put("distributorId",Long.toString(wrongVendor));ok(req("admin","POST",path,receipt),400);
+  receipt.put("distributorId",Long.toString(vendor));receipt.put("items",List.of(Map.of("gameId",Long.toString(game),"packNumber","000125","quantity",1),Map.of("gameId",Long.toString(game),"packNumber","bad","quantity",1)));
+  ok(req("admin","POST",path,receipt),400);assertThat(db.queryForObject("SELECT count(*) FROM invoices WHERE dgt_id=?",Long.class,store)).isEqualTo(invoiceCount);
+  assertThat(db.queryForObject("SELECT count(*) FROM lottery_packs WHERE dgt_id=?",Long.class,store)).isEqualTo(2);
+  var first=data.path("packs").get(0);var next=data.path("packs").get(1);
+  var selection=Map.of("id",first.path("id").asText(),"version",first.path("version").asText());
+  var secondSelection=Map.of("id",next.path("id").asText(),"version",next.path("version").asText());
+  var confirm=Map.of("action","CONFIRM","packs",List.of(selection));
+  ok(req("manager","POST",path+"/decision",confirm),403);
+  ok(req("admin","POST",path+"/decision",Map.of("action","REJECT","reason"," ","packs",List.of(selection))),400);
+  ok(req("admin","POST",path+"/decision",Map.of("action","CONFIRM","packs",List.of(selection,Map.of("id",next.path("id").asText(),"version","0")))),409);
+  assertThat(ok(req("admin","GET",path,null),200).path("packs").get(0).path("status").asText()).isEqualTo("PENDING");
+  ok(req("admin","POST",path+"/decision",confirm),200);ok(req("admin","POST",path+"/decision",confirm),409);
+  ok(req("admin","POST","/access/stores/"+second+"/lottery-deliveries/decision",Map.of("action","CONFIRM","packs",List.of(secondSelection))),409);
+  ok(req("admin","POST",path+"/decision",Map.of("action","REJECT","reason","Damaged packaging","packs",List.of(secondSelection))),200);
+  var after=ok(req("admin","GET",path,null),200);assertThat(after.path("packs").toString()).contains("CONFIRMED","REJECTED","Damaged packaging");
+  assertThat(db.queryForObject("SELECT count(*) FROM access_audit_events WHERE dgt_id=? AND event_type LIKE 'LOTTERY_%'",Long.class,store)).isEqualTo(3);
+ }
+ @Test @Order(9971) void lotteryVerificationAndRecordedActivationAreDurable() throws Exception {
+  String delivery=access()+"/lottery-deliveries",path=access()+"/lottery-verification";
+  long vendor=db.queryForObject("INSERT INTO vendors(dgt_id,vendor_name) VALUES (?,?) RETURNING vendor_id",Long.class,store,"Verify supplier "+tag);
+  long game=db.queryForObject("INSERT INTO lottery_games(dgt_id,game_code,game_name,ticket_price,tickets_per_pack,pack_value,commission_percent,status) VALUES (?,'VERIFY','Verify game',10,30,300,7,'ACTIVE') RETURNING lottery_game_id",Long.class,store);
+  ok(req("admin","POST",delivery,Map.of("distributorId",Long.toString(vendor),"deliveryDate","2026-06-01","referenceNumber","VERIFY-"+tag,"items",List.of(Map.of("gameId",Long.toString(game),"packNumber","000900","quantity",2)))),200);
+  var pending=ok(req("admin","GET",delivery,null),200).path("packs");var ids=new ArrayList<String>();var selection=new ArrayList<Map<String,String>>();
+  for(var p:pending)if(p.path("gameId").asText().equals(Long.toString(game))){ids.add(p.path("id").asText());selection.add(Map.of("id",p.path("id").asText(),"version",p.path("version").asText()));}
+  ok(req("cashier","GET",path,null),403);ok(req("other","GET",path,null),403);
+  ok(req("admin","POST",path+"/decision",Map.of("action","VERIFY","packs",selection)),409);
+  ok(req("admin","POST",delivery+"/decision",Map.of("action","CONFIRM","packs",selection)),200);
+  java.util.function.Function<String,Map<String,String>> version=id->{try{for(var p:ok(req("admin","GET",path,null),200).path("packs"))if(p.path("id").asText().equals(id))return Map.of("id",id,"version",p.path("version").asText());throw new AssertionError("Missing pack");}catch(Exception e){throw new RuntimeException(e);}};
+  String first=ids.get(0),secondId=ids.get(1);var firstVersion=version.apply(first);
+  ok(req("admin","POST",path+"/activation",Map.of("packs",List.of(Map.of("id",first,"version",firstVersion.get("version"),"reference","TERM-1")))),409);
+  ok(req("admin","POST",path+"/decision",Map.of("action","NOT_VERIFIED","reason"," ","packs",List.of(firstVersion))),400);
+  ok(req("admin","POST",path+"/decision",Map.of("action","NOT_VERIFIED","reason","Seal mismatch","packs",List.of(firstVersion))),200);
+  ok(req("admin","POST",path+"/decision",Map.of("action","VERIFY","packs",List.of(firstVersion))),409);
+  ok(req("admin","POST",path+"/decision",Map.of("action","VERIFY","packs",List.of(version.apply(first)))),409);
+  ok(req("admin","POST",path+"/decision",Map.of("action","RESTORE","packs",List.of(version.apply(first)))),200);
+  db.update("UPDATE lottery_games SET status='INACTIVE' WHERE lottery_game_id=?",game);
+  ok(req("admin","POST",path+"/decision",Map.of("action","VERIFY","packs",List.of(version.apply(first)))),400);
+  db.update("UPDATE lottery_games SET status='ACTIVE' WHERE lottery_game_id=?",game);
+  var both=List.of(version.apply(first),version.apply(secondId));
+  ok(req("manager","POST",path+"/decision",Map.of("action","VERIFY","packs",both)),403);
+  ok(req("admin","POST",path+"/decision",Map.of("action","VERIFY","packs",both)),200);
+  var a1=Map.of("id",first,"version",version.apply(first).get("version"),"reference","TERM-001");
+  var a2=Map.of("id",secondId,"version",version.apply(secondId).get("version"),"reference","");
+  ok(req("admin","POST",path+"/activation",Map.of("packs",List.of(a1,a2))),400);
+  assertThat(db.queryForObject("SELECT activation_reference FROM lottery_packs WHERE lottery_pack_id=?",String.class,Long.parseLong(first))).isNull();
+  ok(req("manager","POST",path+"/activation",Map.of("packs",List.of(a1))),403);
+  ok(req("admin","POST","/access/stores/"+second+"/lottery-verification/activation",Map.of("packs",List.of(a1))),409);
+  long role=db.queryForObject("SELECT role_type_id FROM role_types WHERE role_type_name='MANAGER'",Long.class);
+  db.update("INSERT INTO store_role_permissions(dgt_id,role_type_id,permission_code,allowed) VALUES (?,?,'LOTTERY_ACTIVATE_PACKS',true)",store,role);
+  ok(req("manager","POST",path+"/activation",Map.of("packs",List.of(a1))),200);
+  ok(req("manager","POST",path+"/activation",Map.of("packs",List.of(a1))),409);
+  ok(req("admin","POST",path+"/decision",Map.of("action","RESTORE","packs",List.of(version.apply(first)))),409);
+  var data=ok(req("manager","GET",path,null),200);assertThat(data.path("canVerify").asBoolean()).isFalse();assertThat(data.path("canActivate").asBoolean()).isTrue();
+  assertThat(data.path("packs").toString()).contains("TERM-001","activated","manager Test");
+  assertThat(db.queryForObject("SELECT count(*) FROM access_audit_events WHERE dgt_id=? AND target_id=? AND event_type='LOTTERY_VERIFICATION_NOT_VERIFIED' AND changes->>'reason'='Seal mismatch'",Long.class,store,first)).isEqualTo(1);
+ }
+
 }

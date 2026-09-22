@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import {useQuery} from "@tanstack/react-query";
+import {request} from "@/lib/backend";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Table,
@@ -12,13 +13,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -26,110 +20,27 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Truck,
-  Plus,
-  Trash2,
-  Barcode,
-  Save,
   CheckCircle,
   AlertTriangle,
   XCircle,
   CheckCheck,
   Ban,
   ClipboardCheck,
+  ReceiptText,
 } from "lucide-react";
-import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
+import { AddReceivedReceiptDialog, type ReceiptDraft } from "./AddReceivedReceiptDialog";
 
-// Mock distributors
-const distributors = [
-  { id: "1", name: "PA Lottery Distribution" },
-  { id: "2", name: "State Games Inc." },
-  { id: "3", name: "Lucky Tickets Co." },
-];
-
-// Mock games with ticket rules
-const games = [
-  { id: "1", name: "Powerball", ticketsPerPack: 50, ticketPrice: 2 },
-  { id: "2", name: "Mega Millions", ticketsPerPack: 50, ticketPrice: 2 },
-  { id: "3", name: "Cash 5", ticketsPerPack: 50, ticketPrice: 1 },
-  { id: "4", name: "Pick 3", ticketsPerPack: 50, ticketPrice: 1 },
-  { id: "5", name: "Scratch Off - $5", ticketsPerPack: 50, ticketPrice: 5 },
-  { id: "6", name: "Scratch Off - $10", ticketsPerPack: 30, ticketPrice: 10 },
-  { id: "7", name: "Scratch Off - $20", ticketsPerPack: 20, ticketPrice: 20 },
-];
-
-// Mock pending confirmation packs (previously confirmed received, now awaiting confirmation)
-const mockPendingPacks = [
-  {
-    id: "p1",
-    gameName: "Powerball",
-    packNumber: "000001",
-    startTicket: "000001001",
-    endTicket: "000001050",
-    ticketsCount: 50,
-    packValue: 100,
-    deliveryRef: "INV-2026-001",
-    receivedDate: "2026-01-25",
-    receivedBy: "John Doe",
-  },
-  {
-    id: "p2",
-    gameName: "Powerball",
-    packNumber: "000002",
-    startTicket: "000002001",
-    endTicket: "000002050",
-    ticketsCount: 50,
-    packValue: 100,
-    deliveryRef: "INV-2026-001",
-    receivedDate: "2026-01-25",
-    receivedBy: "John Doe",
-  },
-  {
-    id: "p3",
-    gameName: "Mega Millions",
-    packNumber: "000003",
-    startTicket: "000003001",
-    endTicket: "000003050",
-    ticketsCount: 50,
-    packValue: 100,
-    deliveryRef: "INV-2026-001",
-    receivedDate: "2026-01-25",
-    receivedBy: "John Doe",
-  },
-  {
-    id: "p4",
-    gameName: "Cash 5",
-    packNumber: "000004",
-    startTicket: "000004001",
-    endTicket: "000004050",
-    ticketsCount: 50,
-    packValue: 50,
-    deliveryRef: "INV-2026-002",
-    receivedDate: "2026-01-26",
-    receivedBy: "Jane Smith",
-  },
-];
-
-interface PackEntry {
-  id: string;
-  gameId: string;
-  gameName: string;
-  packNumber: string;
-  startTicket: string;
-  endTicket: string;
-  ticketsPerPack: number;
-  packValue: number;
-  status: "pending" | "valid" | "error";
-  errorMessage?: string;
-}
 
 interface PendingPack {
   id: string;
+  version: string;
+  status: string;
+  reason: string | null;
   gameName: string;
   packNumber: string;
   startTicket: string;
@@ -141,166 +52,50 @@ interface PendingPack {
   receivedBy: string;
 }
 
-export const ReceivedDelivery = () => {
-  // --- Received Delivery State ---
-  const [distributor, setDistributor] = useState("");
-  const [deliveryDate, setDeliveryDate] = useState(format(new Date(), "yyyy-MM-dd"));
-  const [invoiceNumber, setInvoiceNumber] = useState("");
-  const [receivedBy] = useState("John Doe");
-  const [packs, setPacks] = useState<PackEntry[]>([]);
-  const [selectedPacks, setSelectedPacks] = useState<string[]>([]);
-  const [barcodeInput, setBarcodeInput] = useState("");
-  const [bulkGameId, setBulkGameId] = useState("");
-  const [bulkStartPack, setBulkStartPack] = useState("");
-  const [bulkEndPack, setBulkEndPack] = useState("");
-
-  // --- Confirm Delivery State ---
-  const [pendingPacks, setPendingPacks] = useState<PendingPack[]>(mockPendingPacks);
+interface DeliveryData {
+ packs: PendingPack[]; receiver: string; today: string; canReceive: boolean; canConfirm: boolean;
+ vendors: {id:string;name:string}[]; games: {id:string;name:string}[];
+}
+export const ReceivedDelivery = ({storeId}:{storeId:string}) => {
+  const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
   const [selectedConfirmPacks, setSelectedConfirmPacks] = useState<string[]>([]);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [packToReject, setPackToReject] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [bulkRejectDialogOpen, setBulkRejectDialogOpen] = useState(false);
-
-  const currentUser = "John Doe";
-
-  // --- Received Delivery Logic ---
-  const usedPackNumbers = new Set(packs.map((p) => p.packNumber));
-
-  const validatePack = (packNumber: string, _gameId: string): { valid: boolean; message?: string } => {
-    if (!packNumber.trim()) return { valid: false, message: "Pack number is required" };
-    if (usedPackNumbers.has(packNumber)) return { valid: false, message: "Duplicate pack number" };
-    return { valid: true };
+  const [busy,setBusy]=useState(false);
+  const busyRef=useRef(false);
+  const receiptRequest=useRef<{body:string;key:string}|null>(null);
+  const path=`/access/stores/${encodeURIComponent(storeId)}/lottery-deliveries`;
+  const q=useQuery({queryKey:['lottery-deliveries',storeId],queryFn:()=>request<DeliveryData>(path),enabled:!!storeId,retry:false});
+  const pendingPacks=(q.data?.packs??[]).filter(p=>p.status==='PENDING');
+  const processedPacks=(q.data?.packs??[]).filter(p=>p.status!=='PENDING');
+  const distributors=q.data?.vendors??[], games=q.data?.games??[];
+  const currentUser=q.data?.receiver??'';
+  const mutate=async(action:()=>Promise<unknown>)=>{
+   if(busyRef.current)return false;
+   busyRef.current=true;setBusy(true);
+   try{await action();setSelectedConfirmPacks([]);await q.refetch();return true;}
+   catch(error){toast({title:'Lottery delivery was not saved',description:error instanceof Error?error.message:'Please retry',variant:'destructive'});return false;}
+   finally{busyRef.current=false;setBusy(false);}
   };
-
-  const addPack = (gameId: string, packNumber: string) => {
-    const game = games.find((g) => g.id === gameId);
-    if (!game) return;
-    const validation = validatePack(packNumber, gameId);
-    const startTicket = `${packNumber}001`;
-    const endTicket = `${packNumber}${String(game.ticketsPerPack).padStart(3, "0")}`;
-    const packValue = game.ticketsPerPack * game.ticketPrice;
-    const newPack: PackEntry = {
-      id: crypto.randomUUID(),
-      gameId: game.id,
-      gameName: game.name,
-      packNumber,
-      startTicket,
-      endTicket,
-      ticketsPerPack: game.ticketsPerPack,
-      packValue,
-      status: validation.valid ? "valid" : "error",
-      errorMessage: validation.message,
-    };
-    setPacks((prev) => [...prev, newPack]);
+  const handleReceiptSaved=async(draft:ReceiptDraft)=>{
+   const {receivedBy,...input}=draft;
+   const body=JSON.stringify(input);
+   if(receiptRequest.current?.body!==body)receiptRequest.current={body,key:crypto.randomUUID()};
+   const saved=await mutate(()=>request(path,{method:'POST',body,headers:{'Idempotency-Key':receiptRequest.current!.key}}));
+   if(!saved)throw new Error('Receipt not saved');
+   receiptRequest.current=null;
+   toast({title:'Receipt saved',description:'Packs are saved in the database and pending confirmation.'});
   };
-
-  const handleBarcodeScanned = () => {
-    if (!barcodeInput.trim() || !bulkGameId) {
-      toast({ title: "Error", description: "Please select a game and enter/scan a barcode", variant: "destructive" });
-      return;
-    }
-    addPack(bulkGameId, barcodeInput.trim());
-    setBarcodeInput("");
+  const decide=async(ids:string[],action:'CONFIRM'|'REJECT')=>{
+   const packs=ids.map(id=>pendingPacks.find(p=>p.id===id)).filter((p):p is PendingPack=>!!p).map(p=>({id:p.id,version:p.version}));
+   const saved=await mutate(()=>request(path+'/decision',{method:'POST',body:JSON.stringify({action,reason:rejectionReason,packs})}));
+   if(saved)toast({title:action==='CONFIRM'?'Packs confirmed':'Packs rejected',description:action==='CONFIRM'?'Saved for the verification step. Packs are not activated.':'Rejection reason saved; pack records retained.'});
+   return saved;
   };
-
-  const handleBulkAdd = () => {
-    if (!bulkGameId || !bulkStartPack || !bulkEndPack) {
-      toast({ title: "Error", description: "Please fill in all bulk entry fields", variant: "destructive" });
-      return;
-    }
-    const start = parseInt(bulkStartPack);
-    const end = parseInt(bulkEndPack);
-    if (isNaN(start) || isNaN(end) || start > end) {
-      toast({ title: "Error", description: "Invalid pack range", variant: "destructive" });
-      return;
-    }
-    for (let i = start; i <= end; i++) {
-      addPack(bulkGameId, String(i).padStart(6, "0"));
-    }
-    setBulkStartPack("");
-    setBulkEndPack("");
-    toast({ title: "Success", description: `Added ${end - start + 1} packs` });
-  };
-
-  const removePack = (id: string) => {
-    setPacks((prev) => prev.filter((p) => p.id !== id));
-    setSelectedPacks((prev) => prev.filter((pId) => pId !== id));
-  };
-
-  const removeSelected = () => {
-    setPacks((prev) => prev.filter((p) => !selectedPacks.includes(p.id)));
-    setSelectedPacks([]);
-  };
-
-  const togglePackSelection = (id: string) => {
-    setSelectedPacks((prev) => prev.includes(id) ? prev.filter((pId) => pId !== id) : [...prev, id]);
-  };
-
-  const toggleAllSelection = () => {
-    if (selectedPacks.length === packs.length) {
-      setSelectedPacks([]);
-    } else {
-      setSelectedPacks(packs.map((p) => p.id));
-    }
-  };
-
-  const handleSaveDraft = () => {
-    if (!distributor) {
-      toast({ title: "Error", description: "Please select a distributor", variant: "destructive" });
-      return;
-    }
-    toast({ title: "Draft Saved", description: `Saved ${packs.length} packs as draft` });
-  };
-
-  const handleConfirmReceived = () => {
-    if (!distributor) {
-      toast({ title: "Error", description: "Please select a distributor", variant: "destructive" });
-      return;
-    }
-    const invalidPacks = packs.filter((p) => p.status === "error");
-    if (invalidPacks.length > 0) {
-      toast({ title: "Error", description: `${invalidPacks.length} packs have validation errors`, variant: "destructive" });
-      return;
-    }
-    if (packs.length === 0) {
-      toast({ title: "Error", description: "Please add at least one pack", variant: "destructive" });
-      return;
-    }
-    toast({ title: "Delivery Confirmed", description: `${packs.length} packs moved to Confirm / Activate Pack` });
-    setPacks([]);
-    setSelectedPacks([]);
-    setInvoiceNumber("");
-  };
-
-  const totalPackValue = packs.reduce((sum, p) => sum + p.packValue, 0);
-  const validPacks = packs.filter((p) => p.status === "valid").length;
-  const errorPacks = packs.filter((p) => p.status === "error").length;
-
-  // --- Confirm Delivery Logic ---
-  const confirmPack = (packId: string) => {
-    setPendingPacks((prev) =>
-      prev.filter((pack) => {
-        if (pack.id === packId) {
-          toast({ title: "Pack Confirmed", description: `Pack ${pack.packNumber} is now pending activation` });
-          return false;
-        }
-        return true;
-      })
-    );
-    setSelectedConfirmPacks((prev) => prev.filter((id) => id !== packId));
-  };
-
-  const confirmAllPacks = () => {
-    if (pendingPacks.length === 0) {
-      toast({ title: "No Packs", description: "No packs to confirm", variant: "destructive" });
-      return;
-    }
-    const count = pendingPacks.length;
-    setPendingPacks([]);
-    setSelectedConfirmPacks([]);
-    toast({ title: "Packs Confirmed", description: `${count} packs are now pending activation` });
-  };
+  const confirmPack=(id:string)=>void decide([id],'CONFIRM');
+  const confirmAllPacks=()=>void decide(pendingPacks.map(p=>p.id),'CONFIRM');
 
   const openRejectDialog = (packId: string) => {
     setPackToReject(packId);
@@ -308,26 +103,10 @@ export const ReceivedDelivery = () => {
     setRejectDialogOpen(true);
   };
 
-  const confirmReject = () => {
-    if (!rejectionReason.trim()) {
-      toast({ title: "Error", description: "Rejection reason is required", variant: "destructive" });
-      return;
+  const confirmReject = async () => {
+    if(packToReject && await decide([packToReject],'REJECT')){
+      setRejectDialogOpen(false);setPackToReject(null);setRejectionReason('');
     }
-    if (packToReject) {
-      setPendingPacks((prev) =>
-        prev.filter((pack) => {
-          if (pack.id === packToReject) {
-            toast({ title: "Pack Rejected", description: `Pack ${pack.packNumber} has been rejected` });
-            return false;
-          }
-          return true;
-        })
-      );
-      setSelectedConfirmPacks((prev) => prev.filter((id) => id !== packToReject));
-    }
-    setRejectDialogOpen(false);
-    setPackToReject(null);
-    setRejectionReason("");
   };
 
   const openBulkRejectDialog = () => {
@@ -339,17 +118,8 @@ export const ReceivedDelivery = () => {
     setBulkRejectDialogOpen(true);
   };
 
-  const confirmBulkReject = () => {
-    if (!rejectionReason.trim()) {
-      toast({ title: "Error", description: "Rejection reason is required", variant: "destructive" });
-      return;
-    }
-    const rejectedCount = selectedConfirmPacks.length;
-    setPendingPacks((prev) => prev.filter((p) => !selectedConfirmPacks.includes(p.id)));
-    setSelectedConfirmPacks([]);
-    setBulkRejectDialogOpen(false);
-    setRejectionReason("");
-    toast({ title: "Packs Rejected", description: `${rejectedCount} packs have been rejected` });
+  const confirmBulkReject=async()=>{
+   if(await decide(selectedConfirmPacks,'REJECT')){setBulkRejectDialogOpen(false);setRejectionReason('');}
   };
 
   const toggleConfirmPackSelection = (id: string) => {
@@ -364,8 +134,11 @@ export const ReceivedDelivery = () => {
     }
   };
 
+  if(!storeId)return <p>Select a store.</p>;
+  if(q.isPending)return <p role="status">Loading lottery deliveries…</p>;
+  if(q.error)return <p role="alert">{q.error.message} <Button onClick={()=>void q.refetch()}>Retry</Button></p>;
   return (
-    <div className="space-y-6">
+    <fieldset disabled={busy} className="space-y-6 min-w-0">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -378,214 +151,13 @@ export const ReceivedDelivery = () => {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleSaveDraft}>
-            <Save className="w-4 h-4 mr-1" />
-            Save as Draft
-          </Button>
-          <Button onClick={handleConfirmReceived}>
-            <CheckCircle className="w-4 h-4 mr-1" />
-            Confirm Received
+          <Button disabled={!q.data?.canReceive} onClick={() => setReceiptDialogOpen(true)}>
+            <ReceiptText className="w-4 h-4 mr-1" />
+            Add Received Receipt
           </Button>
         </div>
       </div>
 
-      {/* Delivery Details */}
-      <Card>
-        <CardHeader className="pb-4">
-          <CardTitle className="text-lg">Delivery Details</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="distributor">
-                Distributor / Vendor <span className="text-destructive">*</span>
-              </Label>
-              <Select value={distributor} onValueChange={setDistributor}>
-                <SelectTrigger id="distributor">
-                  <SelectValue placeholder="Select distributor" />
-                </SelectTrigger>
-                <SelectContent className="z-50 bg-popover">
-                  {distributors.map((d) => (
-                    <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="deliveryDate">Delivery Date</Label>
-              <Input id="deliveryDate" type="date" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="invoiceNumber">Delivery Reference / Invoice #</Label>
-              <Input id="invoiceNumber" placeholder="Enter invoice number" value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="receivedBy">Received By</Label>
-              <Input id="receivedBy" value={receivedBy} disabled className="bg-muted" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Quick Entry */}
-      <Card>
-        <CardHeader className="pb-4">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Barcode className="w-5 h-5" />
-            Quick Entry
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="space-y-4 p-4 border rounded-lg">
-              <h4 className="font-medium text-sm">Scan Pack Barcode</h4>
-              <div className="space-y-3">
-                <div className="space-y-2">
-                  <Label>Select Game</Label>
-                  <Select value={bulkGameId} onValueChange={setBulkGameId}>
-                    <SelectTrigger><SelectValue placeholder="Select game" /></SelectTrigger>
-                    <SelectContent className="z-50 bg-popover">
-                      {games.map((g) => (<SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex gap-2">
-                  <Input placeholder="Scan or enter barcode..." value={barcodeInput} onChange={(e) => setBarcodeInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleBarcodeScanned()} />
-                  <Button onClick={handleBarcodeScanned}><Plus className="w-4 h-4" /></Button>
-                </div>
-              </div>
-            </div>
-            <div className="space-y-4 p-4 border rounded-lg">
-              <h4 className="font-medium text-sm">Manual Range Entry</h4>
-              <div className="space-y-3">
-                <div className="space-y-2">
-                  <Label>Select Game</Label>
-                  <Select value={bulkGameId} onValueChange={setBulkGameId}>
-                    <SelectTrigger><SelectValue placeholder="Select game" /></SelectTrigger>
-                    <SelectContent className="z-50 bg-popover">
-                      {games.map((g) => (<SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <Input placeholder="Start pack #" value={bulkStartPack} onChange={(e) => setBulkStartPack(e.target.value)} />
-                  </div>
-                  <span className="self-center text-muted-foreground">to</span>
-                  <div className="flex-1">
-                    <Input placeholder="End pack #" value={bulkEndPack} onChange={(e) => setBulkEndPack(e.target.value)} />
-                  </div>
-                  <Button onClick={handleBulkAdd}><Plus className="w-4 h-4 mr-1" />Add</Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Summary Stats */}
-      {packs.length > 0 && (
-        <div className="grid grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="pt-4 pb-4">
-              <p className="text-xs text-muted-foreground">Total Packs</p>
-              <p className="text-2xl font-bold">{packs.length}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-4 pb-4">
-              <p className="text-xs text-muted-foreground">Valid Packs</p>
-              <p className="text-2xl font-bold text-primary">{validPacks}</p>
-            </CardContent>
-          </Card>
-          <Card className={errorPacks > 0 ? "border-destructive/50" : ""}>
-            <CardContent className="pt-4 pb-4">
-              <p className="text-xs text-muted-foreground">Errors</p>
-              <p className={`text-2xl font-bold ${errorPacks > 0 ? "text-destructive" : ""}`}>{errorPacks}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-4 pb-4">
-              <p className="text-xs text-muted-foreground">Total Value</p>
-              <p className="text-2xl font-bold">${totalPackValue.toLocaleString()}</p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Packs Received Table */}
-      <Card>
-        <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">Packs Received</CardTitle>
-            {selectedPacks.length > 0 && (
-              <Button variant="destructive" size="sm" onClick={removeSelected}>
-                <Trash2 className="w-4 h-4 mr-1" />
-                Remove Selected ({selectedPacks.length})
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          {packs.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <Barcode className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p>No packs added yet</p>
-              <p className="text-sm">Scan a barcode or use manual entry above</p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12">
-                    <Checkbox checked={selectedPacks.length === packs.length && packs.length > 0} onCheckedChange={toggleAllSelection} />
-                  </TableHead>
-                  <TableHead>Game Name</TableHead>
-                  <TableHead>Pack / Book #</TableHead>
-                  <TableHead>Start Ticket #</TableHead>
-                  <TableHead>End Ticket #</TableHead>
-                  <TableHead className="text-center">Tickets</TableHead>
-                  <TableHead className="text-right">Pack Value</TableHead>
-                  <TableHead className="text-center">Status</TableHead>
-                  <TableHead className="w-12"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {packs.map((pack) => (
-                  <TableRow key={pack.id} className={pack.status === "error" ? "bg-destructive/5" : ""}>
-                    <TableCell>
-                      <Checkbox checked={selectedPacks.includes(pack.id)} onCheckedChange={() => togglePackSelection(pack.id)} />
-                    </TableCell>
-                    <TableCell className="font-medium">{pack.gameName}</TableCell>
-                    <TableCell>{pack.packNumber}</TableCell>
-                    <TableCell>{pack.startTicket}</TableCell>
-                    <TableCell>{pack.endTicket}</TableCell>
-                    <TableCell className="text-center">{pack.ticketsPerPack}</TableCell>
-                    <TableCell className="text-right">${pack.packValue.toFixed(2)}</TableCell>
-                    <TableCell className="text-center">
-                      {pack.status === "valid" ? (
-                        <Badge variant="secondary" className="bg-accent text-accent-foreground">Received (Not Activated)</Badge>
-                      ) : (
-                        <div className="flex items-center justify-center gap-1">
-                          <Badge variant="destructive" className="flex items-center gap-1">
-                            <AlertTriangle className="w-3 h-3" />Error
-                          </Badge>
-                          {pack.errorMessage && <span className="text-xs text-destructive">{pack.errorMessage}</span>}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="icon" onClick={() => removePack(pack.id)} className="h-8 w-8">
-                        <Trash2 className="w-4 h-4 text-muted-foreground hover:text-destructive" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
 
       {/* ===== Packs Pending Confirmation Section ===== */}
       <Card>
@@ -597,12 +169,12 @@ export const ReceivedDelivery = () => {
             </CardTitle>
             <div className="flex gap-2">
               {selectedConfirmPacks.length > 0 && (
-                <Button variant="destructive" size="sm" onClick={openBulkRejectDialog}>
+                <Button variant="destructive" size="sm" disabled={!q.data?.canConfirm} onClick={openBulkRejectDialog}>
                   <Ban className="w-4 h-4 mr-1" />
                   Reject Selected ({selectedConfirmPacks.length})
                 </Button>
               )}
-              <Button onClick={confirmAllPacks} disabled={pendingPacks.length === 0}>
+              <Button onClick={confirmAllPacks} disabled={!q.data?.canConfirm || pendingPacks.length === 0}>
                 <CheckCheck className="w-4 h-4 mr-1" />
                 Confirm All Packs ({pendingPacks.length})
               </Button>
@@ -610,14 +182,7 @@ export const ReceivedDelivery = () => {
           </div>
         </CardHeader>
         <CardContent>
-          {pendingPacks.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <ClipboardCheck className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p>No packs pending confirmation</p>
-              <p className="text-sm">All received packs have been processed</p>
-            </div>
-          ) : (
-            <Table>
+          <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-12">
@@ -637,6 +202,7 @@ export const ReceivedDelivery = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
+                  {pendingPacks.length === 0 && <TableRow><TableCell colSpan={9} className="py-12 text-center text-muted-foreground">No packs pending confirmation. Add a received receipt to begin.</TableCell></TableRow>}
                 {pendingPacks.map((pack) => (
                   <TableRow key={pack.id}>
                     <TableCell>
@@ -651,10 +217,10 @@ export const ReceivedDelivery = () => {
                     <TableCell><span className="text-sm">{pack.deliveryRef}</span></TableCell>
                     <TableCell>
                       <div className="flex items-center justify-center gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => confirmPack(pack.id)} className="h-8 text-primary hover:text-primary hover:bg-primary/10">
+                        <Button variant="ghost" size="sm" disabled={!q.data?.canConfirm} onClick={() => confirmPack(pack.id)} className="h-8 text-primary hover:text-primary hover:bg-primary/10">
                           <CheckCircle className="w-4 h-4 mr-1" />Confirm
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => openRejectDialog(pack.id)} className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10">
+                        <Button variant="ghost" size="sm" disabled={!q.data?.canConfirm} onClick={() => openRejectDialog(pack.id)} className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10">
                           <XCircle className="w-4 h-4 mr-1" />Reject
                         </Button>
                       </div>
@@ -663,10 +229,16 @@ export const ReceivedDelivery = () => {
                 ))}
               </TableBody>
             </Table>
-          )}
         </CardContent>
       </Card>
 
+      <div className="flex items-center gap-3"><Button variant="outline" onClick={()=>void q.refetch()}>Refresh</Button>
+       {(!games.length || !distributors.length) && <p className="text-sm text-muted-foreground">Receipt entry needs an active lottery game and vendor in this store.</p>}
+      </div>
+      <Card><CardHeader><CardTitle className="text-lg">Confirmed and Rejected Packs</CardTitle></CardHeader><CardContent>
+       <Table><TableHeader><TableRow><TableHead>Game</TableHead><TableHead>Pack / Book #</TableHead><TableHead>Delivery Ref</TableHead><TableHead>Status</TableHead><TableHead>Rejection Reason</TableHead></TableRow></TableHeader>
+       <TableBody>{processedPacks.length===0 && <TableRow><TableCell colSpan={5} className="py-12 text-center text-muted-foreground">No confirmed or rejected packs yet.</TableCell></TableRow>}{processedPacks.map(p=><TableRow key={p.id}><TableCell>{p.gameName}</TableCell><TableCell>{p.packNumber}</TableCell><TableCell>{p.deliveryRef}</TableCell><TableCell>{p.status}</TableCell><TableCell>{p.reason??'—'}</TableCell></TableRow>)}</TableBody></Table>
+      </CardContent></Card>
       {/* Verification Rules */}
       <Card className="bg-muted/30">
         <CardHeader className="pb-3">
@@ -677,10 +249,10 @@ export const ReceivedDelivery = () => {
         </CardHeader>
         <CardContent>
           <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-            <li>Pack number must be unique (no duplicates in system)</li>
-            <li>Ticket range must be valid for the game type</li>
-            <li>No overlap with existing ticket ranges</li>
-            <li>Confirmed packs will move to "Pending Activation" status</li>
+            <li>Pack number must be unique within the store and game</li>
+            <li>Ticket positions run from 1 through the game’s tickets per pack</li>
+            <li>Each receipt is saved in full; duplicate packs or invalid lines reject the entire receipt</li>
+            <li>Confirmed packs are saved for verification; activation is a separate step</li>
             <li>Confirmed packs are <strong>not yet sellable</strong> until activated</li>
           </ul>
         </CardContent>
@@ -725,6 +297,17 @@ export const ReceivedDelivery = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+
+      <AddReceivedReceiptDialog
+        open={receiptDialogOpen}
+        onOpenChange={setReceiptDialogOpen}
+        distributors={distributors}
+        games={games}
+        defaultReceivedBy={currentUser}
+        onSave={handleReceiptSaved}
+        defaultDeliveryDate={q.data?.today}
+        saving={busy}
+      />
+    </fieldset>
   );
 };

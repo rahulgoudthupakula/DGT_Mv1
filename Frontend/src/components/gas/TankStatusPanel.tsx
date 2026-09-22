@@ -1,147 +1,18 @@
-import { Fuel, AlertTriangle, Gauge, FileText, Droplets } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
-
-interface TankData {
-  id: string;
-  fuelType: string;
-  currentGallons: number;
-  capacity: number;
-  lastReading: string;
-  lowAlert: boolean;
-  waterAlert: boolean;
-}
-
-const tanks: TankData[] = [
-  {
-    id: "T-01",
-    fuelType: "Regular (87)",
-    currentGallons: 5200,
-    capacity: 10000,
-    lastReading: "Today, 6:00 AM",
-    lowAlert: false,
-    waterAlert: false,
-  },
-  {
-    id: "T-02",
-    fuelType: "Plus (89)",
-    currentGallons: 1800,
-    capacity: 8000,
-    lastReading: "Today, 6:00 AM",
-    lowAlert: true,
-    waterAlert: false,
-  },
-  {
-    id: "T-03",
-    fuelType: "Premium (93)",
-    currentGallons: 4100,
-    capacity: 8000,
-    lastReading: "Today, 6:00 AM",
-    lowAlert: false,
-    waterAlert: false,
-  },
-  {
-    id: "T-04",
-    fuelType: "Diesel",
-    currentGallons: 800,
-    capacity: 6000,
-    lastReading: "Yesterday, 10:00 PM",
-    lowAlert: true,
-    waterAlert: true,
-  },
-];
-
-const getCapacityColor = (percent: number) => {
-  if (percent <= 20) return "bg-red-500";
-  if (percent <= 40) return "bg-amber-500";
-  return "bg-emerald-500";
-};
-
-export const TankStatusPanel = () => {
-  return (
-    <Card className="border-border">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <Droplets className="h-4.5 w-4.5 text-primary" />
-            Tank Status
-          </CardTitle>
-          <span className="text-[11px] text-muted-foreground">
-            {tanks.length} tanks monitored
-          </span>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {tanks.map((tank) => {
-            const percent = Math.round((tank.currentGallons / tank.capacity) * 100);
-            const capacityColor = getCapacityColor(percent);
-
-            return (
-              <div
-                key={tank.id}
-                className="border border-border rounded-lg p-4 space-y-3 bg-muted/20"
-              >
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Fuel className="h-4 w-4 text-primary" />
-                    <span className="font-semibold text-sm text-foreground">
-                      {tank.fuelType}
-                    </span>
-                    <span className="text-xs text-muted-foreground">({tank.id})</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    {tank.lowAlert && (
-                      <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
-                        <AlertTriangle className="h-3 w-3 mr-0.5" />
-                        Low
-                      </Badge>
-                    )}
-                    {tank.waterAlert && (
-                      <Badge className="text-[10px] px-1.5 py-0 bg-amber-500/90 hover:bg-amber-500 text-white border-0">
-                        <Droplets className="h-3 w-3 mr-0.5" />
-                        Water
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-
-                {/* Capacity Bar */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">
-                      {tank.currentGallons.toLocaleString()} / {tank.capacity.toLocaleString()} gal
-                    </span>
-                    <span className="font-semibold text-foreground">{percent}%</span>
-                  </div>
-                  <div className="h-3 w-full bg-secondary rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all ${capacityColor}`}
-                      style={{ width: `${percent}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Last Reading */}
-                <div className="text-[11px] text-muted-foreground">
-                  Last reading: {tank.lastReading}
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center gap-2 pt-1">
-                  <Button variant="ghost" size="sm" className="text-[11px] h-7 gap-1">
-                    <FileText className="h-3 w-3" />
-                    View Tank Report
-                  </Button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
-  );
+import {Fuel,AlertTriangle,FileText,Droplets} from 'lucide-react';
+import {Card,CardContent,CardHeader,CardTitle} from '@/components/ui/card';
+import {Button} from '@/components/ui/button';
+import {Badge} from '@/components/ui/badge';
+import {useAppNavigation} from '@/contexts/NavigationContext';
+import {type DashboardTank,tankPercent,tankLow} from './gasDashboardData';
+import {gallons,measuredTime} from './tank-report/tankReportData';
+export const TankStatusPanel=({tanks,timezone}:{tanks:DashboardTank[];timezone:string})=>{
+ const {navigateTo}=useAppNavigation();
+ return <Card className="border-border"><CardHeader className="pb-3"><div className="flex items-center justify-between"><CardTitle className="text-base font-semibold flex items-center gap-2"><Droplets className="h-4 w-4 text-primary"/>Tank Status</CardTitle><span className="text-[11px] text-muted-foreground">{tanks.length} tanks configured</span></div></CardHeader><CardContent>
+ {!tanks.length&&<p className="text-sm text-muted-foreground">No tanks configured for this store.</p>}
+ <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{tanks.map(t=>{const percent=tankPercent(t);const low=tankLow(t);return <div key={t.id} className="border border-border rounded-lg p-4 space-y-3 bg-muted/20">
+  <div className="flex items-center justify-between gap-2"><div className="flex items-center gap-2"><Fuel className="h-4 w-4 text-primary"/><span className="font-semibold text-sm">{t.gradeName}</span><span className="text-xs text-muted-foreground">({t.number})</span></div>{low&&<Badge variant="destructive" className="text-[10px]"><AlertTriangle className="h-3 w-3 mr-1"/>Low</Badge>}</div>
+  <div className="space-y-1.5"><div className="flex items-center justify-between text-xs"><span className="text-muted-foreground">{gallons(t.currentGallons)} / {gallons(t.capacity)} gal</span><span>{percent==null?'—':percent.toFixed(1)+'%'}</span></div><div className="h-3 w-full bg-secondary rounded-full overflow-hidden"><div className={`h-full rounded-full ${low?'bg-red-500':'bg-primary'}`} style={{width:`${Math.max(0,Math.min(100,percent??0))}%`}}/></div></div>
+  <p className="text-[11px] text-muted-foreground">Last reading: {t.measuredAt?measuredTime(t.measuredAt,timezone):'Not recorded'}</p>
+  <Button variant="ghost" size="sm" className="text-[11px] h-7 gap-1" onClick={()=>navigateTo('Gas','Tank report')}><FileText className="h-3 w-3"/>View Tank Report</Button>
+ </div>;})}</div></CardContent></Card>;
 };

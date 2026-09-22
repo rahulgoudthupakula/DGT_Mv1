@@ -16,8 +16,8 @@ import tools.jackson.databind.ObjectMapper;
 @ConditionalOnProperty(name="app.gas.price.enabled",havingValue="true")
 @RequestMapping("/api/v1/access/stores/{store}/gas-prices")
 public class StoreGasPriceController {
- private final ScopedAccess a;private final ObjectMapper json;
- public StoreGasPriceController(ScopedAccess a,ObjectMapper json){this.a=a;this.json=json;}
+ private final ScopedAccess a;private final ObjectMapper json;private final GasDashboardService dashboard;
+ public StoreGasPriceController(ScopedAccess a,ObjectMapper json,GasDashboardService dashboard){this.a=a;this.json=json;this.dashboard=dashboard;}
  private void access(String store){if(a.admin(a.user(),a.company(store)))return;
   if(!Boolean.TRUE.equals(a.db.queryForObject("SELECT EXISTS(SELECT 1 FROM user_roles r JOIN role_types t USING(role_type_id) JOIN store_role_permissions p ON p.dgt_id=r.dgt_id AND p.role_type_id=r.role_type_id WHERE r.user_id=? AND r.dgt_id=? AND r.is_active AND t.is_active AND upper(t.role_type_name)='MANAGER' AND p.permission_code='GAS_SETTINGS' AND p.allowed)",Boolean.class,a.user(),store)))throw a.denied();}
  private ResponseStatusException bad(String m){return new ResponseStatusException(HttpStatus.BAD_REQUEST,m);}
@@ -38,6 +38,8 @@ public class StoreGasPriceController {
  """,store).stream().map(Rows::normalize).toList();}
  @GetMapping @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
  public Object get(@PathVariable String store){access(store);return data(store);}
+ @GetMapping("/dashboard") @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
+ public Object dashboard(@PathVariable String store){access(store);var result=dashboard.tanks(store);result.put("prices",history(store).stream().filter(p->"CURRENT".equals(p.get("status"))).toList());return result;}
  private Object data(String store){return Map.of("history",history(store),"grades",a.db.queryForList("SELECT fuel_grade_id::text AS id,grade_name AS name FROM fuel_grades WHERE is_active ORDER BY grade_name,fuel_grade_id"),"assignedGrades",a.db.queryForList("SELECT DISTINCT x.fuel_grade_id::text FROM fuel_tank_grade_assignments x JOIN fuel_tanks t USING(tank_id) WHERE t.dgt_id=? AND x.effective_from<=(CURRENT_TIMESTAMP AT TIME ZONE (SELECT timezone FROM stores WHERE dgt_id=?))::date AND (x.effective_to IS NULL OR x.effective_to>=(CURRENT_TIMESTAMP AT TIME ZONE (SELECT timezone FROM stores WHERE dgt_id=?))::date)",String.class,store,store,store),"timezone",Objects.toString(a.db.queryForObject("SELECT timezone FROM stores WHERE dgt_id=?",String.class,store),"UTC"));}
  public record Input(String gradeId,BigDecimal cash,BigDecimal credit,String reason,String notes,String effectiveTime,LocalDateTime scheduledFor,String overlapChoice){}
  private void price(BigDecimal p){if(p==null||p.signum()<=0||p.compareTo(new BigDecimal("9999999.999"))>0||p.stripTrailingZeros().scale()>3)throw bad("Enter positive cash and credit prices, with up to three decimal places");}
