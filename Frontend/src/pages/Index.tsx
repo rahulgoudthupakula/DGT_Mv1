@@ -1,3 +1,6 @@
+import {ManageStoresPage} from "@/components/profile/ManageStoresPage";
+import {PageTabAccess} from "@/components/ui/tabs";
+import { childPermissions, pagePermission, sectionPermissions, pagePermissions, canNavigatePage, canNavigateSection, firstPermittedPage } from "@/lib/page-permissions";
 import {disabledModules} from '@/lib/moduleAvailability';
 import { useStoreAccess } from "@/lib/store-access";
 import { useQuery } from "@tanstack/react-query";
@@ -124,7 +127,20 @@ const Index = ({ onLogout }: { onLogout: () => void }) => {
   const [selectedStoreId, setSelectedStoreId] = useState<string>(initial?.selectedStoreId ?? "");
 
   const storeAccess = useStoreAccess(selectedStoreId);
-  const connectedPage = (!activeProfilePage && activeNav === "Lottery" && ["Received and confirm delivery","Verify and activate packs","Day/shift closing","Settle and return packs","Games","Pack history","Settings"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Sales and Performance Reports" && activeSubNav === "POS report") || (!activeProfilePage && activeNav === "Tender Types" && ["Credit card","EBT/Foodstamps","Fleet cards","Reports"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Everyday Closing Reports" && ["Dashboard","Store","Reports"].includes(activeSubNav??"")) || showLiveCounter || !showLiveCounter && ((!activeProfilePage && activeNav === "Gas" && ["Dashboard","Settings","Delivery","Gas price","Inventory adjustment","Tank report"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Grocery" && ["Dashboard","Purchase Orders","Customized order guide","Edit & view invoices","Inventory adjustment","Settings","Reports"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Inventory Valuation" && activeSubNav === "Current stock") || (!activeProfilePage && activeNav === "Price Book" && ["Statistics","New arrivals","Items","Vendor management","Rebate management","Promotions","Discounts","Bulk update","Price groups","Inventory by item (current stock)"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Workweek" && ["Employees","Week Schedule","Time Off Request","Time Off Approvals"].includes(activeSubNav??"")) || ["Store Account Overview","Access & Integrations","User Profile Management","Subscriptions & Billing"].includes(activeProfilePage ?? ""));
+  const connectedPage = (!activeProfilePage && activeNav === "Lottery" && ["Received and confirm delivery","Verify and activate packs","Day/shift closing","Settle and return packs","Games","Pack history","Settings"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Sales and Performance Reports" && activeSubNav === "POS report") || (!activeProfilePage && activeNav === "Tender Types" && ["Credit card","EBT/Foodstamps","Fleet cards","Reports"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Everyday Closing Reports" && ["Dashboard","Store","Reports"].includes(activeSubNav??"")) || showLiveCounter || !showLiveCounter && ((!activeProfilePage && activeNav === "Gas" && ["Dashboard","Settings","Delivery","Gas price","Inventory adjustment","Tank report"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Grocery" && ["Dashboard","Purchase Orders","Customized order guide","Edit & view invoices","Inventory adjustment","Settings","Reports"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Inventory Valuation" && activeSubNav === "Current stock") || (!activeProfilePage && activeNav === "Price Book" && ["Statistics","New arrivals","Items","Vendor management","Rebate management","Promotions","Discounts","Bulk update","Price groups","Inventory by item (current stock)"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Workweek" && ["Employees","Week Schedule","Time Off Request","Time Off Approvals"].includes(activeSubNav??"")) || ["Support & Training","Manage Stores","Store Account Overview","Access & Integrations","User Profile Management","Subscriptions & Billing"].includes(activeProfilePage ?? ""));
+  const governedPage = !activeProfilePage && !showLiveCounter;
+  const pageAccessPending = governedPage && storeAccess.isPending;
+  const pageAccessDenied = governedPage && !storeAccess.isPending && !canNavigatePage(storeAccess.data,activeNav,activeSubNav);
+  useEffect(() => {
+    if (!pageAccessDenied) return;
+    // Saved/deep navigation may point to a page that was subsequently revoked.
+    const section = canNavigateSection(storeAccess.data,activeNav) ? activeNav : Object.keys(sectionPermissions).find(nav=>canNavigateSection(storeAccess.data,nav));
+    const next = section ? firstPermittedPage(storeAccess.data,section) : null;
+    if(next&&section) {setActiveNav(section);setActiveSubNav(next);}
+    else {setActiveProfilePage("User Profile Management");setActiveSubNav(null);}
+    setActiveSubPage(null);
+    setNavParams({});
+  }, [pageAccessDenied, selectedStoreId, activeNav, storeAccess.data]);
   const layoutOnly = !connectedPage && storeAccess.data?.admin === true;
 
   const storesQuery = useQuery({ queryKey: ["backend-stores"], queryFn: listStores });
@@ -134,10 +150,8 @@ const Index = ({ onLogout }: { onLogout: () => void }) => {
       setSelectedStoreId(storesQuery.data[0]?.dgt_id ?? "");
     }
   }, [storesQuery.data, selectedStoreId]);
-  // Company hierarchy is not yet available from the schema.
-  const isChildStore = false;
+  // Data synchronization is a separate feature; hierarchy does not enable it.
   const isParentStore = false;
-  const parentStoreName = "";
   // Persist nav state to sessionStorage on every change
   useEffect(() => {
     try {
@@ -148,7 +162,7 @@ const Index = ({ onLogout }: { onLogout: () => void }) => {
   }, [activeNav, activeSubNav, activeSubPage, navParams, activeProfilePage, showLiveCounter, selectedStoreId]);
 
   const handleNavClick = (nav: string) => {
-    if(disabledModules.has(nav))return;
+    if(disabledModules.has(nav)||!canNavigateSection(storeAccess.data,nav))return;
     setActiveNav(nav);
     // Default to the "Dashboard" sub-page when available so each section
     // lands on its dashboard view.
@@ -163,7 +177,7 @@ const Index = ({ onLogout }: { onLogout: () => void }) => {
       "Tender Types": "Dashboard",
       "Banking Management": "Dashboard",
     };
-    setActiveSubNav(defaults[nav] ?? null);
+    setActiveSubNav(firstPermittedPage(storeAccess.data,nav) ?? defaults[nav] ?? null);
     setActiveSubPage(null);
     setNavParams({});
     setActiveProfilePage(null);
@@ -185,13 +199,13 @@ const Index = ({ onLogout }: { onLogout: () => void }) => {
 
   const handleContextNavigate = useCallback(
     (nav: string, subNav: string, subPage?: string, params?: NavigationParams) => {
-      if(disabledModules.has(nav))return;
+      if(disabledModules.has(nav)||!canNavigateSection(storeAccess.data,nav))return;
     setActiveNav(nav);
       setActiveSubNav(subNav);
       setActiveSubPage(subPage || null);
       setNavParams(params ?? {});
     },
-    []
+    [storeAccess.data]
   );
 
   // Vendor profile view
@@ -482,11 +496,14 @@ const Index = ({ onLogout }: { onLogout: () => void }) => {
 
         <main className="container mx-auto px-6 py-8">
           {layoutOnly && <div role="status" className="mb-6 rounded border bg-muted p-4 text-sm">Admin layout preview. Existing example content is for layout review only; database actions are not connected.</div>}
+          <PageTabAccess.Provider value={activeProfilePage||showLiveCounter||['Grocery','Gas','Lottery'].includes(activeNav)?{}:Object.fromEntries(Object.entries(childPermissions[pagePermission(activeNav,activeSubNav)??'']??{}).map(([tab,code])=>[tab,storeAccess.data?.admin===true||storeAccess.data?.pages[code]===true]))}>
           <fieldset disabled={layoutOnly && !showOrderGuide && !showGasDelivery} className="min-w-0 border-0 p-0 m-0" {...(layoutOnly && !showOrderGuide && !showGasDelivery ? {inert:""} : {})}>
-          {!connectedPage && !layoutOnly ? (
+          {pageAccessPending ? <p>Loading page access…</p> : pageAccessDenied ? null : !connectedPage && !layoutOnly ? (
             <div className="space-y-3"><p>This page is not connected to store permissions yet.</p><button className="underline" onClick={()=>{setShowLiveCounter(false);setActiveProfilePage("Store Account Overview");}}>Store Account Overview</button><span> · </span><button className="underline" onClick={()=>{setShowLiveCounter(false);setActiveProfilePage("Access & Integrations");}}>Access &amp; Integrations</button></div>
           ) : showLiveCounter ? (
             <LiveCounterPage key={selectedStoreId} storeId={selectedStoreId} onOpenDailyClosing={() => handleNavClick("Everyday Closing Reports")} />
+          ) : activeProfilePage === "Manage Stores" ? (
+            <ManageStoresPage key={selectedStoreId} storeId={selectedStoreId} onSelect={setSelectedStoreId} onSetup={(id,page)=>{setSelectedStoreId(id);setActiveSubPage(null);setNavParams({});setShowLiveCounter(false);if(page==='employees'){setActiveProfilePage(null);setActiveNav('Workweek');setActiveSubNav('Employees');}else{setActiveProfilePage(page==='permissions'?'Access & Integrations':'Store Account Overview');setActiveSubNav(null);}}}/>
           ) : activeProfilePage === "Store Account Overview" ? (
             <>
               {storesQuery.isPending ? <p>Loading stores…</p> : storesQuery.error ?
@@ -502,7 +519,7 @@ const Index = ({ onLogout }: { onLogout: () => void }) => {
           ) : activeProfilePage === "POS Settings" ? (
             <PosSettingsPage />
           ) : activeProfilePage === "Support & Training" ? (
-            <SupportHubPage />
+            <SupportHubPage key={selectedStoreId} storeId={selectedStoreId} />
           ) : showVendorProfile ? (
             <VendorProfile
               vendorName={navParams.vendorName!} storeId={selectedStoreId} vendorId={navParams.vendorId}
@@ -596,7 +613,7 @@ const Index = ({ onLogout }: { onLogout: () => void }) => {
           ) : showGasDelivery ? (
             <GasDeliveryPage key={selectedStoreId} storeId={selectedStoreId} />
           ) : showGasPayments ? (
-            <GasPaymentPage />
+            <GasPaymentPage key={selectedStoreId} storeId={selectedStoreId} />
           ) : showGasInventoryAdjustment ? (
             <GasInventoryAdjustmentPage key={selectedStoreId} storeId={selectedStoreId} />
           ) : showGasTankReport ? (
@@ -673,6 +690,7 @@ const Index = ({ onLogout }: { onLogout: () => void }) => {
             </div>
           )}
           </fieldset>
+          </PageTabAccess.Provider>
         </main>
         <FloatingAIButton />
       </div>

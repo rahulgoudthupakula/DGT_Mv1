@@ -55,6 +55,7 @@ public class LotteryDispositionController {
  public record Command(String action,List<Selected> packs,String returnType,String reason,String reference){}
  @PostMapping @Transactional public Object change(@PathVariable String store,@RequestBody Command in){
   if(!Set.of("SETTLE","REQUEST_RETURN","CONFIRM_RETURN").contains(Objects.toString(in.action(),"")))throw bad("Invalid action");
+  new com.dgt.backend.access.PagePermissions(a).requireAny(store,in.action().equals("SETTLE")?"LOTTERY_PAGE_RETURNS_SETTLE":"LOTTERY_PAGE_RETURNS_RETURN");
   access(store,in.action().equals("SETTLE")?"LOTTERY_SETTLE_PACKS":"LOTTERY_RETURN_PACKS");lock(store);a.db.queryForList("SELECT lottery_pack_id FROM lottery_packs WHERE dgt_id=? FOR UPDATE",store);
   if(in.packs()==null||in.packs().isEmpty()||in.packs().size()>1000)throw bad("Select 1–1,000 packs");
   var all=new HashMap<String,Map<String,Object>>();for(var p:a.db.queryForList(QUERY,store))all.put(p.get("id").toString(),p);

@@ -1,3 +1,4 @@
+import { useStoreAccess } from "@/lib/store-access";
 import { useState } from "react";
 import { DollarSign, Download, Calendar, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,7 +18,8 @@ import { PaymentSummaryCards } from "./PaymentSummaryCards";
 import { PaymentRegisterTable } from "./PaymentRegisterTable";
 import { RecordPaymentDrawer } from "./RecordPaymentDrawer";
 
-export const GasPaymentPage = () => {
+export const GasPaymentPage = ({storeId}:{storeId:string}) => {
+  const canOpenForm = useStoreAccess(storeId).data?.pages?.["GAS_PAGE_INVOICES_PAYMENT"] === true;
   const [startDate, setStartDate] = useState<Date>(new Date());
   const [endDate, setEndDate] = useState<Date>(new Date());
   const [vendor, setVendor] = useState("all");
@@ -43,10 +45,10 @@ export const GasPaymentPage = () => {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-foreground">Gas Payments</h1>
         <div className="flex items-center gap-2">
-          <Button size="sm" className="gap-1.5 text-xs" onClick={() => setRecordOpen(true)}>
+          {canOpenForm&&<Button size="sm" className="gap-1.5 text-xs" onClick={() => setRecordOpen(true)}>
             <DollarSign className="h-3.5 w-3.5" />
             Record Payment
-          </Button>
+          </Button>}
           <Button variant="outline" size="sm" className="gap-1.5 text-xs">
             <Download className="h-3.5 w-3.5" />
             Export
@@ -152,7 +154,7 @@ export const GasPaymentPage = () => {
       <PaymentRegisterTable vendor={vendor} paymentMethod={paymentMethod} status={status} deliveryRef={deliveryRef} />
 
       {/* Header Record Payment Drawer (no prefill) */}
-      <RecordPaymentDrawer open={recordOpen} onOpenChange={setRecordOpen} />
+      <RecordPaymentDrawer open={recordOpen&&canOpenForm} onOpenChange={setRecordOpen} />
     </div>
   );
 };

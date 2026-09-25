@@ -1,4 +1,5 @@
 import { login, developmentDatabase } from "@/lib/backend";
+import { Link } from "react-router-dom";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -63,6 +64,7 @@ export const LoginPage = ({ onLogin }: { onLogin: () => void }) => {
               {busy ? "Signing in…" : "Sign In"}
             </Button>
           </form>
+          <p className="mt-4 text-center text-sm text-muted-foreground">New to DGT? <Link to="/signup" className="text-primary font-medium underline-offset-4 hover:underline focus-visible:underline">Create an account</Link></p>
         </CardContent>
       </Card>
     </div>

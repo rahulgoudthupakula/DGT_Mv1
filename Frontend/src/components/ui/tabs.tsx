@@ -3,7 +3,16 @@ import * as TabsPrimitive from "@radix-ui/react-tabs";
 
 import { cn } from "@/lib/utils";
 
-const Tabs = TabsPrimitive.Root;
+export const PageTabAccess = React.createContext<Record<string,boolean>>({});
+function Tabs({value,defaultValue,onValueChange,...props}:React.ComponentProps<typeof TabsPrimitive.Root>){
+ const access=React.useContext(PageTabAccess);
+ const [internal,setInternal]=React.useState(defaultValue);
+ const requested=value??internal;
+ const denied=requested!==undefined&&access[requested]===false;
+ const selected=denied?Object.keys(access).find(key=>access[key]):requested;
+ React.useEffect(()=>{if(denied&&selected!==undefined){setInternal(selected);onValueChange?.(selected);}},[denied,selected,onValueChange]);
+ return <TabsPrimitive.Root {...props} value={selected??''} onValueChange={v=>{if(access[v]!==false){setInternal(v);onValueChange?.(v);}}}/>;
+}
 
 const TabsList = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.List>,
@@ -23,7 +32,10 @@ TabsList.displayName = TabsPrimitive.List.displayName;
 const TabsTrigger = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.Trigger>,
   React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>
->(({ className, ...props }, ref) => (
+>(({ className, ...props }, ref) => {
+ const access=React.useContext(PageTabAccess);
+ if(access[props.value]===false)return null;
+ return (
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
@@ -32,13 +44,16 @@ const TabsTrigger = React.forwardRef<
     )}
     {...props}
   />
-));
+);});
 TabsTrigger.displayName = TabsPrimitive.Trigger.displayName;
 
 const TabsContent = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>
->(({ className, ...props }, ref) => (
+>(({ className, children, ...props }, ref) => {
+ const access=React.useContext(PageTabAccess);
+ if(access[props.value]===false)return null;
+ return (
   <TabsPrimitive.Content
     ref={ref}
     className={cn(
@@ -46,8 +61,8 @@ const TabsContent = React.forwardRef<
       className,
     )}
     {...props}
-  />
-));
+  ><PageTabAccess.Provider value={{}}>{children}</PageTabAccess.Provider></TabsPrimitive.Content>
+);});
 TabsContent.displayName = TabsPrimitive.Content.displayName;
 
 export { Tabs, TabsList, TabsTrigger, TabsContent };

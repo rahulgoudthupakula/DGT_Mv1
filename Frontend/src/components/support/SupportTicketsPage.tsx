@@ -1,3 +1,4 @@
+import { request } from "@/lib/backend";
 import { useState, useRef, useEffect } from "react";
 import {
   Plus,
@@ -36,55 +37,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-const initialTickets = [
-  { id: "TKT-4821", subject: "POS not syncing daily totals", module: "Grocery", priority: "High", status: "Open", created: "2026-02-10", updated: "2026-02-11", messages: 3 },
-  { id: "TKT-4790", subject: "Gas delivery variance alert stuck", module: "Gas", priority: "Medium", status: "In Progress", created: "2026-02-08", updated: "2026-02-11", messages: 7 },
-  { id: "TKT-4755", subject: "Payroll tax form 941 export issue", module: "Payroll", priority: "High", status: "In Progress", created: "2026-02-05", updated: "2026-02-10", messages: 2 },
-  { id: "TKT-4710", subject: "Lottery settlement mismatch", module: "Lottery", priority: "Low", status: "Resolved", created: "2026-02-01", updated: "2026-02-06", messages: 5 },
-  { id: "TKT-4688", subject: "Credit card batch not closing", module: "Tender", priority: "Medium", status: "Open", created: "2026-01-28", updated: "2026-02-02", messages: 1 },
-  { id: "TKT-4621", subject: "Bank reconcile date filter broken", module: "Banking", priority: "Low", status: "Resolved", created: "2026-01-20", updated: "2026-01-25", messages: 4 },
-];
-
-type Ticket = typeof initialTickets[0];
+type Ticket = {ticket_id:number; id:string;subject:string;module:string;priority:string;status:string;created:string;updated:string;messages:number};
 type Message = { sender: "store" | "dgt"; text: string };
-
-const initialConversations: Record<string, Message[]> = {
-  "TKT-4821": [
-    { sender: "dgt", text: "Thank you for reaching out. We're investigating the POS sync issue and will update you shortly." },
-    { sender: "store", text: "It started after the last update on Feb 10th. Daily totals are off by about $200." },
-    { sender: "dgt", text: "Understood. Can you confirm your POS firmware version? We'll cross-reference with the latest patch." },
-  ],
-  "TKT-4790": [
-    { sender: "dgt", text: "Thank you for reaching out. We're investigating the variance alert and will update you shortly." },
-    { sender: "store", text: "The alert has been stuck on 'Pending' since Feb 8. The delivery was already reconciled." },
-    { sender: "dgt", text: "We see the discrepancy in the logs. We're working on a fix — ETA 24 hours." },
-    { sender: "store", text: "Thanks. Do I need to do anything in the meantime?" },
-    { sender: "dgt", text: "No action needed. Please leave the alert as-is so we can trace the root cause." },
-    { sender: "store", text: "Got it. Will do." },
-    { sender: "dgt", text: "We've deployed a hotfix. Can you refresh and confirm if the alert has cleared?" },
-  ],
-  "TKT-4755": [
-    { sender: "dgt", text: "Thank you for reaching out. We're looking into the 941 export issue." },
-    { sender: "store", text: "The export fails with a 'missing employer EIN' error even though it's set in settings." },
-  ],
-  "TKT-4710": [
-    { sender: "dgt", text: "We've reviewed the settlement logs. Can you confirm the date range for the mismatch?" },
-    { sender: "store", text: "It was Feb 1–3. The lottery terminal showed $320 but our records show $298." },
-    { sender: "dgt", text: "Found it — the discrepancy was due to a timezone offset in the nightly report. Resolved." },
-    { sender: "store", text: "Great, thank you! Will this affect future reports?" },
-    { sender: "dgt", text: "No. The fix is retroactive and all future reports will use UTC consistently." },
-  ],
-  "TKT-4688": [
-    { sender: "dgt", text: "We're looking into the credit card batch closure issue." },
-    { sender: "store", text: "The batch just shows 'Processing' indefinitely. It never actually closes." },
-  ],
-  "TKT-4621": [
-    { sender: "dgt", text: "The date filter bug in bank reconcile has been patched in the latest release." },
-    { sender: "store", text: "Just updated and confirmed — the filter is working correctly now. Thanks!" },
-    { sender: "dgt", text: "Glad to hear it! Let us know if anything else comes up." },
-    { sender: "store", text: "Will do. Marking as resolved." },
-  ],
-};
 
 const priorityColor: Record<string, string> = {
   High: "bg-destructive/10 text-destructive border-destructive/20",
@@ -106,70 +60,52 @@ const statusBadge: Record<string, string> = {
 
 const ALL_STATUSES = ["Open", "In Progress", "Resolved"] as const;
 
-export const SupportTicketsPage = () => {
-  const [tickets, setTickets] = useState<Ticket[]>(initialTickets);
+export const SupportTicketsPage = ({storeId}: {storeId:string}) => {
+  const base = `/access/stores/${encodeURIComponent(storeId)}/support-tickets`;
+  const [error,setError]=useState("");
+  const [busy,setBusy]=useState(false);
+  const createKey=useRef(crypto.randomUUID());
+  const replyKey=useRef(crypto.randomUUID());
+  const [tickets, setTickets] = useState<Ticket[]>([]);
   const [showNewTicket, setShowNewTicket] = useState(false);
   const [viewTicket, setViewTicket] = useState<Ticket | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [replyText, setReplyText] = useState("");
-  const [conversations, setConversations] = useState<Record<string, Message[]>>(initialConversations);
+  const [conversations, setConversations] = useState<Record<string, Message[]>>({});
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const [newForm, setNewForm] = useState({ subject: "", module: "", priority: "", description: "", phone: "" });
 
+  useEffect(()=>{createKey.current=crypto.randomUUID();},[newForm]);
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [viewTicket, conversations]);
 
-  const handleSubmitTicket = () => {
-    if (!newForm.subject.trim() || !newForm.module || !newForm.priority) return;
-    const today = new Date().toISOString().slice(0, 10);
-    const nextId = `TKT-${Math.max(...tickets.map((t) => parseInt(t.id.split("-")[1]))) + 1}`;
-    const newTicket: Ticket = {
-      id: nextId,
-      subject: newForm.subject.trim(),
-      module: newForm.module,
-      priority: newForm.priority,
-      status: "Open",
-      created: today,
-      updated: today,
-      messages: 1,
-    };
-    setConversations((prev) => ({
-      ...prev,
-      [nextId]: [{ sender: "store", text: newForm.description.trim() || newForm.subject.trim() }],
-    }));
-    setTickets((prev) => [newTicket, ...prev]);
-    setNewForm({ subject: "", module: "", priority: "", description: "", phone: "" });
-    setShowNewTicket(false);
-    setViewTicket(newTicket);
+  useEffect(() => {
+    let active=true;
+    const load=async()=>{try{const rows=await request<Ticket[]>(base);if(active){setTickets(rows);setViewTicket(old=>old?(rows.find(t=>t.id===old.id)??old):null);setError("");}}catch(e){if(active)setError(e instanceof Error?e.message:"Unable to load tickets");}};
+    void load(); const timer=setInterval(load,15000);return()=>{active=false;clearInterval(timer);};
+  },[base]);
+  useEffect(()=>{
+    if(!viewTicket)return;let active=true;
+    const load=async()=>{try{const rows=await request<Message[]>(`${base}/${viewTicket.ticket_id}/messages`);if(active)setConversations(old=>({...old,[viewTicket.id]:rows}));}catch(e){if(active)setError(e instanceof Error?e.message:"Unable to load replies");}};
+    void load();const timer=setInterval(load,10000);return()=>{active=false;clearInterval(timer);};
+  },[base,viewTicket?.ticket_id]);
+  const handleSubmitTicket = async () => {
+    if(busy||!newForm.subject.trim()||!newForm.description.trim())return;
+    setBusy(true);setError("");
+    try{const t=await request<Ticket>(base,{method:"POST",headers:{"Idempotency-Key":createKey.current},body:JSON.stringify(newForm)});setTickets(old=>[t,...old.filter(x=>x.id!==t.id)]);setShowNewTicket(false);setViewTicket(t);setNewForm({subject:"",module:"",priority:"",description:"",phone:""});createKey.current=crypto.randomUUID();}
+    catch(e){setError(e instanceof Error?e.message:"Unable to submit ticket");}finally{setBusy(false);}
   };
-
-  const handleSendReply = () => {
-    if (!replyText.trim() || !viewTicket) return;
-    const today = new Date().toISOString().slice(0, 10);
-    const newMsg: Message = { sender: "store", text: replyText.trim() };
-    setConversations((prev) => ({
-      ...prev,
-      [viewTicket.id]: [...(prev[viewTicket.id] ?? []), newMsg],
-    }));
-    setTickets((prev) =>
-      prev.map((t) =>
-        t.id === viewTicket.id ? { ...t, messages: t.messages + 1, updated: today } : t
-      )
-    );
-    setViewTicket((prev) =>
-      prev ? { ...prev, messages: prev.messages + 1, updated: today } : prev
-    );
-    setReplyText("");
+  const handleSendReply = async () => {
+    if(busy||!viewTicket||!replyText.trim())return;setBusy(true);setError("");
+    try{const rows=await request<Message[]>(`${base}/${viewTicket.ticket_id}/messages`,{method:"POST",headers:{"Idempotency-Key":replyKey.current},body:JSON.stringify({text:replyText})});setConversations(old=>({...old,[viewTicket.id]:rows}));setReplyText("");replyKey.current=crypto.randomUUID();}
+    catch(e){setError(e instanceof Error?e.message:"Unable to send reply");}finally{setBusy(false);}
   };
-
-  const updateTicketStatus = (id: string, newStatus: string) => {
-    const today = new Date().toISOString().slice(0, 10);
-    setTickets((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, status: newStatus, updated: today } : t))
-    );
-    setViewTicket((prev) => (prev && prev.id === id ? { ...prev, status: newStatus, updated: today } : prev));
+  const updateTicketStatus = async (id:string,status:string) => {
+    if(busy||!viewTicket)return;setBusy(true);setError("");
+    try{await request(`${base}/${viewTicket.ticket_id}/status`,{method:"POST",body:JSON.stringify({status})});setTickets(old=>old.map(t=>t.id===id?{...t,status}:t));setViewTicket(old=>old?{...old,status}:old);}
+    catch(e){setError(e instanceof Error?e.message:"Unable to update status");}finally{setBusy(false);}
   };
 
   const filtered = tickets.filter((t) => {
@@ -187,6 +123,7 @@ export const SupportTicketsPage = () => {
 
   return (
     <div className="space-y-8">
+      {error && <p role="alert" className="text-destructive">{error}</p>}
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Support Tickets</h1>
@@ -300,6 +237,7 @@ export const SupportTicketsPage = () => {
               <SheetHeader>
                 <div className="flex items-center gap-2 flex-wrap">
                   <SheetTitle className="text-base">{viewTicket.id}</SheetTitle>
+                  {error && <p role="alert" className="text-destructive">{error}</p>}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-semibold cursor-pointer hover:opacity-80 transition-opacity ${statusBadge[viewTicket.status]}`}>
@@ -383,7 +321,7 @@ export const SupportTicketsPage = () => {
                     placeholder="Type your reply…"
                     rows={3}
                     value={replyText}
-                    onChange={(e) => setReplyText(e.target.value)}
+                    onChange={(e) => {setReplyText(e.target.value);replyKey.current=crypto.randomUUID();}}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleSendReply();
                     }}
@@ -392,7 +330,7 @@ export const SupportTicketsPage = () => {
                     size="sm"
                     className="w-full gap-1.5"
                     onClick={handleSendReply}
-                    disabled={!replyText.trim()}
+                    disabled={busy || !replyText.trim()}
                   >
                     <Send className="w-3.5 h-3.5" /> Send Reply
                   </Button>
@@ -407,6 +345,7 @@ export const SupportTicketsPage = () => {
       <Sheet open={showNewTicket} onOpenChange={setShowNewTicket}>
         <SheetContent className="sm:max-w-lg overflow-y-auto">
           <SheetHeader>
+            {error && <p role="alert" className="text-destructive">{error}</p>}
             <SheetTitle>Create New Ticket</SheetTitle>
             <SheetDescription>Fill in the details below and our team will get back to you shortly.</SheetDescription>
           </SheetHeader>
@@ -442,20 +381,13 @@ export const SupportTicketsPage = () => {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Description</Label>
+              <Label className="text-xs font-semibold">Description *</Label>
               <Textarea
                 placeholder="Describe the issue in detail…"
                 rows={4}
                 value={newForm.description}
                 onChange={(e) => setNewForm((f) => ({ ...f, description: e.target.value }))}
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Attach Screenshot (optional)</Label>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" className="gap-1.5 text-xs"><Paperclip className="w-3.5 h-3.5" /> Choose File</Button>
-                <span className="text-xs text-muted-foreground">No file chosen</span>
-              </div>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Contact Phone (optional)</Label>
@@ -469,7 +401,7 @@ export const SupportTicketsPage = () => {
               <Button
                 className="flex-1"
                 onClick={handleSubmitTicket}
-                disabled={!newForm.subject.trim() || !newForm.module || !newForm.priority}
+                disabled={busy || !newForm.subject.trim() || !newForm.description.trim() || !newForm.module || !newForm.priority}
               >
                 Submit Ticket
               </Button>

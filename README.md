@@ -2,6 +2,7 @@
 
 Spring Boot 4 / Java 21 backend and React / Vite frontend, backed by PostgreSQL 17.
 
+- [Local development setup](docs/LOCAL_DEVELOPMENT.md)
 - [Backend setup](Backend/README.md)
 - [Flyway setup](docs/FLYWAY_DEPLOYMENT.md)
 - [AWS deployment](docs/AWS_DEPLOYMENT.md)

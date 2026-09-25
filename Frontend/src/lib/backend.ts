@@ -4,6 +4,7 @@ export const developmentDatabase = (import.meta.env.VITE_DATA_ENV || "developmen
 export const profilePreview = import.meta.env.VITE_PROFILE_PREVIEW !== "false";
 let authorization = "";
 export interface StoreRecord {
+  parent_store_dgt_id?: string | null;
   created_at: string | null;
   dgt_id: string; store_id: string | null; store_name: string;
   legal_business_name: string | null; tax_id: string | null;

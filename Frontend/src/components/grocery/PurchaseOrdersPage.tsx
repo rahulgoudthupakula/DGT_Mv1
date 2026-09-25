@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TabsList } from "@/components/ui/tabs";
+import { PermissionTabs as Tabs, PermissionTabsContent as TabsContent, PermissionTabsTrigger as TabsTrigger } from "@/components/ui/permission-tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {request} from '@/lib/backend';
 interface PricebookItem {sku:string;barcode:string;name:string;dept:string;category:string;vendor:string;cost:number;stock:number;pack:number;moq:number;target:number;lead_time_days:number|null;}
@@ -203,7 +204,7 @@ export const PurchaseOrdersPage = ({storeId}:{storeId:string}) => {
 
   return <div className="space-y-6">
     <div><h1 className="text-2xl font-bold text-foreground">Purchase Orders</h1><p className="mt-1 text-sm text-muted-foreground">Create purchase orders, send them for approval, and review order history.</p></div>
-    <Tabs value={tab} onValueChange={setTab}>
+    <Tabs storeId={storeId} parent="GROCERY_PAGE_PURCHASE_ORDERS" value={tab} onValueChange={setTab}>
       <TabsList><TabsTrigger disabled={!permissions.canCreate} value="suggested">Suggested Order Guide</TabsTrigger><TabsTrigger value="history">PO History</TabsTrigger></TabsList>
       <TabsContent value="suggested" className="mt-5 space-y-4">
         <div className="grid gap-4 md:grid-cols-3">

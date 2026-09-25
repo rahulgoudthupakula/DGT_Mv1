@@ -1,7 +1,8 @@
 import { useRef, useState } from "react";
 import {useQuery} from "@tanstack/react-query";
 import {request} from "@/lib/backend";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TabsList } from "@/components/ui/tabs";
+import { PermissionTabs as Tabs, PermissionTabsContent as TabsContent, PermissionTabsTrigger as TabsTrigger } from "@/components/ui/permission-tabs";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -217,7 +218,7 @@ export const VerifyActivatePacks = ({storeId}:{storeId:string}) => {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <Tabs storeId={storeId} parent="LOTTERY_PAGE_ACTIVATE" value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList>
           <TabsTrigger value="verify">Verify Packs ({unverifiedPacks.length})</TabsTrigger>
           <TabsTrigger value="activate">Activate Packs ({verifiedPacks.length})</TabsTrigger>

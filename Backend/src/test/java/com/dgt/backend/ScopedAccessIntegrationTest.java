@@ -11,7 +11,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import tools.jackson.databind.*;
 import static org.assertj.core.api.Assertions.*;
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={
- "app.tender.fleet.enabled=true","app.tender.ebt.enabled=true","app.tender.credit-card.enabled=true","app.daily-closing.enabled=true","app.sales.activity.enabled=true","app.gas.tank-report.enabled=true","app.gas.adjustments.enabled=true","app.gas.price.enabled=true","app.gas.delivery.enabled=true","app.gas.settings.enabled=true","app.pricebook.enabled=true","app.workweek.enabled=true","app.billing.enabled=true","app.profile.enabled=true","spring.datasource.url=jdbc:postgresql://127.0.0.1:55439/dgt_test","spring.datasource.username=${DGT_TEST_RUNTIME_USER:dgt_test}","spring.datasource.password=${DGT_TEST_RUNTIME_PASSWORD:only-test-password}","logging.level.root=WARN","debug=false"})
+ "app.workforce.enabled=true","app.tender.fleet.enabled=true","app.tender.ebt.enabled=true","app.tender.credit-card.enabled=true","app.daily-closing.enabled=true","app.sales.activity.enabled=true","app.gas.tank-report.enabled=true","app.gas.adjustments.enabled=true","app.gas.price.enabled=true","app.gas.delivery.enabled=true","app.gas.settings.enabled=true","app.pricebook.enabled=true","app.workweek.enabled=true","app.billing.enabled=true","app.profile.enabled=true","spring.datasource.url=jdbc:postgresql://127.0.0.1:55439/dgt_test","spring.datasource.username=${DGT_TEST_RUNTIME_USER:dgt_test}","spring.datasource.password=${DGT_TEST_RUNTIME_PASSWORD:only-test-password}","logging.level.root=WARN","debug=false"})
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class ScopedAccessIntegrationTest {
@@ -46,9 +46,22 @@ class ScopedAccessIntegrationTest {
    if(role.equals("admin")||role.equals("other"))db.update("INSERT INTO company_admins(company_id,user_id) VALUES (?,?)",role.equals("admin")?company:otherCompany,id);
    else{long roleType=db.queryForObject("SELECT role_type_id FROM role_types WHERE role_type_name=?",Long.class,role.toUpperCase());long ar=db.queryForObject("INSERT INTO user_roles(user_id,role_type_id,dgt_id) VALUES (?,?,?) RETURNING user_role_id",Long.class,id,roleType,store);assignments.put(role,ar);for(String code:List.of("STORE_SETTINGS_VIEW","STORE_SETTINGS_EDIT","DEPARTMENTS_VIEW","DEPARTMENTS_EDIT"))db.update("INSERT INTO store_role_permissions(dgt_id,role_type_id,permission_code,allowed) VALUES (?,?,?,?)",store,roleType,code,!role.equals("accountant")||code.endsWith("_VIEW"));for(long module:List.of(settingsModule,departmentModule))db.update("INSERT INTO permissions(user_role_id,module_id,can_view,can_edit) VALUES (?,?,true,?)",ar,module,!role.equals("accountant"));}
   }
+  // Legacy workflow tests explicitly enable their parent modules.
+  for(var section:com.dgt.backend.access.PagePermissions.SECTIONS)if(!section.defaultAllowed())
+   db.update("INSERT INTO store_role_permissions(dgt_id,role_type_id,permission_code,allowed) SELECT ?,role_type_id,?,true FROM role_types WHERE role_type_name IN ('MANAGER','CASHIER','ACCOUNTANT')",store,section.code());
  }
  @AfterAll void cleanup(){
   if(company==0)return;
+  db.update("DELETE FROM store_creation_requests WHERE company_id IN (?,?)",company,otherCompany);
+  for(String child:db.queryForList("SELECT dgt_id FROM stores WHERE company_id IN (?,?) AND parent_store_dgt_id IS NOT NULL ORDER BY dgt_id DESC",String.class,company,otherCompany)){
+   db.update("DELETE FROM access_audit_events WHERE dgt_id=?",child);
+   db.update("DELETE FROM user_roles WHERE dgt_id=?",child);
+   db.update("DELETE FROM store_role_permissions WHERE dgt_id=?",child);
+   db.update("DELETE FROM store_contact_info WHERE dgt_id=?",child);
+   db.update("DELETE FROM store_business_hours WHERE dgt_id=?",child);
+   db.update("DELETE FROM stores WHERE dgt_id=?",child);
+  }
+  db.update("DELETE FROM user_store_permission_overrides WHERE dgt_id IN (?,?,?)",store,second,foreign);
   db.update("DELETE FROM lottery_sales_links WHERE lottery_pack_inventory_id IN (SELECT lottery_pack_inventory_id FROM lottery_pack_inventory WHERE dgt_id IN (?,?,?))",store,second,foreign);
   db.update("DELETE FROM lottery_pack_inventory_items WHERE lottery_pack_inventory_id IN (SELECT lottery_pack_inventory_id FROM lottery_pack_inventory WHERE dgt_id IN (?,?,?))",store,second,foreign);
   db.update("DELETE FROM lottery_pack_inventory WHERE dgt_id IN (?,?,?)",store,second,foreign);
@@ -2054,6 +2067,162 @@ ok(call("admin","PUT",path+"/programs/"+id,form,program.get("version").asText(),
   assertThat(report.toString()).contains("Settled","PACK SETTLE","CLOSING CLOSED","Received");
   for(var pack:report.path("packs")){assertThat(pack.path("timeline").size()).isGreaterThan(0);assertThat(pack.path("ticketsRemaining").asInt()).isGreaterThanOrEqualTo(0);}
   assertThat(ok(req("admin","GET","/access/stores/"+second+"/lottery-pack-history",null),200).path("packs").isEmpty()).isTrue();
+ }
+
+ @Test @Order(999) void subpagePermissionsAreIndependentAndEnforced() throws Exception {
+  long role=db.queryForObject("SELECT role_type_id FROM role_types WHERE role_type_name='MANAGER'",Long.class);
+  String base=access()+"/role-permissions";
+  assertThat(ok(req("manager","GET",access()+"/context",null),200).path("roles").toString()).contains("MANAGER");
+  assertThat(ok(req("cashier","GET",access()+"/context",null),200).path("roles").toString()).contains("CASHIER");
+  var catalogue=ok(req("admin","GET",base,null),200);
+  assertThat(catalogue.path("pages").size()).isEqualTo(60);
+  assertThat(catalogue.path("sections").size()).isEqualTo(12);
+  Set<String> visible=new HashSet<>();catalogue.path("actions").forEach(a->visible.add(a.path("code").asText()));
+  assertThat(visible).contains("GROCERY_PAGE_INVOICES","GAS_PAGE_DELIVERY","LOTTERY_PAGE_ACTIVATE").doesNotContain("STORE_SETTINGS_VIEW","STORE_SETTINGS_EDIT","LOTTERY_RECEIVE_DELIVERY","GROCERY_CREATE_PO","GAS_RECORD_DELIVERY");
+  db.update("INSERT INTO store_role_permissions(dgt_id,role_type_id,permission_code,allowed) VALUES (?,?,'GAS_VIEW_DELIVERIES',true) ON CONFLICT(dgt_id,role_type_id,permission_code) DO UPDATE SET allowed=true",store,role);
+  ok(req("manager","GET",access()+"/gas-deliveries",null),200);
+  var change=Map.of("roleTypeId",role,"code","GAS_PAGE_DELIVERY","allowed",false,"version","0");
+  ok(req("manager","PUT",base,change),403);ok(req("other","PUT",base,change),403);
+  ok(req("admin","PUT",base,change),200);
+  assertThat(ok(req("manager","GET",access()+"/context",null),200).path("pages").path("GAS_PAGE_DELIVERY").asBoolean()).isFalse();
+  ok(req("manager","GET",access()+"/gas-deliveries",null),403);
+  assertThat(ok(req("manager","GET",access()+"/context",null),200).path("pages").path("GAS_PAGE_TANK_REPORT").asBoolean()).isTrue();
+  ok(req("admin","GET",access()+"/gas-deliveries",null),200);
+  ok(req("admin","PUT",base,change),409);
+  String version=db.queryForObject("SELECT xmin::text FROM store_role_permissions WHERE dgt_id=? AND role_type_id=? AND permission_code='GAS_PAGE_DELIVERY'",String.class,store,role);
+  var enable=Map.of("roleTypeId",role,"code","GAS_PAGE_DELIVERY","allowed",true,"version",version);
+  var stale=Map.of("roleTypeId",role,"code","GAS_PAGE_TANK_REPORT","allowed",false,"version","invalid");
+  ok(req("admin","PUT",base+"/batch",Map.of("changes",List.of(enable,stale))),409);
+  ok(req("manager","GET",access()+"/gas-deliveries",null),403);
+  ok(req("admin","PUT",base+"/batch",Map.of("changes",List.of(enable))),200);
+  ok(req("manager","GET",access()+"/gas-deliveries",null),200);
+  // Enabling a page must not grant manager-only actions to a cashier.
+  long cashier=db.queryForObject("SELECT role_type_id FROM role_types WHERE role_type_name='CASHIER'",Long.class);
+  ok(req("admin","PUT",base,Map.of("roleTypeId",cashier,"code","GAS_PAGE_TANK_REPORT","allowed",true,"version","0")),200);
+  ok(req("cashier","GET",access()+"/gas-prices",null),403);
+  ok(req("other","GET",access()+"/context",null),403);
+  // A hidden entry form cannot be opened by calling its write endpoint directly.
+  ok(req("admin","PUT",base,Map.of("roleTypeId",role,"code","GAS_PAGE_DELIVERY_ADD","allowed",false,"version","0")),200);
+  ok(req("manager","GET",access()+"/gas-deliveries",null),200);
+  ok(req("manager","POST",access()+"/gas-deliveries",Map.of()),403);
+  var rights=ok(req("manager","GET",access()+"/context",null),200).path("pages");
+  assertThat(rights.has("GAS_PAGE_DASHBOARD")).isFalse();
+  assertThat(rights.path("GAS_PAGE_DELIVERY_ADD").asBoolean()).isFalse();
+  // Hide a tabbed parent when all of its children are disabled.
+  for(String code:List.of("GROCERY_PAGE_INVOICES_EDIT","GROCERY_PAGE_INVOICES_APPROVALS","GROCERY_PAGE_INVOICES_VIEW"))
+   ok(req("admin","PUT",base,Map.of("roleTypeId",role,"code",code,"allowed",false,"version","0")),200);
+  assertThat(ok(req("manager","GET",access()+"/context",null),200).path("pages").path("GROCERY_PAGE_INVOICES").asBoolean()).isFalse();
+  ok(req("manager","GET",access()+"/invoice-entry",null),403);
+
+ }
+
+ @Test @Order(1000) void parentModulesCascadeAndRestoreSubpagePreferences() throws Exception {
+  long role=db.queryForObject("SELECT role_type_id FROM role_types WHERE role_type_name='MANAGER'",Long.class);
+  String base=access()+"/role-permissions";
+  for(String module:List.of("GROCERY","GAS","LOTTERY")){
+   String code="MODULE_"+module;
+   var disable=Map.of("roleTypeId",role,"code",code,"allowed",false,"version","0");
+   ok(req("manager","PUT",base,disable),403);
+   ok(req("admin","PUT",base,disable),200);
+   var rights=ok(req("manager","GET",access()+"/context",null),200).path("pages");
+   assertThat(rights.path(code).asBoolean()).isFalse();
+   rights.properties().forEach(e->{if(e.getKey().startsWith(module+"_PAGE_"))assertThat(e.getValue().asBoolean()).as(e.getKey()).isFalse();});
+   String endpoint=switch(module){case "GROCERY" -> "purchase-orders";case "GAS" -> "gas-deliveries";default -> "lottery-deliveries";};
+   ok(req("manager","GET",access()+"/"+endpoint,null),403);
+   ok(req("admin","GET",access()+"/"+endpoint,null),200);
+   assertThat(ok(req("cashier","GET",access()+"/context",null),200).path("pages").path(code).asBoolean()).isTrue();
+   ok(req("admin","PUT",base,disable),409);
+   String version=db.queryForObject("SELECT xmin::text FROM store_role_permissions WHERE dgt_id=? AND role_type_id=? AND permission_code=?",String.class,store,role,code);
+   ok(req("admin","PUT",base,Map.of("roleTypeId",role,"code",code,"allowed",true,"version",version)),200);
+  }
+  var restored=ok(req("manager","GET",access()+"/context",null),200).path("pages");
+  assertThat(restored.path("GAS_PAGE_DELIVERY").asBoolean()).isTrue();
+  assertThat(restored.path("GAS_PAGE_DELIVERY_ADD").asBoolean()).isFalse();
+  assertThat(restored.path("GROCERY_PAGE_INVOICES").asBoolean()).isFalse();
+ }
+
+ @Test @Order(1001) void employeeOverridesAreIsolatedAndEnforced() throws Exception {
+  long role=db.queryForObject("SELECT role_type_id FROM role_types WHERE role_type_name='CASHIER'",Long.class);
+  var employeeIds=db.queryForList("SELECT employee_id FROM employees WHERE user_id=?",Long.class,users.get("cashier"));
+  long employee=employeeIds.isEmpty()?db.queryForObject("INSERT INTO employees(user_id,first_name,last_name,hire_date,employee_type) VALUES (?,'Override','Cashier','2020-01-01','FULL_TIME') RETURNING employee_id",Long.class,users.get("cashier")):employeeIds.getFirst();
+  for(String target:List.of(store,second)){
+   db.update("INSERT INTO employee_store_assignments(employee_id,dgt_id,is_primary,effective_from,role_type_id) VALUES (?,?,false,'2020-01-01',?) ON CONFLICT DO NOTHING",employee,target,role);
+   db.update("INSERT INTO user_roles(user_id,role_type_id,dgt_id) VALUES (?,?,?) ON CONFLICT DO NOTHING",users.get("cashier"),role,target);
+  }
+  long peer=db.queryForObject("INSERT INTO users(dgt_id,employee_id,first_name,last_name,email,password_hash) VALUES (?,?,'Peer','Cashier',?,?) RETURNING user_id",Long.class,store,"peer-"+tag,"peer-"+tag+"@example.test",new BCryptPasswordEncoder(4).encode(password));
+  db.update("INSERT INTO user_roles(user_id,role_type_id,dgt_id) VALUES (?,?,?)",peer,role,store);
+  db.update("UPDATE store_role_permissions SET allowed=false WHERE dgt_id=? AND role_type_id=? AND permission_code='MODULE_WORKWEEK'",store,role);
+  String path=access()+"/employee-access/"+employee+"/permissions";
+  var initial=ok(req("admin","GET",path,null),200);
+  var body=Map.of("version",initial.path("version").asText(),"overrides",Map.of("MODULE_WORKWEEK",true));
+  ok(req("cashier","PUT",path,body),403);ok(req("other","PUT",path,body),403);
+  ok(req("cashier","GET",access()+"/workforce",null),403);
+  var saved=ok(req("admin","PUT",path,body),200);
+  assertThat(saved.path("effective").path("MODULE_WORKWEEK").asBoolean()).isTrue();
+  assertThat(saved.path("roleDefaults").path("MODULE_WORKWEEK").asBoolean()).isFalse();
+  ok(req("cashier","GET",access()+"/workforce",null),200);
+  ok(req("peer","GET",access()+"/workforce",null),403);
+  ok(req("cashier","GET","/access/stores/"+second+"/workforce",null),403);
+  ok(req("cashier","GET",access()+"/employees",null),403);
+  ok(req("admin","PUT",path,body),409);
+  ok(req("admin","PUT",path,Map.of("version",saved.path("version").asText(),"overrides",Map.of("UNKNOWN",true))),400);
+  saved=ok(req("admin","PUT",path,Map.of("version",saved.path("version").asText(),"overrides",Map.of("MODULE_WORKWEEK",true,"MODULE_LOTTERY",false,"LOTTERY_PAGE_RECEIVED",true))),200);
+  assertThat(saved.path("effective").path("LOTTERY_PAGE_RECEIVED").asBoolean()).isFalse();
+  ok(req("cashier","GET",access()+"/lottery-deliveries",null),403);
+  var reset=ok(req("admin","PUT",path,Map.of("version",saved.path("version").asText(),"overrides",Map.of())),200);
+  assertThat(reset.path("effective").path("MODULE_WORKWEEK").asBoolean()).isFalse();
+  assertThat(reset.path("effective").path("LOTTERY_PAGE_RECEIVED").asBoolean()).isTrue();
+  ok(req("cashier","GET",access()+"/workforce",null),403);
+ }
+
+ @Test @Order(1002) void remainingModulesExposeAndEnforcePageAndTabPermissions() throws Exception {
+  long role=db.queryForObject("SELECT role_type_id FROM role_types WHERE role_type_name='MANAGER'",Long.class);
+  String matrix=access()+"/role-permissions";
+  var catalogue=ok(req("admin","GET",matrix,null),200);
+  Set<String> groups=new HashSet<>();catalogue.path("pages").forEach(p->groups.add(p.path("group").asText()));
+  assertThat(groups).hasSize(12).contains("Payroll Permissions","Banking Management Permissions","Workweek Permissions","Financial and Payment Services Permissions");
+  for(String code:List.of("TENDERS_PAGE_CREDIT_CARD_SETTINGS","PRICE_BOOK_PAGE_DISCOUNTS_REASONS","WORKWEEK_PAGE_WEEK_SCHEDULE_AVAILABILITY"))
+   ok(req("admin","PUT",matrix,Map.of("roleTypeId",role,"code",code,"allowed",false,"version","0")),200);
+  var rights=ok(req("manager","GET",access()+"/context",null),200).path("pages");
+  assertThat(rights.path("TENDERS_PAGE_CREDIT_CARD").asBoolean()).isTrue();
+  assertThat(rights.path("TENDERS_PAGE_CREDIT_CARD_SETTINGS").asBoolean()).isFalse();
+  ok(req("manager","PUT",access()+"/credit-card/settings",Map.of()),403);
+  ok(req("manager","POST",access()+"/discounts",Map.of()),403);
+  ok(req("admin","PUT",matrix,Map.of("roleTypeId",role,"code","TENDERS_PAGE_CREDIT_CARD","allowed",false,"version","0")),200);
+  ok(req("manager","GET",access()+"/credit-card",null),403);
+  rights=ok(req("manager","GET",access()+"/context",null),200).path("pages");
+  assertThat(rights.path("TENDERS_PAGE_CREDIT_CARD_SETTLEMENT").asBoolean()).isFalse();
+  assertThat(rights.path("TENDERS_PAGE_EBT_FOODSTAMPS").asBoolean()).isTrue();
+  assertThat(rights.path("PAYROLL_PAGE_RUN_PAYROLL").asBoolean()).isFalse();
+ }
+
+ @Test @Order(1003) void adminCreatesChildStoreWithoutSignup() throws Exception {
+  String endpoint=access()+"/manage-stores",key=UUID.randomUUID().toString();
+  var original=db.queryForMap("SELECT legal_business_name,tax_id FROM stores WHERE dgt_id=?",store);
+  var body=new LinkedHashMap<String,Object>();body.put("parentStoreId",store);body.put("storeId","child-"+tag);body.put("storeName","Child "+tag);body.put("legalBusinessName",original.get("legal_business_name"));body.put("taxId",original.get("tax_id"));body.put("licenseNumber","child-license-"+tag);body.put("timezone","America/New_York");body.put("address","123 Local Test Street");body.put("phone","");body.put("email","child@example.test");
+  ok(req("manager","GET",endpoint,null),403);ok(req("cashier","POST",endpoint,body),403);ok(req("other","POST",endpoint,body),403);
+  var foreignParent=new LinkedHashMap<>(body);foreignParent.put("parentStoreId",foreign);ok(req("admin","POST",endpoint,foreignParent),403);
+  var invalid=new LinkedHashMap<>(body);invalid.put("timezone","Invalid/Zone");ok(req("admin","POST",endpoint,invalid),400);
+  var created=ok(call("admin","POST",endpoint,body,null,key),201);String child=created.path("dgtId").asText();
+  assertThat(child).startsWith("DGT-");
+  assertThat(ok(call("admin","POST",endpoint,body,null,key),201).path("dgtId").asText()).isEqualTo(child);
+  var changed=new LinkedHashMap<>(body);changed.put("storeName","Different");ok(call("admin","POST",endpoint,changed,null,key),409);
+  ok(req("admin","POST",endpoint,body),409);
+  assertThat(db.queryForObject("SELECT parent_store_dgt_id FROM stores WHERE dgt_id=?",String.class,child)).isEqualTo(store);
+  assertThat(db.queryForObject("SELECT company_id FROM stores WHERE dgt_id=?",Long.class,child)).isEqualTo(company);
+  assertThat(db.queryForObject("SELECT count(*) FROM store_business_hours WHERE dgt_id=? AND status='UNSET'",Integer.class,child)).isEqualTo(7);
+  assertThat(db.queryForObject("SELECT count(*) FROM store_role_permissions WHERE dgt_id=?",Integer.class,child)).isEqualTo(db.queryForObject("SELECT count(*) FROM store_role_permissions WHERE dgt_id=?",Integer.class,store));
+  assertThat(db.queryForObject("SELECT count(*) FROM user_roles WHERE dgt_id=?",Integer.class,child)).isZero();
+  assertThat(db.queryForObject("SELECT count(*) FROM employee_store_assignments WHERE dgt_id=?",Integer.class,child)).isZero();
+  assertThat(ok(req("admin","GET","/access/stores",null),200).toString()).contains(child);
+  assertThat(ok(req("manager","GET","/access/stores",null),200).toString()).doesNotContain(child);
+  assertThat(ok(req("admin","GET",endpoint,null),200).toString()).contains(child,"parent_store_name");
+  ok(req("admin","GET","/stores/"+child+"/settings",null),200);
+  ok(req("admin","GET","/access/stores/"+child+"/role-permissions",null),200);
+  ok(req("other","GET","/access/stores/"+child+"/manage-stores",null),403);
+  long role=db.queryForObject("SELECT role_type_id FROM role_types WHERE role_type_name='MANAGER'",Long.class);
+  db.update("UPDATE store_role_permissions SET allowed=false WHERE dgt_id=? AND role_type_id=? AND permission_code='MODULE_GROCERY'",child,role);
+  assertThat(db.queryForObject("SELECT allowed FROM store_role_permissions WHERE dgt_id=? AND role_type_id=? AND permission_code='MODULE_GROCERY'",Boolean.class,store,role)).isTrue();
  }
 
 }

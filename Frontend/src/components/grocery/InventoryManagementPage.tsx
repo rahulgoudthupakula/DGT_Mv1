@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TabsList } from "@/components/ui/tabs";
+import { PermissionTabs as Tabs, PermissionTabsContent as TabsContent, PermissionTabsTrigger as TabsTrigger } from "@/components/ui/permission-tabs";
 import { SlidersHorizontal, RotateCcw, CalendarClock, ArrowRightLeft, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { StockAdjustments } from "./StockAdjustments";
 import { ReturnableInventory } from "./ReturnableInventory";
@@ -29,7 +30,7 @@ export const InventoryManagementPage = ({storeId}:{storeId:string}) => {
         <p className="text-sm text-muted-foreground">Manage stock adjustments, returns, and expiring items</p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as InventoryTab)}>
+      <Tabs storeId={storeId} parent="GROCERY_PAGE_INVENTORY" value={activeTab} onValueChange={(v) => setActiveTab(v as InventoryTab)}>
         <TabsList className="flex flex-wrap h-auto gap-1 bg-muted p-1">
           {tabs.map((tab) => (
             <TabsTrigger

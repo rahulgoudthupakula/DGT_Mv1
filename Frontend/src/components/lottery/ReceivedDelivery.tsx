@@ -1,3 +1,4 @@
+import { useStoreAccess } from "@/lib/store-access";
 import { useRef, useState } from "react";
 import {useQuery} from "@tanstack/react-query";
 import {request} from "@/lib/backend";
@@ -57,6 +58,7 @@ interface DeliveryData {
  vendors: {id:string;name:string}[]; games: {id:string;name:string}[];
 }
 export const ReceivedDelivery = ({storeId}:{storeId:string}) => {
+  const canOpenForm = useStoreAccess(storeId).data?.pages?.["LOTTERY_PAGE_RECEIVED_ADD"] === true;
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
   const [selectedConfirmPacks, setSelectedConfirmPacks] = useState<string[]>([]);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
@@ -151,10 +153,10 @@ export const ReceivedDelivery = ({storeId}:{storeId:string}) => {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button disabled={!q.data?.canReceive} onClick={() => setReceiptDialogOpen(true)}>
+          {canOpenForm&&<Button disabled={!q.data?.canReceive} onClick={() => setReceiptDialogOpen(true)}>
             <ReceiptText className="w-4 h-4 mr-1" />
             Add Received Receipt
-          </Button>
+          </Button>}
         </div>
       </div>
 
@@ -299,7 +301,7 @@ export const ReceivedDelivery = ({storeId}:{storeId:string}) => {
       </Dialog>
 
       <AddReceivedReceiptDialog
-        open={receiptDialogOpen}
+        open={receiptDialogOpen&&canOpenForm}
         onOpenChange={setReceiptDialogOpen}
         distributors={distributors}
         games={games}

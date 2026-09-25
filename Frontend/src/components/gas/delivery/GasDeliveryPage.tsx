@@ -1,3 +1,4 @@
+import { useStoreAccess } from "@/lib/store-access";
 import { useEffect, useState } from "react";
 import { Plus, Upload, Download, Calendar, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,7 @@ const DEFAULT_START = subDays(new Date(),30);
 const DEFAULT_END = new Date();
 
 export const GasDeliveryPage = ({storeId}:{storeId:string}) => {
+  const canOpenForm = useStoreAccess(storeId).data?.pages?.["GAS_PAGE_DELIVERY_ADD"] === true;
   const path=`/access/stores/${encodeURIComponent(storeId)}/gas-deliveries`;
   const query=useQuery({queryKey:['gas-deliveries',storeId],queryFn:()=>request<DeliveryData>(path),enabled:!!storeId,refetchOnWindowFocus:false});
   const options=useQuery({queryKey:['gas-delivery-options',storeId],queryFn:()=>request<DeliveryOptions>(path+'/options'),enabled:!!storeId,refetchOnWindowFocus:false});
@@ -53,10 +55,10 @@ export const GasDeliveryPage = ({storeId}:{storeId:string}) => {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-foreground">Gas Deliveries</h1>
         <div className="flex items-center gap-2">
-          <Button size="sm" className="gap-1.5 text-xs" disabled={!query.data?.canEdit||opening} onClick={() => {setSelected(null);setAddDrawerOpen(true);void options.refetch();}}>
+          {canOpenForm&&<Button size="sm" className="gap-1.5 text-xs" disabled={!query.data?.canEdit||opening} onClick={() => {setSelected(null);setAddDrawerOpen(true);void options.refetch();}}>
             <Plus className="h-3.5 w-3.5" />
             Add Delivery
-          </Button>
+          </Button>}
           <Button disabled={filtered.length===0} onClick={()=>exportDeliveries(filtered)} variant="outline" size="sm" className="gap-1.5 text-xs">
             <Download className="h-3.5 w-3.5" />
             Export
@@ -145,7 +147,7 @@ export const GasDeliveryPage = ({storeId}:{storeId:string}) => {
       <DeliveryListTable deliveries={filtered} onView={view} busy={opening} />
 
       {/* Add Delivery Dialog */}
-      <AddDeliveryDialog storeId={storeId} open={addDrawerOpen} onOpenChange={setAddDrawerOpen} delivery={selected} today={query.data!.today} options={options.data!} canEdit={query.data!.canEdit} canReceive={query.data!.canReceive} onSaved={saved} />
+      <AddDeliveryDialog storeId={storeId} open={addDrawerOpen && (!!selected || canOpenForm)} onOpenChange={setAddDrawerOpen} delivery={selected} today={query.data!.today} options={options.data!} canEdit={query.data!.canEdit} canReceive={query.data!.canReceive} onSaved={saved} />
     </div>
   );
 };

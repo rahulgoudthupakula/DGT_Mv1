@@ -7,6 +7,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { logout } from "@/lib/backend";
 import Index from "./pages/Index";
 import { LoginPage } from "./pages/LoginPage";
+import { SignupPage } from "./pages/SignupPage";
+import { AccountSetupPage } from "./pages/AccountSetupPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -40,6 +42,8 @@ const App = () => {
                 )
               }
             />
+            <Route path="/account-setup" element={<AccountSetupPage />} />
+            <Route path="/signup" element={isAuthenticated ? <Navigate to="/" replace /> : <SignupPage />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

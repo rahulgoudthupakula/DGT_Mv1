@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAppNavigation } from "@/contexts/NavigationContext";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TabsList } from "@/components/ui/tabs";
+import { PermissionTabs as Tabs, PermissionTabsContent as TabsContent, PermissionTabsTrigger as TabsTrigger } from "@/components/ui/permission-tabs";
 import { Pencil, Eye, CheckCircle2 } from "lucide-react";
 import { OrdersInvoices } from "./OrdersInvoices";
 import { ViewInvoice } from "./ViewInvoice";
@@ -25,7 +26,7 @@ export const EditViewInvoicesPage = ({storeId}:{storeId:string}) => {
         <p className="text-sm text-muted-foreground">Manage and review purchase invoices</p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as InvoiceTab)}>
+      <Tabs storeId={storeId} parent="GROCERY_PAGE_INVOICES" value={activeTab} onValueChange={(v) => setActiveTab(v as InvoiceTab)}>
         <TabsList className="flex flex-wrap h-auto gap-1 bg-muted p-1">
           {tabs.map((tab) => (
             <TabsTrigger

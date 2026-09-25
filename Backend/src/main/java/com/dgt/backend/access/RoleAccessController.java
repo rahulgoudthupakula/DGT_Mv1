@@ -29,12 +29,18 @@ public class RoleAccessController {
   new Action("LOTTERY_ACTIVATE_PACKS","Record completed pack activations","Lottery Permissions",true),new Action("LOTTERY_CLOSE_SHIFT","Close shift","Lottery Permissions",true),
   new Action("LOTTERY_RETURN_PACKS","Return packs","Lottery Permissions",true),new Action("LOTTERY_SETTLE_PACKS","Settle packs","Lottery Permissions",true),
   new Action("LOTTERY_VIEW_REPORTS","View pack history","Lottery Permissions",true),new Action("LOTTERY_SETTINGS","Manage lottery games and counter setting","Lottery Permissions",true));
- @GetMapping public Object get(@PathVariable String store){access.requireAdmin(store);return Map.of("actions",ACTIONS,"roles",access.db.queryForList("SELECT role_type_id,role_type_name FROM role_types WHERE is_active AND role_type_name IN ('MANAGER','CASHIER','ACCOUNTANT') ORDER BY CASE role_type_name WHEN 'MANAGER' THEN 0 WHEN 'CASHIER' THEN 1 ELSE 2 END"),"permissions",access.db.queryForList("SELECT *,xmin::text AS version FROM store_role_permissions WHERE dgt_id=?",store).stream().map(com.dgt.backend.common.entity.Rows::normalize).toList());}
+ private static List<Action> visibleActions(){
+  var list=new ArrayList<Action>();
+  PagePermissions.SECTIONS.forEach(s->list.add(new Action(s.code(),s.label(),"Store Permissions",true)));
+  ACTIONS.stream().filter(a->!Set.of("STORE_SETTINGS_VIEW","STORE_SETTINGS_EDIT").contains(a.code())).filter(a->!Set.of("Grocery Permissions","Gas Permissions","Lottery Permissions").contains(a.group())).forEach(list::add);
+  PagePermissions.PAGES.forEach(p->list.add(new Action(p.code(),p.label(),p.group(),p.implemented())));return list;
+ }
+ @GetMapping public Object get(@PathVariable String store){access.requireAdmin(store);return Map.of("actions",visibleActions(),"sections",PagePermissions.SECTIONS,"pages",PagePermissions.PAGES,"children",PagePermissions.CHILDREN,"roles",access.db.queryForList("SELECT role_type_id,role_type_name FROM role_types WHERE is_active AND role_type_name IN ('MANAGER','CASHIER','ACCOUNTANT') ORDER BY CASE role_type_name WHEN 'MANAGER' THEN 0 WHEN 'CASHIER' THEN 1 ELSE 2 END"),"permissions",access.db.queryForList("SELECT *,xmin::text AS version FROM store_role_permissions WHERE dgt_id=?",store).stream().map(com.dgt.backend.common.entity.Rows::normalize).toList());}
  public record Change(long roleTypeId,String code,boolean allowed,String version){}
  public record Batch(List<Change> changes){}
  @PutMapping("/batch") @Transactional public Object saveBatch(@PathVariable String store,@RequestBody Batch batch){
   access.requireAdmin(store);access.db.queryForList("SELECT company_id FROM companies WHERE company_id=? FOR UPDATE",access.company(store));access.requireAdmin(store);
-  if(batch.changes()==null||batch.changes().size()>60)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid preferences");
+  if(batch.changes()==null||batch.changes().size()>150)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid preferences");
   Set<String> seen=new HashSet<>();
   for(Change c:batch.changes()){
    if(c==null||!seen.add(c.roleTypeId()+":"+c.code()))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Duplicate preference");
@@ -52,7 +58,7 @@ public class RoleAccessController {
  }
  @PutMapping @Transactional public Object save(@PathVariable String store,@RequestBody Change c){
   access.requireAdmin(store);access.db.queryForList("SELECT company_id FROM companies WHERE company_id=? FOR UPDATE",access.company(store));access.requireAdmin(store);
-  if(ACTIONS.stream().noneMatch(a->a.code().equals(c.code())))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Unknown permission");
+  if(PagePermissions.SECTIONS.stream().noneMatch(p->p.code().equals(c.code()))&&ACTIONS.stream().noneMatch(a->a.code().equals(c.code()))&&PagePermissions.PAGES.stream().noneMatch(p->p.code().equals(c.code()))&&PagePermissions.CHILDREN.stream().noneMatch(p->p.code().equals(c.code())))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Unknown permission");
   if(access.db.queryForList("SELECT role_type_id FROM role_types WHERE role_type_id=? AND is_active AND role_type_name IN ('MANAGER','CASHIER','ACCOUNTANT')",c.roleTypeId()).size()!=1)throw access.denied();
   if("PRICE_BOOK_ACCESS".equals(c.code()) && access.db.queryForList("SELECT role_type_id FROM role_types WHERE role_type_id=? AND upper(role_type_name)='MANAGER'",c.roleTypeId()).size()!=1)throw access.denied();
   if(c.allowed()&&Set.of("GROCERY_APPROVE_PO","GROCERY_SETTINGS","GAS_SETTINGS","GAS_APPROVE_ADJUSTMENT").contains(c.code())&&access.db.queryForList("SELECT role_type_id FROM role_types WHERE role_type_id=? AND upper(role_type_name)='MANAGER'",c.roleTypeId()).isEmpty())throw access.denied();

@@ -1,3 +1,5 @@
+import { useStoreAccess } from "@/lib/store-access";
+import { canNavigatePage, canNavigateSection } from "@/lib/page-permissions";
 import {disabledModules} from '@/lib/moduleAvailability';
 import type { StoreRecord } from "@/lib/backend";
 import { useRef, useEffect, useState } from "react";
@@ -195,6 +197,8 @@ const NavPillBar = ({ navItems, activeNav, onNavClick }: { navItems: string[]; a
 
 export const DashboardHeader = ({ stores, activeNav, activeSubNav, onNavClick, onSubNavClick, onProfilePageClick, onLiveCounterClick, selectedStoreId, onStoreChange, onLogout, hideSubNav }: DashboardHeaderProps) => {
   const [storeSearch, setStoreSearch] = useState("");
+  const pageAccess = useStoreAccess(selectedStoreId);
+  const visibleNavItems = navItems.filter(item=>canNavigateSection(pageAccess.data,item));
 
   const allStores = stores.map(s => ({id: s.dgt_id, name: s.store_name, address: s.dgt_id, isParent: false}));
   const selectedStore = allStores.find(s => s.id === selectedStoreId);
@@ -330,6 +334,7 @@ export const DashboardHeader = ({ stores, activeNav, activeSubNav, onNavClick, o
               <Building2 className="w-4 h-4" />
               <span>Store Account Overview</span>
             </DropdownMenuItem>
+            {pageAccess.data?.admin&&<DropdownMenuItem className="flex items-center gap-2 cursor-pointer" onSelect={()=>onProfilePageClick?.("Manage Stores")}><Building2 className="w-4 h-4"/><span>Manage Stores</span></DropdownMenuItem>}
             <DropdownMenuSeparator />
             <DropdownMenuItem className="flex items-center gap-2 cursor-pointer" onSelect={() => onProfilePageClick?.("Access & Integrations")}>
               <Settings className="w-4 h-4" />
@@ -374,7 +379,7 @@ export const DashboardHeader = ({ stores, activeNav, activeSubNav, onNavClick, o
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="center" className="w-64 max-h-80 overflow-y-auto z-50 bg-popover">
-              {navItems.map((item) => (
+              {visibleNavItems.map((item) => (
                 <DropdownMenuItem
                   key={item}
                   disabled={disabledModules.has(item)}
@@ -389,7 +394,7 @@ export const DashboardHeader = ({ stores, activeNav, activeSubNav, onNavClick, o
         </div>
 
         {/* Desktop: scrollable pill bar */}
-        <NavPillBar navItems={navItems} activeNav={activeNav} onNavClick={onNavClick} />
+        <NavPillBar navItems={visibleNavItems} activeNav={activeNav} onNavClick={onNavClick} />
       </nav>
 
       {/* Secondary Navigation - Sub items */}
@@ -398,6 +403,8 @@ export const DashboardHeader = ({ stores, activeNav, activeSubNav, onNavClick, o
           <div className="inline-flex items-center gap-2 px-4 flex-nowrap">
             {subNavItems[activeNav].map((subItem) => (
               (() => {
+                const denied = !canNavigatePage(pageAccess.data, activeNav, subItem);
+                if (denied) return null;
                 const pages = subPageItems[`${activeNav}|${subItem}`];
                 const hasDropdown = Array.isArray(pages) && pages.length > 0;
 
@@ -412,6 +419,8 @@ export const DashboardHeader = ({ stores, activeNav, activeSubNav, onNavClick, o
                       key={subItem}
                       variant="ghost"
                       size="sm"
+                      disabled={denied}
+                      title={denied ? "Page access is not enabled for your role" : undefined}
                       onClick={() => onSubNavClick?.(subItem)}
                       className={pillClass}
                     >
@@ -423,7 +432,7 @@ export const DashboardHeader = ({ stores, activeNav, activeSubNav, onNavClick, o
                 return (
                   <DropdownMenu key={subItem}>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className={pillClass}>
+                      <Button variant="ghost" size="sm" className={pillClass} disabled={denied} title={denied ? "Page access is not enabled for your role" : undefined}>
                         <span>{subItem}</span>
                         <ChevronDown className="ml-1 h-3.5 w-3.5 opacity-70" />
                       </Button>

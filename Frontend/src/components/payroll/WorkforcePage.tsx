@@ -1,4 +1,4 @@
-import {useState,Children,isValidElement,type ReactNode} from 'react';
+import {useContext,useState,Children,isValidElement,type ReactNode} from 'react';
 import {useQuery,useQueryClient,keepPreviousData} from '@tanstack/react-query';
 import {request} from '@/lib/backend';
 import {Button} from '@/components/ui/button';
@@ -6,7 +6,7 @@ import {Card,CardContent,CardHeader,CardTitle} from '@/components/ui/card';
 import {Badge} from '@/components/ui/badge';
 import {Table,TableBody,TableCell,TableHead,TableHeader,TableRow} from '@/components/ui/table';
 import {Sheet,SheetContent,SheetHeader,SheetTitle,SheetDescription} from '@/components/ui/sheet';
-import {Tabs,TabsList,TabsTrigger} from '@/components/ui/tabs';
+import {PageTabAccess,Tabs,TabsList,TabsTrigger} from '@/components/ui/tabs';
 import {Textarea} from '@/components/ui/textarea';
 import {Select,SelectContent,SelectItem,SelectTrigger,SelectValue} from '@/components/ui/select';
 import {Input} from '@/components/ui/input';
@@ -43,6 +43,7 @@ export function WorkforcePage({storeId,view='schedule'}:{storeId:string;view?:'s
  const [decision,setDecision]=useState<{row:WorkRequest;action:string}|null>(null),[note,setNote]=useState(''),[replacement,setReplacement]=useState('');
  const [weekAction,setWeekAction]=useState('');const [filter,setFilter]=useState('pending');
  const employees=data?.employees??[],shifts=data?.shifts??[];const name=(id:number)=>employees.find(e=>e.employee_id===id)?.name??`Employee ${id}`;
+ const tabRights=useContext(PageTabAccess);
  const subjects=employees.filter(e=>data?.manager||e.own);
  const futureShifts=shifts.filter(s=>new Date(s.start_local+s.start_offset).getTime()>Date.now());
  const effectiveWeek=week||data?.week||'';
@@ -54,7 +55,7 @@ export function WorkforcePage({storeId,view='schedule'}:{storeId:string;view?:'s
  function openDecision(row:WorkRequest,action:string){setDecision({row,action});setReplacement(row.target_employee_id?String(row.target_employee_id):(subjects.find(e=>e.own)?String(subjects.find(e=>e.own)!.employee_id):''));setNote('');setError('');}
  function exportCsv(){const cell=(v:unknown)=>'"'+String(v??'').replace(/^[=+@-]/,"'$&").replace(/"/g,'""')+'"';const csv=[['Employee','Date','Start','End','Timezone','Status','Hours'],...shifts.map(s=>[name(s.employee_id),s.work_date,s.start_local,s.end_local,data?.timezone,s.status,s.hours])].map(r=>r.map(cell).join(',')).join('\n');const url=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));const link=document.createElement('a');link.href=url;link.download=`schedule-${effectiveWeek}.csv`;link.click();URL.revokeObjectURL(url);}
  if(query.isPending)return <p>Loading workforce…</p>;if(query.error)return <p role="alert">{query.error.message} <Button onClick={()=>query.refetch()}>Retry</Button></p>;if(!data)return null;
- const showingSchedule=view==='schedule'&&tab==='schedule',showingAvailability=view==='schedule'&&tab==='availability';
+ const showingSchedule=view==='schedule'&&tab==='schedule'&&tabRights.schedule!==false,showingAvailability=view==='schedule'&&tab==='availability'&&tabRights.availability!==false;
  const requests=data.requests.filter(r=>view==='approvals'?(filter==='all'||r.status==='PENDING'):view==='requests'?r.kind==='TIME_OFF':showingAvailability?r.kind==='EXCEPTION':['COVER','SWAP'].includes(r.kind));
  const totalHours=(id:number)=>shifts.filter(s=>s.employee_id===id&&s.status!=='NEEDS_COVERAGE').reduce((n,s)=>n+s.hours,0);
  const scheduled=shifts.filter(s=>s.status!=='NEEDS_COVERAGE');
