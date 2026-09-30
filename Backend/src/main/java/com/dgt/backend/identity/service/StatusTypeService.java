@@ -1,21 +1,46 @@
 package com.dgt.backend.identity.service;
 
-import java.util.*;
+import com.dgt.backend.identity.dto.StatusTypeResponse;
+import com.dgt.backend.identity.dto.CreateStatusTypeRequest;
+import com.dgt.backend.identity.dto.UpdateStatusTypeRequest;
+import com.dgt.backend.identity.entity.StatusType;
+import com.dgt.backend.identity.repository.StatusTypeRepository;
+import com.dgt.backend.common.dto.PageResponse;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.dgt.backend.common.service.WriteValidator;
-import com.dgt.backend.identity.repository.StatusTypeRepository;
-import com.dgt.backend.identity.entity.StatusType;
-import static com.dgt.backend.identity.database.StatusTypeDatabase.TABLE;
+import org.springframework.web.server.ResponseStatusException;
+
 @Service
 public class StatusTypeService {
     private final StatusTypeRepository repository;
-    private final WriteValidator validator;
-    public StatusTypeService(StatusTypeRepository repository,WriteValidator validator) { this.repository=repository; this.validator=validator; }
-    public Map<String,Object> list(int page,int size) { return repository.list(page,size); }
-    public StatusType get(Long id) { return repository.findById(id); }
+    public StatusTypeService(StatusTypeRepository repository) { this.repository = repository; }
+
+    public PageResponse<StatusTypeResponse> list(int page, int size) {
+        var p = repository.findAll(PageRequest.of(page, size, Sort.by("statusTypeId")));
+        return new PageResponse<>(p.getContent().stream().map(StatusTypeResponse::from).toList(), page, size, p.getTotalElements());
+    }
+
+    public StatusTypeResponse get(Long id) {
+        return StatusTypeResponse.from(repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found")));
+    }
+
     @Transactional
-    public Map<String,Object> create(Map<String,Object> values) { return repository.create(validator.validate(TABLE,values,true)); }
+    public StatusTypeResponse create(CreateStatusTypeRequest req) {
+        var entity = StatusType.builder()
+                .statusName(req.statusName())
+                .build();
+        return StatusTypeResponse.from(repository.save(entity));
+    }
+
     @Transactional
-    public Map<String,Object> update(Long id,Map<String,Object> values,String expected) { var validated=validator.validate(TABLE,values,false); validator.validateUpdate(TABLE,id,validated); return repository.update(id,validated,expected); }
+    public StatusTypeResponse update(Long id, UpdateStatusTypeRequest req) {
+        var entity = repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found"));
+        if (req.statusName() != null) entity.setStatusName(req.statusName());
+        return StatusTypeResponse.from(repository.save(entity));
+    }
 }

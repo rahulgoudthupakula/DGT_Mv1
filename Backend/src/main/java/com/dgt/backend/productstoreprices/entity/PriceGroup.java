@@ -1,32 +1,42 @@
 package com.dgt.backend.productstoreprices.entity;
 
-import java.util.Map;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import java.math.BigDecimal;
 import java.time.*;
-import tools.jackson.databind.JsonNode;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.dgt.backend.common.entity.Rows;
-/** Persistence model for public.price_groups; IDs and types follow the inspected database. */
-public record PriceGroup(
-        @JsonProperty("_version") String rowVersion,
-        @JsonProperty("price_group_id") Long priceGroupId,
-        @JsonProperty("price_group_name") String priceGroupName,
-        @JsonProperty("description") String description,
-        @JsonProperty("is_active") Boolean isActive,
-        @JsonProperty("created_at") OffsetDateTime createdAt,
-        @JsonProperty("updated_at") OffsetDateTime updatedAt,
-        @JsonProperty("group_price") BigDecimal groupPrice,
-        @JsonProperty("dgt_id") String dgtId) {
-    public static PriceGroup fromRow(Map<String,Object> row) {
-        return new PriceGroup(
-            Rows.value(row,"_version",String.class),
-            Rows.value(row,"price_group_id",Long.class),
-            Rows.value(row,"price_group_name",String.class),
-            Rows.value(row,"description",String.class),
-            Rows.value(row,"is_active",Boolean.class),
-            Rows.value(row,"created_at",OffsetDateTime.class),
-            Rows.value(row,"updated_at",OffsetDateTime.class),
-            Rows.value(row,"group_price",BigDecimal.class),
-            Rows.value(row,"dgt_id",String.class));
-    }
+
+@Entity
+@Table(name = "price_groups")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+public class PriceGroup {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "price_group_id")
+    private Long priceGroupId;
+
+    @Column(name = "price_group_name", length = 100)
+    private String priceGroupName;
+
+    @Column(name = "description")
+    private String description;
+
+    @Column(name = "is_active")
+    private Boolean isActive;
+
+    @Column(name = "group_price", precision = 12, scale = 2)
+    private BigDecimal groupPrice;
+
+    @Column(name = "dgt_id", length = 50)
+    private String dgtId;
+
+    @Column(name = "created_at", updatable = false)
+    @CreationTimestamp
+    private OffsetDateTime createdAt;
+
+    @Column(name = "updated_at")
+    @UpdateTimestamp
+    private OffsetDateTime updatedAt;
 }

@@ -1,26 +1,35 @@
 package com.dgt.backend.productstoreprices.controller;
 
-import java.util.*;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.dgt.backend.productstoreprices.dto.ProductStorePriceResponse;
+import com.dgt.backend.productstoreprices.dto.CreateProductStorePriceRequest;
+import com.dgt.backend.productstoreprices.dto.UpdateProductStorePriceRequest;
 import com.dgt.backend.productstoreprices.service.ProductStorePriceService;
-import com.dgt.backend.productstoreprices.entity.ProductStorePrice;
+import com.dgt.backend.common.dto.PageResponse;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
 @RestController
 @RequestMapping("/api/v1/product-store-prices")
 public class ProductStorePriceController {
     private final ProductStorePriceService service;
-    public ProductStorePriceController(ProductStorePriceService service) { this.service=service; }
+    public ProductStorePriceController(ProductStorePriceService service) { this.service = service; }
+
     @GetMapping
     @PreAuthorize("@accessPolicy.check(authentication, 'product_store_prices', 'READ')")
-    public Map<String,Object> list(@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="50") int size) { return service.list(page,size); }
+    public PageResponse<ProductStorePriceResponse> list(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) { return service.list(page, size); }
+
     @GetMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'product_store_prices', 'READ')")
-    public ProductStorePrice get(@PathVariable Long id) { return service.get(id); }
+    public ProductStorePriceResponse get(@PathVariable Long id) { return service.get(id); }
+
     @PostMapping
-    @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
+    @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("@accessPolicy.check(authentication, 'product_store_prices', 'WRITE')")
-    public Map<String,Object> create(@RequestBody Map<String,Object> values) { return service.create(values); }
+    public ProductStorePriceResponse create(@Valid @RequestBody CreateProductStorePriceRequest request) { return service.create(request); }
+
     @PatchMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'product_store_prices', 'WRITE')")
-    public Map<String,Object> update(@PathVariable Long id,@RequestHeader("If-Match") String expected,@RequestBody Map<String,Object> values) { return service.update(id,values,expected); }
+    public ProductStorePriceResponse update(@PathVariable Long id, @RequestBody UpdateProductStorePriceRequest request) { return service.update(id, request); }
 }

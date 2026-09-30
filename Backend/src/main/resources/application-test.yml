@@ -1,0 +1,62 @@
+springdoc:
+  swagger-ui:
+    enabled: false
+  api-docs:
+    enabled: false
+
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:55439}/dgt_test?sslmode=disable
+    username: ${DB_USERNAME:dgt_test}
+    password: ${DB_PASSWORD:only-test-password}
+    hikari:
+      maximum-pool-size: 2
+  flyway:
+    enabled: false
+
+server:
+  port: 0
+  address: 127.0.0.1
+
+logging:
+  level:
+    root: WARN
+    com.dgt: DEBUG
+
+app:
+  cors-origins: http://localhost:5173
+  profile:
+    enabled: true
+  billing:
+    enabled: true
+  workweek:
+    enabled: true
+  workforce:
+    enabled: true
+    shift-changes:
+      enabled: true
+  pricebook:
+    enabled: true
+  gas:
+    settings:
+      enabled: true
+    delivery:
+      enabled: true
+    price:
+      enabled: true
+    adjustments:
+      enabled: true
+    tank-report:
+      enabled: true
+  sales:
+    activity:
+      enabled: true
+  daily-closing:
+    enabled: true
+  tender:
+    credit-card:
+      enabled: true
+    ebt:
+      enabled: true
+    fleet:
+      enabled: true

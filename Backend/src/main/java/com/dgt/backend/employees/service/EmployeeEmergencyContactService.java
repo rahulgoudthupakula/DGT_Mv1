@@ -1,21 +1,52 @@
 package com.dgt.backend.employees.service;
 
-import java.util.*;
+import com.dgt.backend.employees.dto.EmployeeEmergencyContactResponse;
+import com.dgt.backend.employees.dto.CreateEmployeeEmergencyContactRequest;
+import com.dgt.backend.employees.dto.UpdateEmployeeEmergencyContactRequest;
+import com.dgt.backend.employees.entity.EmployeeEmergencyContact;
+import com.dgt.backend.employees.repository.EmployeeEmergencyContactRepository;
+import com.dgt.backend.common.dto.PageResponse;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.dgt.backend.common.service.WriteValidator;
-import com.dgt.backend.employees.repository.EmployeeEmergencyContactRepository;
-import com.dgt.backend.employees.entity.EmployeeEmergencyContact;
-import static com.dgt.backend.employees.database.EmployeeEmergencyContactDatabase.TABLE;
+import org.springframework.web.server.ResponseStatusException;
+
 @Service
 public class EmployeeEmergencyContactService {
     private final EmployeeEmergencyContactRepository repository;
-    private final WriteValidator validator;
-    public EmployeeEmergencyContactService(EmployeeEmergencyContactRepository repository,WriteValidator validator) { this.repository=repository; this.validator=validator; }
-    public Map<String,Object> list(int page,int size) { return repository.list(page,size); }
-    public EmployeeEmergencyContact get(Long id) { return repository.findById(id); }
+    public EmployeeEmergencyContactService(EmployeeEmergencyContactRepository repository) { this.repository = repository; }
+
+    public PageResponse<EmployeeEmergencyContactResponse> list(int page, int size) {
+        var p = repository.findAll(PageRequest.of(page, size, Sort.by("emergencyContactId")));
+        return new PageResponse<>(p.getContent().stream().map(EmployeeEmergencyContactResponse::from).toList(), page, size, p.getTotalElements());
+    }
+
+    public EmployeeEmergencyContactResponse get(Long id) {
+        return EmployeeEmergencyContactResponse.from(repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found")));
+    }
+
     @Transactional
-    public Map<String,Object> create(Map<String,Object> values) { return repository.create(validator.validate(TABLE,values,true)); }
+    public EmployeeEmergencyContactResponse create(CreateEmployeeEmergencyContactRequest req) {
+        var entity = EmployeeEmergencyContact.builder()
+                .employeeId(req.employeeId())
+                .contactName(req.contactName())
+                .relationship(req.relationship())
+                .phone(req.phone())
+                .build();
+        return EmployeeEmergencyContactResponse.from(repository.save(entity));
+    }
+
     @Transactional
-    public Map<String,Object> update(Long id,Map<String,Object> values,String expected) { var validated=validator.validate(TABLE,values,false); validator.validateUpdate(TABLE,id,validated); return repository.update(id,validated,expected); }
+    public EmployeeEmergencyContactResponse update(Long id, UpdateEmployeeEmergencyContactRequest req) {
+        var entity = repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found"));
+        if (req.employeeId() != null) entity.setEmployeeId(req.employeeId());
+        if (req.contactName() != null) entity.setContactName(req.contactName());
+        if (req.relationship() != null) entity.setRelationship(req.relationship());
+        if (req.phone() != null) entity.setPhone(req.phone());
+        return EmployeeEmergencyContactResponse.from(repository.save(entity));
+    }
 }

@@ -1,34 +1,50 @@
 package com.dgt.backend.employees.entity;
 
-import java.util.Map;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.annotations.SQLRestriction;
 import java.math.BigDecimal;
 import java.time.*;
-import tools.jackson.databind.JsonNode;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.dgt.backend.common.entity.Rows;
-/** Persistence model for public.employee_compensation; IDs and types follow the inspected database. */
-public record EmployeeCompensation(
-        @JsonProperty("_version") String rowVersion,
-        @JsonProperty("compensation_id") Long compensationId,
-        @JsonProperty("employee_id") Long employeeId,
-        @JsonProperty("pay_type") String payType,
-        @JsonProperty("hourly_rate") BigDecimal hourlyRate,
-        @JsonProperty("annual_salary") BigDecimal annualSalary,
-        @JsonProperty("effective_from") LocalDate effectiveFrom,
-        @JsonProperty("effective_to") LocalDate effectiveTo,
-        @JsonProperty("created_at") OffsetDateTime createdAt,
-        @JsonProperty("updated_at") OffsetDateTime updatedAt) {
-    public static EmployeeCompensation fromRow(Map<String,Object> row) {
-        return new EmployeeCompensation(
-            Rows.value(row,"_version",String.class),
-            Rows.value(row,"compensation_id",Long.class),
-            Rows.value(row,"employee_id",Long.class),
-            Rows.value(row,"pay_type",String.class),
-            Rows.value(row,"hourly_rate",BigDecimal.class),
-            Rows.value(row,"annual_salary",BigDecimal.class),
-            Rows.value(row,"effective_from",LocalDate.class),
-            Rows.value(row,"effective_to",LocalDate.class),
-            Rows.value(row,"created_at",OffsetDateTime.class),
-            Rows.value(row,"updated_at",OffsetDateTime.class));
-    }
+
+@Entity
+@Table(name = "employee_compensation")
+@SQLRestriction("archived_at IS NULL")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+public class EmployeeCompensation {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "compensation_id")
+    private Long compensationId;
+
+    @Column(name = "employee_id", nullable = false)
+    private Long employeeId;
+
+    @Column(name = "pay_type", nullable = false, length = 50)
+    private String payType;
+
+    @Column(name = "hourly_rate", precision = 12, scale = 2)
+    private BigDecimal hourlyRate;
+
+    @Column(name = "annual_salary", precision = 12, scale = 2)
+    private BigDecimal annualSalary;
+
+    @Column(name = "effective_from", nullable = false)
+    private LocalDate effectiveFrom;
+
+    @Column(name = "effective_to")
+    private LocalDate effectiveTo;
+
+    @Column(name = "archived_at")
+    private OffsetDateTime archivedAt;
+
+    @Column(name = "created_at", updatable = false)
+    @CreationTimestamp
+    private OffsetDateTime createdAt;
+
+    @Column(name = "updated_at")
+    @UpdateTimestamp
+    private OffsetDateTime updatedAt;
 }

@@ -1,26 +1,35 @@
 package com.dgt.backend.productbarcodes.controller;
 
-import java.util.*;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.dgt.backend.productbarcodes.dto.ProductBarcodeResponse;
+import com.dgt.backend.productbarcodes.dto.CreateProductBarcodeRequest;
+import com.dgt.backend.productbarcodes.dto.UpdateProductBarcodeRequest;
 import com.dgt.backend.productbarcodes.service.ProductBarcodeService;
-import com.dgt.backend.productbarcodes.entity.ProductBarcode;
+import com.dgt.backend.common.dto.PageResponse;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
 @RestController
 @RequestMapping("/api/v1/product-barcodes")
 public class ProductBarcodeController {
     private final ProductBarcodeService service;
-    public ProductBarcodeController(ProductBarcodeService service) { this.service=service; }
+    public ProductBarcodeController(ProductBarcodeService service) { this.service = service; }
+
     @GetMapping
     @PreAuthorize("@accessPolicy.check(authentication, 'product_barcodes', 'READ')")
-    public Map<String,Object> list(@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="50") int size) { return service.list(page,size); }
+    public PageResponse<ProductBarcodeResponse> list(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) { return service.list(page, size); }
+
     @GetMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'product_barcodes', 'READ')")
-    public ProductBarcode get(@PathVariable Long id) { return service.get(id); }
+    public ProductBarcodeResponse get(@PathVariable Long id) { return service.get(id); }
+
     @PostMapping
-    @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
+    @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("@accessPolicy.check(authentication, 'product_barcodes', 'WRITE')")
-    public Map<String,Object> create(@RequestBody Map<String,Object> values) { return service.create(values); }
+    public ProductBarcodeResponse create(@Valid @RequestBody CreateProductBarcodeRequest request) { return service.create(request); }
+
     @PatchMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'product_barcodes', 'WRITE')")
-    public Map<String,Object> update(@PathVariable Long id,@RequestHeader("If-Match") String expected,@RequestBody Map<String,Object> values) { return service.update(id,values,expected); }
+    public ProductBarcodeResponse update(@PathVariable Long id, @RequestBody UpdateProductBarcodeRequest request) { return service.update(id, request); }
 }

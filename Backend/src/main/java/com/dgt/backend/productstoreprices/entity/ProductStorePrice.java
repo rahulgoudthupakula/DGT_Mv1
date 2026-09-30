@@ -1,32 +1,42 @@
 package com.dgt.backend.productstoreprices.entity;
 
-import java.util.Map;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import java.math.BigDecimal;
 import java.time.*;
-import tools.jackson.databind.JsonNode;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.dgt.backend.common.entity.Rows;
-/** Persistence model for public.product_store_prices; IDs and types follow the inspected database. */
-public record ProductStorePrice(
-        @JsonProperty("_version") String rowVersion,
-        @JsonProperty("store_price_id") Long storePriceId,
-        @JsonProperty("dgt_id") String dgtId,
-        @JsonProperty("product_id") Long productId,
-        @JsonProperty("retail_price") BigDecimal retailPrice,
-        @JsonProperty("is_active") Boolean isActive,
-        @JsonProperty("rebate_id") Long rebateId,
-        @JsonProperty("created_at") OffsetDateTime createdAt,
-        @JsonProperty("updated_at") OffsetDateTime updatedAt) {
-    public static ProductStorePrice fromRow(Map<String,Object> row) {
-        return new ProductStorePrice(
-            Rows.value(row,"_version",String.class),
-            Rows.value(row,"store_price_id",Long.class),
-            Rows.value(row,"dgt_id",String.class),
-            Rows.value(row,"product_id",Long.class),
-            Rows.value(row,"retail_price",BigDecimal.class),
-            Rows.value(row,"is_active",Boolean.class),
-            Rows.value(row,"rebate_id",Long.class),
-            Rows.value(row,"created_at",OffsetDateTime.class),
-            Rows.value(row,"updated_at",OffsetDateTime.class));
-    }
+
+@Entity
+@Table(name = "product_store_prices")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+public class ProductStorePrice {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "store_price_id")
+    private Long storePriceId;
+
+    @Column(name = "dgt_id", nullable = false, length = 50)
+    private String dgtId;
+
+    @Column(name = "product_id", nullable = false)
+    private Long productId;
+
+    @Column(name = "retail_price", precision = 12, scale = 2)
+    private BigDecimal retailPrice;
+
+    @Column(name = "is_active")
+    private Boolean isActive;
+
+    @Column(name = "rebate_id")
+    private Long rebateId;
+
+    @Column(name = "created_at", updatable = false)
+    @CreationTimestamp
+    private OffsetDateTime createdAt;
+
+    @Column(name = "updated_at")
+    @UpdateTimestamp
+    private OffsetDateTime updatedAt;
 }

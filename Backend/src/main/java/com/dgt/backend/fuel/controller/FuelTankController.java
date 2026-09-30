@@ -1,26 +1,35 @@
 package com.dgt.backend.fuel.controller;
 
-import java.util.*;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.dgt.backend.fuel.dto.FuelTankResponse;
+import com.dgt.backend.fuel.dto.CreateFuelTankRequest;
+import com.dgt.backend.fuel.dto.UpdateFuelTankRequest;
 import com.dgt.backend.fuel.service.FuelTankService;
-import com.dgt.backend.fuel.entity.FuelTank;
+import com.dgt.backend.common.dto.PageResponse;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
 @RestController
 @RequestMapping("/api/v1/fuel-tanks")
 public class FuelTankController {
     private final FuelTankService service;
-    public FuelTankController(FuelTankService service) { this.service=service; }
+    public FuelTankController(FuelTankService service) { this.service = service; }
+
     @GetMapping
     @PreAuthorize("@accessPolicy.check(authentication, 'fuel_tanks', 'READ')")
-    public Map<String,Object> list(@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="50") int size) { return service.list(page,size); }
+    public PageResponse<FuelTankResponse> list(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) { return service.list(page, size); }
+
     @GetMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'fuel_tanks', 'READ')")
-    public FuelTank get(@PathVariable Long id) { return service.get(id); }
+    public FuelTankResponse get(@PathVariable Long id) { return service.get(id); }
+
     @PostMapping
-    @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
+    @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("@accessPolicy.check(authentication, 'fuel_tanks', 'WRITE')")
-    public Map<String,Object> create(@RequestBody Map<String,Object> values) { return service.create(values); }
+    public FuelTankResponse create(@Valid @RequestBody CreateFuelTankRequest request) { return service.create(request); }
+
     @PatchMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'fuel_tanks', 'WRITE')")
-    public Map<String,Object> update(@PathVariable Long id,@RequestHeader("If-Match") String expected,@RequestBody Map<String,Object> values) { return service.update(id,values,expected); }
+    public FuelTankResponse update(@PathVariable Long id, @RequestBody UpdateFuelTankRequest request) { return service.update(id, request); }
 }

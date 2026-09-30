@@ -1,42 +1,57 @@
 package com.dgt.backend.inventory.entity;
 
-import java.util.Map;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import java.math.BigDecimal;
 import java.time.*;
-import tools.jackson.databind.JsonNode;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.dgt.backend.common.entity.Rows;
-/** Persistence model for public.inventory_reduction_requests; IDs and types follow the inspected database. */
-public record InventoryReductionRequest(
-        @JsonProperty("_version") String rowVersion,
-        @JsonProperty("reduction_request_id") Long reductionRequestId,
-        @JsonProperty("dgt_id") String dgtId,
-        @JsonProperty("product_id") Long productId,
-        @JsonProperty("request_type") String requestType,
-        @JsonProperty("quantity") BigDecimal quantity,
-        @JsonProperty("reason") String reason,
-        @JsonProperty("status") String status,
-        @JsonProperty("notes") String notes,
-        @JsonProperty("destination") String destination,
-        @JsonProperty("requested_by") Long requestedBy,
-        @JsonProperty("rejection_reason") String rejectionReason,
-        @JsonProperty("created_at") OffsetDateTime createdAt,
-        @JsonProperty("updated_at") OffsetDateTime updatedAt) {
-    public static InventoryReductionRequest fromRow(Map<String,Object> row) {
-        return new InventoryReductionRequest(
-            Rows.value(row,"_version",String.class),
-            Rows.value(row,"reduction_request_id",Long.class),
-            Rows.value(row,"dgt_id",String.class),
-            Rows.value(row,"product_id",Long.class),
-            Rows.value(row,"request_type",String.class),
-            Rows.value(row,"quantity",BigDecimal.class),
-            Rows.value(row,"reason",String.class),
-            Rows.value(row,"status",String.class),
-            Rows.value(row,"notes",String.class),
-            Rows.value(row,"destination",String.class),
-            Rows.value(row,"requested_by",Long.class),
-            Rows.value(row,"rejection_reason",String.class),
-            Rows.value(row,"created_at",OffsetDateTime.class),
-            Rows.value(row,"updated_at",OffsetDateTime.class));
-    }
+
+@Entity
+@Table(name = "inventory_reduction_requests")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+public class InventoryReductionRequest {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "reduction_request_id")
+    private Long reductionRequestId;
+
+    @Column(name = "dgt_id", nullable = false, length = 50)
+    private String dgtId;
+
+    @Column(name = "product_id")
+    private Long productId;
+
+    @Column(name = "request_type", length = 50)
+    private String requestType;
+
+    @Column(name = "quantity", precision = 12, scale = 3)
+    private BigDecimal quantity;
+
+    @Column(name = "reason")
+    private String reason;
+
+    @Column(name = "status", length = 50)
+    private String status;
+
+    @Column(name = "notes")
+    private String notes;
+
+    @Column(name = "destination", length = 100)
+    private String destination;
+
+    @Column(name = "requested_by")
+    private Long requestedBy;
+
+    @Column(name = "rejection_reason")
+    private String rejectionReason;
+
+    @Column(name = "created_at", updatable = false)
+    @CreationTimestamp
+    private OffsetDateTime createdAt;
+
+    @Column(name = "updated_at")
+    @UpdateTimestamp
+    private OffsetDateTime updatedAt;
 }

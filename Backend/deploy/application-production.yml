@@ -18,6 +18,10 @@ app:
     enabled: true
   workweek:
     enabled: true
+  workforce:
+    enabled: true
+    shift-changes:
+      enabled: true
   billing:
     enabled: true
   daily-closing:

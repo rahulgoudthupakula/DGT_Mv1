@@ -1,32 +1,40 @@
 package com.dgt.backend.fuel.entity;
 
-import java.util.Map;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
 import java.math.BigDecimal;
 import java.time.*;
-import tools.jackson.databind.JsonNode;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.dgt.backend.common.entity.Rows;
-/** Persistence model for public.fuel_invoice_items; IDs and types follow the inspected database. */
-public record FuelInvoiceItem(
-        @JsonProperty("_version") String rowVersion,
-        @JsonProperty("fuel_invoice_item_id") Long fuelInvoiceItemId,
-        @JsonProperty("invoice_id") Long invoiceId,
-        @JsonProperty("fuel_grade_id") Long fuelGradeId,
-        @JsonProperty("gross_gallons") BigDecimal grossGallons,
-        @JsonProperty("net_gallons") BigDecimal netGallons,
-        @JsonProperty("price_per_gallon") BigDecimal pricePerGallon,
-        @JsonProperty("fuel_line_total") BigDecimal fuelLineTotal,
-        @JsonProperty("created_at") OffsetDateTime createdAt) {
-    public static FuelInvoiceItem fromRow(Map<String,Object> row) {
-        return new FuelInvoiceItem(
-            Rows.value(row,"_version",String.class),
-            Rows.value(row,"fuel_invoice_item_id",Long.class),
-            Rows.value(row,"invoice_id",Long.class),
-            Rows.value(row,"fuel_grade_id",Long.class),
-            Rows.value(row,"gross_gallons",BigDecimal.class),
-            Rows.value(row,"net_gallons",BigDecimal.class),
-            Rows.value(row,"price_per_gallon",BigDecimal.class),
-            Rows.value(row,"fuel_line_total",BigDecimal.class),
-            Rows.value(row,"created_at",OffsetDateTime.class));
-    }
+
+@Entity
+@Table(name = "fuel_invoice_items")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+public class FuelInvoiceItem {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "fuel_invoice_item_id")
+    private Long fuelInvoiceItemId;
+
+    @Column(name = "invoice_id", nullable = false)
+    private Long invoiceId;
+
+    @Column(name = "fuel_grade_id", nullable = false)
+    private Long fuelGradeId;
+
+    @Column(name = "gross_gallons", nullable = false, precision = 12, scale = 3)
+    private BigDecimal grossGallons;
+
+    @Column(name = "net_gallons", nullable = false, precision = 12, scale = 3)
+    private BigDecimal netGallons;
+
+    @Column(name = "price_per_gallon", nullable = false, precision = 12, scale = 4)
+    private BigDecimal pricePerGallon;
+
+    @Column(name = "fuel_line_total", nullable = false, precision = 12, scale = 2)
+    private BigDecimal fuelLineTotal;
+
+    @Column(name = "created_at", updatable = false)
+    @CreationTimestamp
+    private OffsetDateTime createdAt;
 }

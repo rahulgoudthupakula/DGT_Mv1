@@ -1,32 +1,42 @@
 package com.dgt.backend.inventory.entity;
 
-import java.util.Map;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import java.math.BigDecimal;
 import java.time.*;
-import tools.jackson.databind.JsonNode;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.dgt.backend.common.entity.Rows;
-/** Persistence model for public.inventory; IDs and types follow the inspected database. */
-public record Inventory(
-        @JsonProperty("_version") String rowVersion,
-        @JsonProperty("inventory_id") Long inventoryId,
-        @JsonProperty("dgt_id") String dgtId,
-        @JsonProperty("product_id") Long productId,
-        @JsonProperty("available_quantity") BigDecimal availableQuantity,
-        @JsonProperty("cost") BigDecimal cost,
-        @JsonProperty("return_cost") BigDecimal returnCost,
-        @JsonProperty("created_at") OffsetDateTime createdAt,
-        @JsonProperty("updated_at") OffsetDateTime updatedAt) {
-    public static Inventory fromRow(Map<String,Object> row) {
-        return new Inventory(
-            Rows.value(row,"_version",String.class),
-            Rows.value(row,"inventory_id",Long.class),
-            Rows.value(row,"dgt_id",String.class),
-            Rows.value(row,"product_id",Long.class),
-            Rows.value(row,"available_quantity",BigDecimal.class),
-            Rows.value(row,"cost",BigDecimal.class),
-            Rows.value(row,"return_cost",BigDecimal.class),
-            Rows.value(row,"created_at",OffsetDateTime.class),
-            Rows.value(row,"updated_at",OffsetDateTime.class));
-    }
+
+@Entity
+@Table(name = "inventory")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+public class Inventory {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "inventory_id")
+    private Long inventoryId;
+
+    @Column(name = "dgt_id", nullable = false, length = 50)
+    private String dgtId;
+
+    @Column(name = "product_id", nullable = false)
+    private Long productId;
+
+    @Column(name = "available_quantity", precision = 12, scale = 3)
+    private BigDecimal availableQuantity;
+
+    @Column(name = "cost", precision = 12, scale = 2)
+    private BigDecimal cost;
+
+    @Column(name = "return_cost", precision = 12, scale = 2)
+    private BigDecimal returnCost;
+
+    @Column(name = "created_at", updatable = false)
+    @CreationTimestamp
+    private OffsetDateTime createdAt;
+
+    @Column(name = "updated_at")
+    @UpdateTimestamp
+    private OffsetDateTime updatedAt;
 }

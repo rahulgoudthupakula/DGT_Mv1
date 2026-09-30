@@ -1,26 +1,35 @@
 package com.dgt.backend.promotions.controller;
 
-import java.util.*;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.dgt.backend.promotions.dto.PromotionResponse;
+import com.dgt.backend.promotions.dto.CreatePromotionRequest;
+import com.dgt.backend.promotions.dto.UpdatePromotionRequest;
 import com.dgt.backend.promotions.service.PromotionService;
-import com.dgt.backend.promotions.entity.Promotion;
+import com.dgt.backend.common.dto.PageResponse;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
 @RestController
 @RequestMapping("/api/v1/promotions")
 public class PromotionController {
     private final PromotionService service;
-    public PromotionController(PromotionService service) { this.service=service; }
+    public PromotionController(PromotionService service) { this.service = service; }
+
     @GetMapping
     @PreAuthorize("@accessPolicy.check(authentication, 'promotions', 'READ')")
-    public Map<String,Object> list(@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="50") int size) { return service.list(page,size); }
+    public PageResponse<PromotionResponse> list(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) { return service.list(page, size); }
+
     @GetMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'promotions', 'READ')")
-    public Promotion get(@PathVariable Long id) { return service.get(id); }
+    public PromotionResponse get(@PathVariable Long id) { return service.get(id); }
+
     @PostMapping
-    @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
+    @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("@accessPolicy.check(authentication, 'promotions', 'WRITE')")
-    public Map<String,Object> create(@RequestBody Map<String,Object> values) { return service.create(values); }
+    public PromotionResponse create(@Valid @RequestBody CreatePromotionRequest request) { return service.create(request); }
+
     @PatchMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'promotions', 'WRITE')")
-    public Map<String,Object> update(@PathVariable Long id,@RequestHeader("If-Match") String expected,@RequestBody Map<String,Object> values) { return service.update(id,values,expected); }
+    public PromotionResponse update(@PathVariable Long id, @RequestBody UpdatePromotionRequest request) { return service.update(id, request); }
 }

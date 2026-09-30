@@ -41,7 +41,7 @@ public class StoreBilling {
   }
  }
  public void advance(String store,LocalDate day){transactions.executeWithoutResult(tx->{lock(store);advanceLocked(store,day);});}
- @Scheduled(fixedDelay=60000,initialDelay=60000) public void renewDue(){for(var row:access.db.queryForList("SELECT s.dgt_id FROM stores s JOIN store_subscriptions ss ON ss.store_id=s.store_id WHERE ss.subscription_status='ACTIVE' AND s.company_id IS NOT NULL AND s.timezone IS NOT NULL")){String store=(String)row.get("dgt_id");try{advance(store,today(store));}catch(Exception e){org.slf4j.LoggerFactory.getLogger(StoreBilling.class).warn("Billing renewal failed for store {}: {}",store,e.getClass().getSimpleName());}}}
+ @Scheduled(fixedDelay=60000,initialDelay=60000) public void renewDue(){for(var row:access.db.queryForList("SELECT s.dgt_id FROM stores s JOIN store_subscriptions ss ON ss.store_id=s.store_id WHERE ss.subscription_status='ACTIVE' AND s.company_id IS NOT NULL AND s.timezone IS NOT NULL")){String store=(String)row.get("dgt_id");try{advance(store,today(store));}catch(Exception e){org.slf4j.LoggerFactory.getLogger(StoreBilling.class).warn("Billing renewal failed for store {}",store,e);}}}
  public record Command(String action,Long planId,String version){}
  @Transactional public Object change(String store,Command c,UUID key){
   access.requireAdmin(store);lock(store);access.requireAdmin(store);long user=access.user();

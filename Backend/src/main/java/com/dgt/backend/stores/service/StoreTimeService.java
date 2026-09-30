@@ -12,7 +12,7 @@ public class StoreTimeService {
     public StoreTimeService(StoreRepository repository) { this.repository=repository; }
     public record BusinessDay(String dgtId,String timezone,LocalDate date,Instant startInclusive,Instant endExclusive) {}
     public BusinessDay businessDay(String id,LocalDate date) {
-        String timezone=repository.findById(id).timezone();
+        String timezone=repository.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Store not found")).getTimezone();
         if(timezone==null) throw new ResponseStatusException(HttpStatus.CONFLICT,"Set this store's timezone before using local business dates");
         return window(id,timezone,date);
     }

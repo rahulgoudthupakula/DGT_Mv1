@@ -1,46 +1,63 @@
 package com.dgt.backend.vendors.entity;
 
-import java.util.Map;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import java.math.BigDecimal;
 import java.time.*;
-import tools.jackson.databind.JsonNode;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.dgt.backend.common.entity.Rows;
-/** Persistence model for public.vendor_contacts; IDs and types follow the inspected database. */
-public record VendorContact(
-        @JsonProperty("_version") String rowVersion,
-        @JsonProperty("contact_id") Long contactId,
-        @JsonProperty("vendor_id") Long vendorId,
-        @JsonProperty("dgt_id") String dgtId,
-        @JsonProperty("contract_number") String contractNumber,
-        @JsonProperty("start_date") LocalDate startDate,
-        @JsonProperty("end_date") LocalDate endDate,
-        @JsonProperty("volume_threshold") BigDecimal volumeThreshold,
-        @JsonProperty("volume_discount_value") BigDecimal volumeDiscountValue,
-        @JsonProperty("volume_discount_type") String volumeDiscountType,
-        @JsonProperty("return_window_days") Integer returnWindowDays,
-        @JsonProperty("status") String status,
-        @JsonProperty("document_url") String documentUrl,
-        @JsonProperty("created_at") OffsetDateTime createdAt,
-        @JsonProperty("updated_at") OffsetDateTime updatedAt,
-        @JsonProperty("force_end_date") LocalDate forceEndDate) {
-    public static VendorContact fromRow(Map<String,Object> row) {
-        return new VendorContact(
-            Rows.value(row,"_version",String.class),
-            Rows.value(row,"contact_id",Long.class),
-            Rows.value(row,"vendor_id",Long.class),
-            Rows.value(row,"dgt_id",String.class),
-            Rows.value(row,"contract_number",String.class),
-            Rows.value(row,"start_date",LocalDate.class),
-            Rows.value(row,"end_date",LocalDate.class),
-            Rows.value(row,"volume_threshold",BigDecimal.class),
-            Rows.value(row,"volume_discount_value",BigDecimal.class),
-            Rows.value(row,"volume_discount_type",String.class),
-            Rows.value(row,"return_window_days",Integer.class),
-            Rows.value(row,"status",String.class),
-            Rows.value(row,"document_url",String.class),
-            Rows.value(row,"created_at",OffsetDateTime.class),
-            Rows.value(row,"updated_at",OffsetDateTime.class),
-            Rows.value(row,"force_end_date",LocalDate.class));
-    }
+
+@Entity
+@Table(name = "vendor_contacts")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+public class VendorContact {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "contact_id")
+    private Long contactId;
+
+    @Column(name = "vendor_id", nullable = false)
+    private Long vendorId;
+
+    @Column(name = "dgt_id", length = 50)
+    private String dgtId;
+
+    @Column(name = "contract_number", length = 100)
+    private String contractNumber;
+
+    @Column(name = "start_date")
+    private LocalDate startDate;
+
+    @Column(name = "end_date")
+    private LocalDate endDate;
+
+    @Column(name = "volume_threshold", precision = 12, scale = 2)
+    private BigDecimal volumeThreshold;
+
+    @Column(name = "volume_discount_value", precision = 12, scale = 2)
+    private BigDecimal volumeDiscountValue;
+
+    @Column(name = "volume_discount_type", length = 50)
+    private String volumeDiscountType;
+
+    @Column(name = "return_window_days")
+    private Integer returnWindowDays;
+
+    @Column(name = "status", length = 50)
+    private String status;
+
+    @Column(name = "document_url")
+    private String documentUrl;
+
+    @Column(name = "force_end_date")
+    private LocalDate forceEndDate;
+
+    @Column(name = "created_at", updatable = false)
+    @CreationTimestamp
+    private OffsetDateTime createdAt;
+
+    @Column(name = "updated_at")
+    @UpdateTimestamp
+    private OffsetDateTime updatedAt;
 }

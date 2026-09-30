@@ -1,21 +1,56 @@
 package com.dgt.backend.employees.service;
 
-import java.util.*;
+import com.dgt.backend.employees.dto.EmployeeCompensationResponse;
+import com.dgt.backend.employees.dto.CreateEmployeeCompensationRequest;
+import com.dgt.backend.employees.dto.UpdateEmployeeCompensationRequest;
+import com.dgt.backend.employees.entity.EmployeeCompensation;
+import com.dgt.backend.employees.repository.EmployeeCompensationRepository;
+import com.dgt.backend.common.dto.PageResponse;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.dgt.backend.common.service.WriteValidator;
-import com.dgt.backend.employees.repository.EmployeeCompensationRepository;
-import com.dgt.backend.employees.entity.EmployeeCompensation;
-import static com.dgt.backend.employees.database.EmployeeCompensationDatabase.TABLE;
+import org.springframework.web.server.ResponseStatusException;
+
 @Service
 public class EmployeeCompensationService {
     private final EmployeeCompensationRepository repository;
-    private final WriteValidator validator;
-    public EmployeeCompensationService(EmployeeCompensationRepository repository,WriteValidator validator) { this.repository=repository; this.validator=validator; }
-    public Map<String,Object> list(int page,int size) { return repository.list(page,size); }
-    public EmployeeCompensation get(Long id) { return repository.findById(id); }
+    public EmployeeCompensationService(EmployeeCompensationRepository repository) { this.repository = repository; }
+
+    public PageResponse<EmployeeCompensationResponse> list(int page, int size) {
+        var p = repository.findAll(PageRequest.of(page, size, Sort.by("compensationId")));
+        return new PageResponse<>(p.getContent().stream().map(EmployeeCompensationResponse::from).toList(), page, size, p.getTotalElements());
+    }
+
+    public EmployeeCompensationResponse get(Long id) {
+        return EmployeeCompensationResponse.from(repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found")));
+    }
+
     @Transactional
-    public Map<String,Object> create(Map<String,Object> values) { return repository.create(validator.validate(TABLE,values,true)); }
+    public EmployeeCompensationResponse create(CreateEmployeeCompensationRequest req) {
+        var entity = EmployeeCompensation.builder()
+                .employeeId(req.employeeId())
+                .payType(req.payType())
+                .hourlyRate(req.hourlyRate())
+                .annualSalary(req.annualSalary())
+                .effectiveFrom(req.effectiveFrom())
+                .effectiveTo(req.effectiveTo())
+                .build();
+        return EmployeeCompensationResponse.from(repository.save(entity));
+    }
+
     @Transactional
-    public Map<String,Object> update(Long id,Map<String,Object> values,String expected) { var validated=validator.validate(TABLE,values,false); validator.validateUpdate(TABLE,id,validated); return repository.update(id,validated,expected); }
+    public EmployeeCompensationResponse update(Long id, UpdateEmployeeCompensationRequest req) {
+        var entity = repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found"));
+        if (req.employeeId() != null) entity.setEmployeeId(req.employeeId());
+        if (req.payType() != null) entity.setPayType(req.payType());
+        if (req.hourlyRate() != null) entity.setHourlyRate(req.hourlyRate());
+        if (req.annualSalary() != null) entity.setAnnualSalary(req.annualSalary());
+        if (req.effectiveFrom() != null) entity.setEffectiveFrom(req.effectiveFrom());
+        if (req.effectiveTo() != null) entity.setEffectiveTo(req.effectiveTo());
+        return EmployeeCompensationResponse.from(repository.save(entity));
+    }
 }

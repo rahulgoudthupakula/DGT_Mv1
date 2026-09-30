@@ -1,21 +1,56 @@
 package com.dgt.backend.employees.service;
 
-import java.util.*;
+import com.dgt.backend.employees.dto.EmployeeStoreAssignmentResponse;
+import com.dgt.backend.employees.dto.CreateEmployeeStoreAssignmentRequest;
+import com.dgt.backend.employees.dto.UpdateEmployeeStoreAssignmentRequest;
+import com.dgt.backend.employees.entity.EmployeeStoreAssignment;
+import com.dgt.backend.employees.repository.EmployeeStoreAssignmentRepository;
+import com.dgt.backend.common.dto.PageResponse;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.dgt.backend.common.service.WriteValidator;
-import com.dgt.backend.employees.repository.EmployeeStoreAssignmentRepository;
-import com.dgt.backend.employees.entity.EmployeeStoreAssignment;
-import static com.dgt.backend.employees.database.EmployeeStoreAssignmentDatabase.TABLE;
+import org.springframework.web.server.ResponseStatusException;
+
 @Service
 public class EmployeeStoreAssignmentService {
     private final EmployeeStoreAssignmentRepository repository;
-    private final WriteValidator validator;
-    public EmployeeStoreAssignmentService(EmployeeStoreAssignmentRepository repository,WriteValidator validator) { this.repository=repository; this.validator=validator; }
-    public Map<String,Object> list(int page,int size) { return repository.list(page,size); }
-    public EmployeeStoreAssignment get(Long id) { return repository.findById(id); }
+    public EmployeeStoreAssignmentService(EmployeeStoreAssignmentRepository repository) { this.repository = repository; }
+
+    public PageResponse<EmployeeStoreAssignmentResponse> list(int page, int size) {
+        var p = repository.findAll(PageRequest.of(page, size, Sort.by("employeeStoreAssignmentId")));
+        return new PageResponse<>(p.getContent().stream().map(EmployeeStoreAssignmentResponse::from).toList(), page, size, p.getTotalElements());
+    }
+
+    public EmployeeStoreAssignmentResponse get(Long id) {
+        return EmployeeStoreAssignmentResponse.from(repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found")));
+    }
+
     @Transactional
-    public Map<String,Object> create(Map<String,Object> values) { return repository.create(validator.validate(TABLE,values,true)); }
+    public EmployeeStoreAssignmentResponse create(CreateEmployeeStoreAssignmentRequest req) {
+        var entity = EmployeeStoreAssignment.builder()
+                .employeeId(req.employeeId())
+                .dgtId(req.dgtId())
+                .isPrimary(req.isPrimary())
+                .effectiveFrom(req.effectiveFrom())
+                .effectiveTo(req.effectiveTo())
+                .roleTypeId(req.roleTypeId())
+                .build();
+        return EmployeeStoreAssignmentResponse.from(repository.save(entity));
+    }
+
     @Transactional
-    public Map<String,Object> update(Long id,Map<String,Object> values,String expected) { var validated=validator.validate(TABLE,values,false); validator.validateUpdate(TABLE,id,validated); return repository.update(id,validated,expected); }
+    public EmployeeStoreAssignmentResponse update(Long id, UpdateEmployeeStoreAssignmentRequest req) {
+        var entity = repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found"));
+        if (req.employeeId() != null) entity.setEmployeeId(req.employeeId());
+        if (req.dgtId() != null) entity.setDgtId(req.dgtId());
+        if (req.isPrimary() != null) entity.setIsPrimary(req.isPrimary());
+        if (req.effectiveFrom() != null) entity.setEffectiveFrom(req.effectiveFrom());
+        if (req.effectiveTo() != null) entity.setEffectiveTo(req.effectiveTo());
+        if (req.roleTypeId() != null) entity.setRoleTypeId(req.roleTypeId());
+        return EmployeeStoreAssignmentResponse.from(repository.save(entity));
+    }
 }

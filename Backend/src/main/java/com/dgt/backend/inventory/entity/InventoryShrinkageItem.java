@@ -1,30 +1,40 @@
 package com.dgt.backend.inventory.entity;
 
-import java.util.Map;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
 import java.math.BigDecimal;
 import java.time.*;
-import tools.jackson.databind.JsonNode;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.dgt.backend.common.entity.Rows;
-/** Persistence model for public.inventory_shrinkage_items; IDs and types follow the inspected database. */
-public record InventoryShrinkageItem(
-        @JsonProperty("_version") String rowVersion,
-        @JsonProperty("shrinkage_item_id") Long shrinkageItemId,
-        @JsonProperty("shrinkage_id") Long shrinkageId,
-        @JsonProperty("product_id") Long productId,
-        @JsonProperty("qty") BigDecimal qty,
-        @JsonProperty("unit_cost") BigDecimal unitCost,
-        @JsonProperty("loss_amount") BigDecimal lossAmount,
-        @JsonProperty("reason") String reason) {
-    public static InventoryShrinkageItem fromRow(Map<String,Object> row) {
-        return new InventoryShrinkageItem(
-            Rows.value(row,"_version",String.class),
-            Rows.value(row,"shrinkage_item_id",Long.class),
-            Rows.value(row,"shrinkage_id",Long.class),
-            Rows.value(row,"product_id",Long.class),
-            Rows.value(row,"qty",BigDecimal.class),
-            Rows.value(row,"unit_cost",BigDecimal.class),
-            Rows.value(row,"loss_amount",BigDecimal.class),
-            Rows.value(row,"reason",String.class));
-    }
+
+@Entity
+@Table(name = "inventory_shrinkage_items")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+public class InventoryShrinkageItem {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "shrinkage_item_id")
+    private Long shrinkageItemId;
+
+    @Column(name = "shrinkage_id", nullable = false)
+    private Long shrinkageId;
+
+    @Column(name = "product_id", nullable = false)
+    private Long productId;
+
+    @Column(name = "qty", precision = 12, scale = 3)
+    private BigDecimal qty;
+
+    @Column(name = "unit_cost", precision = 12, scale = 2)
+    private BigDecimal unitCost;
+
+    @Column(name = "loss_amount", precision = 12, scale = 2)
+    private BigDecimal lossAmount;
+
+    @Column(name = "reason")
+    private String reason;
+
+    @Column(name = "created_at", updatable = false)
+    @CreationTimestamp
+    private OffsetDateTime createdAt;
 }

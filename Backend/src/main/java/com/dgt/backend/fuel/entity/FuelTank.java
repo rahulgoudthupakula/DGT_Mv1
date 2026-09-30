@@ -1,32 +1,42 @@
 package com.dgt.backend.fuel.entity;
 
-import java.util.Map;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import java.math.BigDecimal;
 import java.time.*;
-import tools.jackson.databind.JsonNode;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.dgt.backend.common.entity.Rows;
-/** Persistence model for public.fuel_tanks; IDs and types follow the inspected database. */
-public record FuelTank(
-        @JsonProperty("_version") String rowVersion,
-        @JsonProperty("tank_id") Long tankId,
-        @JsonProperty("dgt_id") String dgtId,
-        @JsonProperty("tank_number") String tankNumber,
-        @JsonProperty("tank_name") String tankName,
-        @JsonProperty("capacity_gallons") BigDecimal capacityGallons,
-        @JsonProperty("safe_fill_capacity") BigDecimal safeFillCapacity,
-        @JsonProperty("created_at") OffsetDateTime createdAt,
-        @JsonProperty("updated_at") OffsetDateTime updatedAt) {
-    public static FuelTank fromRow(Map<String,Object> row) {
-        return new FuelTank(
-            Rows.value(row,"_version",String.class),
-            Rows.value(row,"tank_id",Long.class),
-            Rows.value(row,"dgt_id",String.class),
-            Rows.value(row,"tank_number",String.class),
-            Rows.value(row,"tank_name",String.class),
-            Rows.value(row,"capacity_gallons",BigDecimal.class),
-            Rows.value(row,"safe_fill_capacity",BigDecimal.class),
-            Rows.value(row,"created_at",OffsetDateTime.class),
-            Rows.value(row,"updated_at",OffsetDateTime.class));
-    }
+
+@Entity
+@Table(name = "fuel_tanks")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+public class FuelTank {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "tank_id")
+    private Long tankId;
+
+    @Column(name = "dgt_id", nullable = false, length = 50)
+    private String dgtId;
+
+    @Column(name = "tank_number", nullable = false, length = 20)
+    private String tankNumber;
+
+    @Column(name = "tank_name", length = 100)
+    private String tankName;
+
+    @Column(name = "capacity_gallons", precision = 12, scale = 3)
+    private BigDecimal capacityGallons;
+
+    @Column(name = "safe_fill_capacity", precision = 12, scale = 3)
+    private BigDecimal safeFillCapacity;
+
+    @Column(name = "created_at", updatable = false)
+    @CreationTimestamp
+    private OffsetDateTime createdAt;
+
+    @Column(name = "updated_at")
+    @UpdateTimestamp
+    private OffsetDateTime updatedAt;
 }

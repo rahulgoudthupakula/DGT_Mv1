@@ -1,26 +1,35 @@
 package com.dgt.backend.inventory.controller;
 
-import java.util.*;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.dgt.backend.inventory.dto.InventoryReturnItemResponse;
+import com.dgt.backend.inventory.dto.CreateInventoryReturnItemRequest;
+import com.dgt.backend.inventory.dto.UpdateInventoryReturnItemRequest;
 import com.dgt.backend.inventory.service.InventoryReturnItemService;
-import com.dgt.backend.inventory.entity.InventoryReturnItem;
+import com.dgt.backend.common.dto.PageResponse;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
 @RestController
 @RequestMapping("/api/v1/inventory-return-items")
 public class InventoryReturnItemController {
     private final InventoryReturnItemService service;
-    public InventoryReturnItemController(InventoryReturnItemService service) { this.service=service; }
+    public InventoryReturnItemController(InventoryReturnItemService service) { this.service = service; }
+
     @GetMapping
     @PreAuthorize("@accessPolicy.check(authentication, 'inventory_return_items', 'READ')")
-    public Map<String,Object> list(@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="50") int size) { return service.list(page,size); }
+    public PageResponse<InventoryReturnItemResponse> list(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) { return service.list(page, size); }
+
     @GetMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'inventory_return_items', 'READ')")
-    public InventoryReturnItem get(@PathVariable Long id) { return service.get(id); }
+    public InventoryReturnItemResponse get(@PathVariable Long id) { return service.get(id); }
+
     @PostMapping
-    @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
+    @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("@accessPolicy.check(authentication, 'inventory_return_items', 'WRITE')")
-    public Map<String,Object> create(@RequestBody Map<String,Object> values) { return service.create(values); }
+    public InventoryReturnItemResponse create(@Valid @RequestBody CreateInventoryReturnItemRequest request) { return service.create(request); }
+
     @PatchMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'inventory_return_items', 'WRITE')")
-    public Map<String,Object> update(@PathVariable Long id,@RequestHeader("If-Match") String expected,@RequestBody Map<String,Object> values) { return service.update(id,values,expected); }
+    public InventoryReturnItemResponse update(@PathVariable Long id, @RequestBody UpdateInventoryReturnItemRequest request) { return service.update(id, request); }
 }

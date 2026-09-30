@@ -1,26 +1,35 @@
 package com.dgt.backend.sales.controller;
 
-import java.util.*;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.dgt.backend.sales.dto.TenderTypeResponse;
+import com.dgt.backend.sales.dto.CreateTenderTypeRequest;
+import com.dgt.backend.sales.dto.UpdateTenderTypeRequest;
 import com.dgt.backend.sales.service.TenderTypeService;
-import com.dgt.backend.sales.entity.TenderType;
+import com.dgt.backend.common.dto.PageResponse;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
 @RestController
 @RequestMapping("/api/v1/tender-types")
 public class TenderTypeController {
     private final TenderTypeService service;
-    public TenderTypeController(TenderTypeService service) { this.service=service; }
+    public TenderTypeController(TenderTypeService service) { this.service = service; }
+
     @GetMapping
     @PreAuthorize("@accessPolicy.check(authentication, 'tender_types', 'READ')")
-    public Map<String,Object> list(@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="50") int size) { return service.list(page,size); }
+    public PageResponse<TenderTypeResponse> list(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) { return service.list(page, size); }
+
     @GetMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'tender_types', 'READ')")
-    public TenderType get(@PathVariable Long id) { return service.get(id); }
+    public TenderTypeResponse get(@PathVariable Long id) { return service.get(id); }
+
     @PostMapping
-    @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
+    @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("@accessPolicy.check(authentication, 'tender_types', 'WRITE')")
-    public Map<String,Object> create(@RequestBody Map<String,Object> values) { return service.create(values); }
+    public TenderTypeResponse create(@Valid @RequestBody CreateTenderTypeRequest request) { return service.create(request); }
+
     @PatchMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'tender_types', 'WRITE')")
-    public Map<String,Object> update(@PathVariable Long id,@RequestHeader("If-Match") String expected,@RequestBody Map<String,Object> values) { return service.update(id,values,expected); }
+    public TenderTypeResponse update(@PathVariable Long id, @RequestBody UpdateTenderTypeRequest request) { return service.update(id, request); }
 }

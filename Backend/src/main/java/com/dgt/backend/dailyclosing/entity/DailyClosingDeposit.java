@@ -1,36 +1,53 @@
 package com.dgt.backend.dailyclosing.entity;
 
-import java.util.Map;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.annotations.SQLRestriction;
 import java.math.BigDecimal;
 import java.time.*;
-import tools.jackson.databind.JsonNode;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.dgt.backend.common.entity.Rows;
-/** Persistence model for public.daily_closing_deposits; IDs and types follow the inspected database. */
-public record DailyClosingDeposit(
-        @JsonProperty("_version") String rowVersion,
-        @JsonProperty("deposit_id") Long depositId,
-        @JsonProperty("everyday_closing_id") Long everydayClosingId,
-        @JsonProperty("deposit_date") LocalDate depositDate,
-        @JsonProperty("bank_account_id") Long bankAccountId,
-        @JsonProperty("amount") BigDecimal amount,
-        @JsonProperty("receipt_url") String receiptUrl,
-        @JsonProperty("deposited_by") Long depositedBy,
-        @JsonProperty("status") String status,
-        @JsonProperty("created_at") OffsetDateTime createdAt,
-        @JsonProperty("updated_at") OffsetDateTime updatedAt) {
-    public static DailyClosingDeposit fromRow(Map<String,Object> row) {
-        return new DailyClosingDeposit(
-            Rows.value(row,"_version",String.class),
-            Rows.value(row,"deposit_id",Long.class),
-            Rows.value(row,"everyday_closing_id",Long.class),
-            Rows.value(row,"deposit_date",LocalDate.class),
-            Rows.value(row,"bank_account_id",Long.class),
-            Rows.value(row,"amount",BigDecimal.class),
-            Rows.value(row,"receipt_url",String.class),
-            Rows.value(row,"deposited_by",Long.class),
-            Rows.value(row,"status",String.class),
-            Rows.value(row,"created_at",OffsetDateTime.class),
-            Rows.value(row,"updated_at",OffsetDateTime.class));
-    }
+
+@Entity
+@Table(name = "daily_closing_deposits")
+@SQLRestriction("archived_at IS NULL")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+public class DailyClosingDeposit {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "deposit_id")
+    private Long depositId;
+
+    @Column(name = "everyday_closing_id", nullable = false)
+    private Long everydayClosingId;
+
+    @Column(name = "deposit_date", nullable = false)
+    private LocalDate depositDate;
+
+    @Column(name = "bank_account_id")
+    private Long bankAccountId;
+
+    @Column(name = "amount", nullable = false, precision = 12, scale = 2)
+    private BigDecimal amount;
+
+    @Column(name = "receipt_url")
+    private String receiptUrl;
+
+    @Column(name = "deposited_by")
+    private Long depositedBy;
+
+    @Column(name = "status", nullable = false, length = 50)
+    private String status;
+
+    @Column(name = "archived_at")
+    private OffsetDateTime archivedAt;
+
+    @Column(name = "created_at", updatable = false)
+    @CreationTimestamp
+    private OffsetDateTime createdAt;
+
+    @Column(name = "updated_at")
+    @UpdateTimestamp
+    private OffsetDateTime updatedAt;
 }

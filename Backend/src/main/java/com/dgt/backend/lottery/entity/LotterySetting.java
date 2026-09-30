@@ -1,32 +1,45 @@
 package com.dgt.backend.lottery.entity;
 
-import java.util.Map;
+import com.dgt.backend.common.converter.JsonNodeConverter;
+import com.fasterxml.jackson.databind.JsonNode;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import java.math.BigDecimal;
 import java.time.*;
-import tools.jackson.databind.JsonNode;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.dgt.backend.common.entity.Rows;
-/** Persistence model for public.lottery_settings; IDs and types follow the inspected database. */
-public record LotterySetting(
-        @JsonProperty("_version") String rowVersion,
-        @JsonProperty("lottery_setting_id") Long lotterySettingId,
-        @JsonProperty("dgt_id") String dgtId,
-        @JsonProperty("max_open_packs_per_game") Integer maxOpenPacksPerGame,
-        @JsonProperty("allow_partial_returns") Boolean allowPartialReturns,
-        @JsonProperty("default_commission_per_pack") BigDecimal defaultCommissionPerPack,
-        @JsonProperty("settlement_frequency") JsonNode settlementFrequency,
-        @JsonProperty("created_at") OffsetDateTime createdAt,
-        @JsonProperty("updated_at") OffsetDateTime updatedAt) {
-    public static LotterySetting fromRow(Map<String,Object> row) {
-        return new LotterySetting(
-            Rows.value(row,"_version",String.class),
-            Rows.value(row,"lottery_setting_id",Long.class),
-            Rows.value(row,"dgt_id",String.class),
-            Rows.value(row,"max_open_packs_per_game",Integer.class),
-            Rows.value(row,"allow_partial_returns",Boolean.class),
-            Rows.value(row,"default_commission_per_pack",BigDecimal.class),
-            Rows.value(row,"settlement_frequency",JsonNode.class),
-            Rows.value(row,"created_at",OffsetDateTime.class),
-            Rows.value(row,"updated_at",OffsetDateTime.class));
-    }
+
+@Entity
+@Table(name = "lottery_settings")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+public class LotterySetting {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "lottery_setting_id")
+    private Long lotterySettingId;
+
+    @Column(name = "dgt_id", nullable = false, length = 50)
+    private String dgtId;
+
+    @Column(name = "max_open_packs_per_game")
+    private Integer maxOpenPacksPerGame;
+
+    @Column(name = "allow_partial_returns")
+    private Boolean allowPartialReturns;
+
+    @Column(name = "default_commission_per_pack", precision = 12, scale = 2)
+    private BigDecimal defaultCommissionPerPack;
+
+    @Convert(converter = JsonNodeConverter.class)
+    @Column(name = "settlement_frequency", columnDefinition = "jsonb")
+    private JsonNode settlementFrequency;
+
+    @Column(name = "created_at", updatable = false)
+    @CreationTimestamp
+    private OffsetDateTime createdAt;
+
+    @Column(name = "updated_at")
+    @UpdateTimestamp
+    private OffsetDateTime updatedAt;
 }

@@ -1,40 +1,53 @@
 package com.dgt.backend.products.entity;
 
-import java.util.Map;
-import java.math.BigDecimal;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import java.time.*;
-import tools.jackson.databind.JsonNode;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.dgt.backend.common.entity.Rows;
-/** Persistence model for public.products; IDs and types follow the inspected database. */
-public record Product(
-        @JsonProperty("_version") String rowVersion,
-        @JsonProperty("product_id") Long productId,
-        @JsonProperty("store_sub_department_id") Long storeSubDepartmentId,
-        @JsonProperty("product_name") String productName,
-        @JsonProperty("product_sku") String productSku,
-        @JsonProperty("is_returnable") Boolean isReturnable,
-        @JsonProperty("brand_id") Long brandId,
-        @JsonProperty("unit_of_measure") String unitOfMeasure,
-        @JsonProperty("is_active") Boolean isActive,
-        @JsonProperty("created_at") OffsetDateTime createdAt,
-        @JsonProperty("updated_at") OffsetDateTime updatedAt,
-        @JsonProperty("is_taxable") Boolean isTaxable,
-        @JsonProperty("is_ebt") Boolean isEbt) {
-    public static Product fromRow(Map<String,Object> row) {
-        return new Product(
-            Rows.value(row,"_version",String.class),
-            Rows.value(row,"product_id",Long.class),
-            Rows.value(row,"store_sub_department_id",Long.class),
-            Rows.value(row,"product_name",String.class),
-            Rows.value(row,"product_sku",String.class),
-            Rows.value(row,"is_returnable",Boolean.class),
-            Rows.value(row,"brand_id",Long.class),
-            Rows.value(row,"unit_of_measure",String.class),
-            Rows.value(row,"is_active",Boolean.class),
-            Rows.value(row,"created_at",OffsetDateTime.class),
-            Rows.value(row,"updated_at",OffsetDateTime.class),
-            Rows.value(row,"is_taxable",Boolean.class),
-            Rows.value(row,"is_ebt",Boolean.class));
-    }
+
+@Entity
+@Table(name = "products")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+public class Product {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "product_id")
+    private Long productId;
+
+    @Column(name = "store_sub_department_id")
+    private Long storeSubDepartmentId;
+
+    @Column(name = "product_name", nullable = false, length = 200)
+    private String productName;
+
+    @Column(name = "product_sku", length = 100)
+    private String productSku;
+
+    @Column(name = "is_returnable")
+    private Boolean isReturnable;
+
+    @Column(name = "brand_id")
+    private Long brandId;
+
+    @Column(name = "unit_of_measure", length = 50)
+    private String unitOfMeasure;
+
+    @Column(name = "is_active")
+    private Boolean isActive;
+
+    @Column(name = "is_taxable")
+    private Boolean isTaxable;
+
+    @Column(name = "is_ebt")
+    private Boolean isEbt;
+
+    @Column(name = "created_at", updatable = false)
+    @CreationTimestamp
+    private OffsetDateTime createdAt;
+
+    @Column(name = "updated_at")
+    @UpdateTimestamp
+    private OffsetDateTime updatedAt;
 }

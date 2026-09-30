@@ -1,21 +1,54 @@
 package com.dgt.backend.identity.service;
 
-import java.util.*;
+import com.dgt.backend.identity.dto.PermissionResponse;
+import com.dgt.backend.identity.dto.CreatePermissionRequest;
+import com.dgt.backend.identity.dto.UpdatePermissionRequest;
+import com.dgt.backend.identity.entity.Permission;
+import com.dgt.backend.identity.repository.PermissionRepository;
+import com.dgt.backend.common.dto.PageResponse;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.dgt.backend.common.service.WriteValidator;
-import com.dgt.backend.identity.repository.PermissionRepository;
-import com.dgt.backend.identity.entity.Permission;
-import static com.dgt.backend.identity.database.PermissionDatabase.TABLE;
+import org.springframework.web.server.ResponseStatusException;
+
 @Service
 public class PermissionService {
     private final PermissionRepository repository;
-    private final WriteValidator validator;
-    public PermissionService(PermissionRepository repository,WriteValidator validator) { this.repository=repository; this.validator=validator; }
-    public Map<String,Object> list(int page,int size) { return repository.list(page,size); }
-    public Permission get(Long id) { return repository.findById(id); }
+    public PermissionService(PermissionRepository repository) { this.repository = repository; }
+
+    public PageResponse<PermissionResponse> list(int page, int size) {
+        var p = repository.findAll(PageRequest.of(page, size, Sort.by("permissionId")));
+        return new PageResponse<>(p.getContent().stream().map(PermissionResponse::from).toList(), page, size, p.getTotalElements());
+    }
+
+    public PermissionResponse get(Long id) {
+        return PermissionResponse.from(repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found")));
+    }
+
     @Transactional
-    public Map<String,Object> create(Map<String,Object> values) { return repository.create(validator.validate(TABLE,values,true)); }
+    public PermissionResponse create(CreatePermissionRequest req) {
+        var entity = Permission.builder()
+                .moduleId(req.moduleId())
+                .userRoleId(req.userRoleId())
+                .isActive(req.isActive())
+                .canView(req.canView())
+                .canEdit(req.canEdit())
+                .build();
+        return PermissionResponse.from(repository.save(entity));
+    }
+
     @Transactional
-    public Map<String,Object> update(Long id,Map<String,Object> values,String expected) { var validated=validator.validate(TABLE,values,false); validator.validateUpdate(TABLE,id,validated); return repository.update(id,validated,expected); }
+    public PermissionResponse update(Long id, UpdatePermissionRequest req) {
+        var entity = repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found"));
+        if (req.moduleId() != null) entity.setModuleId(req.moduleId());
+        if (req.userRoleId() != null) entity.setUserRoleId(req.userRoleId());
+        if (req.isActive() != null) entity.setIsActive(req.isActive());
+        if (req.canView() != null) entity.setCanView(req.canView());
+        if (req.canEdit() != null) entity.setCanEdit(req.canEdit());
+        return PermissionResponse.from(repository.save(entity));
+    }
 }

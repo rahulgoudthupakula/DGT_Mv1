@@ -1,0 +1,59 @@
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 3
+  flyway:
+    enabled: false
+
+springdoc:
+  swagger-ui:
+    enabled: true
+  api-docs:
+    enabled: true
+
+server:
+  port: 8181
+  address: 127.0.0.1
+
+logging:
+  level:
+    root: INFO
+    org.springframework: INFO
+
+app:
+  cors-origins: http://localhost:5173,http://localhost:5174
+  profile:
+    enabled: true
+  billing:
+    enabled: true
+  workweek:
+    enabled: true
+  workforce:
+    enabled: true
+    shift-changes:
+      enabled: true
+  pricebook:
+    enabled: true
+  gas:
+    settings:
+      enabled: true
+    delivery:
+      enabled: true
+    price:
+      enabled: true
+    adjustments:
+      enabled: true
+    tank-report:
+      enabled: true
+  sales:
+    activity:
+      enabled: true
+  daily-closing:
+    enabled: true
+  tender:
+    credit-card:
+      enabled: true
+    ebt:
+      enabled: true
+    fleet:
+      enabled: true

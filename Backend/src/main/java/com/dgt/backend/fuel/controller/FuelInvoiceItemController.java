@@ -1,26 +1,35 @@
 package com.dgt.backend.fuel.controller;
 
-import java.util.*;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.dgt.backend.fuel.dto.FuelInvoiceItemResponse;
+import com.dgt.backend.fuel.dto.CreateFuelInvoiceItemRequest;
+import com.dgt.backend.fuel.dto.UpdateFuelInvoiceItemRequest;
 import com.dgt.backend.fuel.service.FuelInvoiceItemService;
-import com.dgt.backend.fuel.entity.FuelInvoiceItem;
+import com.dgt.backend.common.dto.PageResponse;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
 @RestController
 @RequestMapping("/api/v1/fuel-invoice-items")
 public class FuelInvoiceItemController {
     private final FuelInvoiceItemService service;
-    public FuelInvoiceItemController(FuelInvoiceItemService service) { this.service=service; }
+    public FuelInvoiceItemController(FuelInvoiceItemService service) { this.service = service; }
+
     @GetMapping
     @PreAuthorize("@accessPolicy.check(authentication, 'fuel_invoice_items', 'READ')")
-    public Map<String,Object> list(@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="50") int size) { return service.list(page,size); }
+    public PageResponse<FuelInvoiceItemResponse> list(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) { return service.list(page, size); }
+
     @GetMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'fuel_invoice_items', 'READ')")
-    public FuelInvoiceItem get(@PathVariable Long id) { return service.get(id); }
+    public FuelInvoiceItemResponse get(@PathVariable Long id) { return service.get(id); }
+
     @PostMapping
-    @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
+    @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("@accessPolicy.check(authentication, 'fuel_invoice_items', 'WRITE')")
-    public Map<String,Object> create(@RequestBody Map<String,Object> values) { return service.create(values); }
+    public FuelInvoiceItemResponse create(@Valid @RequestBody CreateFuelInvoiceItemRequest request) { return service.create(request); }
+
     @PatchMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'fuel_invoice_items', 'WRITE')")
-    public Map<String,Object> update(@PathVariable Long id,@RequestHeader("If-Match") String expected,@RequestBody Map<String,Object> values) { return service.update(id,values,expected); }
+    public FuelInvoiceItemResponse update(@PathVariable Long id, @RequestBody UpdateFuelInvoiceItemRequest request) { return service.update(id, request); }
 }

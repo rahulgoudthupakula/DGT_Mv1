@@ -1,21 +1,52 @@
 package com.dgt.backend.inventory.service;
 
-import java.util.*;
+import com.dgt.backend.inventory.dto.InventoryShrinkageResponse;
+import com.dgt.backend.inventory.dto.CreateInventoryShrinkageRequest;
+import com.dgt.backend.inventory.dto.UpdateInventoryShrinkageRequest;
+import com.dgt.backend.inventory.entity.InventoryShrinkage;
+import com.dgt.backend.inventory.repository.InventoryShrinkageRepository;
+import com.dgt.backend.common.dto.PageResponse;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.dgt.backend.common.service.WriteValidator;
-import com.dgt.backend.inventory.repository.InventoryShrinkageRepository;
-import com.dgt.backend.inventory.entity.InventoryShrinkage;
-import static com.dgt.backend.inventory.database.InventoryShrinkageDatabase.TABLE;
+import org.springframework.web.server.ResponseStatusException;
+
 @Service
 public class InventoryShrinkageService {
     private final InventoryShrinkageRepository repository;
-    private final WriteValidator validator;
-    public InventoryShrinkageService(InventoryShrinkageRepository repository,WriteValidator validator) { this.repository=repository; this.validator=validator; }
-    public Map<String,Object> list(int page,int size) { return repository.list(page,size); }
-    public InventoryShrinkage get(Long id) { return repository.findById(id); }
+    public InventoryShrinkageService(InventoryShrinkageRepository repository) { this.repository = repository; }
+
+    public PageResponse<InventoryShrinkageResponse> list(int page, int size) {
+        var p = repository.findAll(PageRequest.of(page, size, Sort.by("shrinkageId")));
+        return new PageResponse<>(p.getContent().stream().map(InventoryShrinkageResponse::from).toList(), page, size, p.getTotalElements());
+    }
+
+    public InventoryShrinkageResponse get(Long id) {
+        return InventoryShrinkageResponse.from(repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found")));
+    }
+
     @Transactional
-    public Map<String,Object> create(Map<String,Object> values) { return repository.create(validator.validate(TABLE,values,true)); }
+    public InventoryShrinkageResponse create(CreateInventoryShrinkageRequest req) {
+        var entity = InventoryShrinkage.builder()
+                .dgtId(req.dgtId())
+                .shrinkageDate(req.shrinkageDate())
+                .reasonType(req.reasonType())
+                .createdBy(req.createdBy())
+                .build();
+        return InventoryShrinkageResponse.from(repository.save(entity));
+    }
+
     @Transactional
-    public Map<String,Object> update(Long id,Map<String,Object> values,String expected) { var validated=validator.validate(TABLE,values,false); validator.validateUpdate(TABLE,id,validated); return repository.update(id,validated,expected); }
+    public InventoryShrinkageResponse update(Long id, UpdateInventoryShrinkageRequest req) {
+        var entity = repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found"));
+        if (req.dgtId() != null) entity.setDgtId(req.dgtId());
+        if (req.shrinkageDate() != null) entity.setShrinkageDate(req.shrinkageDate());
+        if (req.reasonType() != null) entity.setReasonType(req.reasonType());
+        if (req.createdBy() != null) entity.setCreatedBy(req.createdBy());
+        return InventoryShrinkageResponse.from(repository.save(entity));
+    }
 }

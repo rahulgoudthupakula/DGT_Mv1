@@ -1,26 +1,37 @@
 package com.dgt.backend.billing.controller;
 
-import java.util.*;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.dgt.backend.billing.dto.SubscriptionPlanResponse;
+import com.dgt.backend.billing.dto.CreateSubscriptionPlanRequest;
+import com.dgt.backend.billing.dto.UpdateSubscriptionPlanRequest;
 import com.dgt.backend.billing.service.SubscriptionPlanService;
-import com.dgt.backend.billing.entity.SubscriptionPlan;
+import com.dgt.backend.common.dto.PageResponse;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
 @RestController
 @RequestMapping("/api/v1/subscription-plans")
 public class SubscriptionPlanController {
     private final SubscriptionPlanService service;
-    public SubscriptionPlanController(SubscriptionPlanService service) { this.service=service; }
+    public SubscriptionPlanController(SubscriptionPlanService service) { this.service = service; }
+
     @GetMapping
     @PreAuthorize("@accessPolicy.check(authentication, 'subscription_plans', 'READ')")
-    public Map<String,Object> list(@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="50") int size) { return service.list(page,size); }
+    public PageResponse<SubscriptionPlanResponse> list(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) {
+        return service.list(page, size);
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'subscription_plans', 'READ')")
-    public SubscriptionPlan get(@PathVariable Long id) { return service.get(id); }
+    public SubscriptionPlanResponse get(@PathVariable Long id) { return service.get(id); }
+
     @PostMapping
-    @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
+    @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("@accessPolicy.check(authentication, 'subscription_plans', 'WRITE')")
-    public Map<String,Object> create(@RequestBody Map<String,Object> values) { return service.create(values); }
+    public SubscriptionPlanResponse create(@Valid @RequestBody CreateSubscriptionPlanRequest request) { return service.create(request); }
+
     @PatchMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'subscription_plans', 'WRITE')")
-    public Map<String,Object> update(@PathVariable Long id,@RequestHeader("If-Match") String expected,@RequestBody Map<String,Object> values) { return service.update(id,values,expected); }
+    public SubscriptionPlanResponse update(@PathVariable Long id, @RequestBody UpdateSubscriptionPlanRequest request) { return service.update(id, request); }
 }

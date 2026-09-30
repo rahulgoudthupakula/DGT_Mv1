@@ -1,26 +1,35 @@
 package com.dgt.backend.identity.controller;
 
-import java.util.*;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.dgt.backend.identity.dto.RoleTypeResponse;
+import com.dgt.backend.identity.dto.CreateRoleTypeRequest;
+import com.dgt.backend.identity.dto.UpdateRoleTypeRequest;
 import com.dgt.backend.identity.service.RoleTypeService;
-import com.dgt.backend.identity.entity.RoleType;
+import com.dgt.backend.common.dto.PageResponse;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
 @RestController
 @RequestMapping("/api/v1/role-types")
 public class RoleTypeController {
     private final RoleTypeService service;
-    public RoleTypeController(RoleTypeService service) { this.service=service; }
+    public RoleTypeController(RoleTypeService service) { this.service = service; }
+
     @GetMapping
     @PreAuthorize("@accessPolicy.check(authentication, 'role_types', 'READ')")
-    public Map<String,Object> list(@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="50") int size) { return service.list(page,size); }
+    public PageResponse<RoleTypeResponse> list(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) { return service.list(page, size); }
+
     @GetMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'role_types', 'READ')")
-    public RoleType get(@PathVariable Long id) { return service.get(id); }
+    public RoleTypeResponse get(@PathVariable Long id) { return service.get(id); }
+
     @PostMapping
-    @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
+    @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("@accessPolicy.check(authentication, 'role_types', 'WRITE')")
-    public Map<String,Object> create(@RequestBody Map<String,Object> values) { return service.create(values); }
+    public RoleTypeResponse create(@Valid @RequestBody CreateRoleTypeRequest request) { return service.create(request); }
+
     @PatchMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'role_types', 'WRITE')")
-    public Map<String,Object> update(@PathVariable Long id,@RequestHeader("If-Match") String expected,@RequestBody Map<String,Object> values) { return service.update(id,values,expected); }
+    public RoleTypeResponse update(@PathVariable Long id, @RequestBody UpdateRoleTypeRequest request) { return service.update(id, request); }
 }

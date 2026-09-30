@@ -1,36 +1,53 @@
 package com.dgt.backend.dailyclosing.entity;
 
-import java.util.Map;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.annotations.SQLRestriction;
 import java.math.BigDecimal;
 import java.time.*;
-import tools.jackson.databind.JsonNode;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.dgt.backend.common.entity.Rows;
-/** Persistence model for public.daily_expenses; IDs and types follow the inspected database. */
-public record DailyExpense(
-        @JsonProperty("_version") String rowVersion,
-        @JsonProperty("expenses_id") Long expensesId,
-        @JsonProperty("everyday_closing_id") Long everydayClosingId,
-        @JsonProperty("expenses_date") LocalDate expensesDate,
-        @JsonProperty("expenses_type") String expensesType,
-        @JsonProperty("description") String description,
-        @JsonProperty("amount") BigDecimal amount,
-        @JsonProperty("paid_by") Long paidBy,
-        @JsonProperty("receipt_number") String receiptNumber,
-        @JsonProperty("created_at") OffsetDateTime createdAt,
-        @JsonProperty("updated_at") OffsetDateTime updatedAt) {
-    public static DailyExpense fromRow(Map<String,Object> row) {
-        return new DailyExpense(
-            Rows.value(row,"_version",String.class),
-            Rows.value(row,"expenses_id",Long.class),
-            Rows.value(row,"everyday_closing_id",Long.class),
-            Rows.value(row,"expenses_date",LocalDate.class),
-            Rows.value(row,"expenses_type",String.class),
-            Rows.value(row,"description",String.class),
-            Rows.value(row,"amount",BigDecimal.class),
-            Rows.value(row,"paid_by",Long.class),
-            Rows.value(row,"receipt_number",String.class),
-            Rows.value(row,"created_at",OffsetDateTime.class),
-            Rows.value(row,"updated_at",OffsetDateTime.class));
-    }
+
+@Entity
+@Table(name = "daily_expenses")
+@SQLRestriction("archived_at IS NULL")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+public class DailyExpense {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "expenses_id")
+    private Long expensesId;
+
+    @Column(name = "everyday_closing_id", nullable = false)
+    private Long everydayClosingId;
+
+    @Column(name = "expenses_date", nullable = false)
+    private LocalDate expensesDate;
+
+    @Column(name = "expenses_type", nullable = false, length = 50)
+    private String expensesType;
+
+    @Column(name = "description")
+    private String description;
+
+    @Column(name = "amount", nullable = false, precision = 12, scale = 2)
+    private BigDecimal amount;
+
+    @Column(name = "paid_by")
+    private Long paidBy;
+
+    @Column(name = "receipt_number", length = 100)
+    private String receiptNumber;
+
+    @Column(name = "archived_at")
+    private OffsetDateTime archivedAt;
+
+    @Column(name = "created_at", updatable = false)
+    @CreationTimestamp
+    private OffsetDateTime createdAt;
+
+    @Column(name = "updated_at")
+    @UpdateTimestamp
+    private OffsetDateTime updatedAt;
 }

@@ -1,26 +1,37 @@
 package com.dgt.backend.promotions.entity;
 
-import java.util.Map;
-import java.math.BigDecimal;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.annotations.SQLRestriction;
 import java.time.*;
-import tools.jackson.databind.JsonNode;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.dgt.backend.common.entity.Rows;
-/** Persistence model for public.promotion_products; IDs and types follow the inspected database. */
-public record PromotionProduct(
-        @JsonProperty("_version") String rowVersion,
-        @JsonProperty("promotion_product_id") Long promotionProductId,
-        @JsonProperty("promotion_id") Long promotionId,
-        @JsonProperty("product_id") Long productId,
-        @JsonProperty("created_at") OffsetDateTime createdAt,
-        @JsonProperty("updated_at") OffsetDateTime updatedAt) {
-    public static PromotionProduct fromRow(Map<String,Object> row) {
-        return new PromotionProduct(
-            Rows.value(row,"_version",String.class),
-            Rows.value(row,"promotion_product_id",Long.class),
-            Rows.value(row,"promotion_id",Long.class),
-            Rows.value(row,"product_id",Long.class),
-            Rows.value(row,"created_at",OffsetDateTime.class),
-            Rows.value(row,"updated_at",OffsetDateTime.class));
-    }
+
+@Entity
+@Table(name = "promotion_products")
+@SQLRestriction("archived_at IS NULL")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+public class PromotionProduct {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "promotion_product_id")
+    private Long promotionProductId;
+
+    @Column(name = "promotion_id", nullable = false)
+    private Long promotionId;
+
+    @Column(name = "product_id", nullable = false)
+    private Long productId;
+
+    @Column(name = "archived_at")
+    private OffsetDateTime archivedAt;
+
+    @Column(name = "created_at", updatable = false)
+    @CreationTimestamp
+    private OffsetDateTime createdAt;
+
+    @Column(name = "updated_at")
+    @UpdateTimestamp
+    private OffsetDateTime updatedAt;
 }

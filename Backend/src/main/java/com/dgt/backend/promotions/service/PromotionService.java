@@ -1,21 +1,58 @@
 package com.dgt.backend.promotions.service;
 
-import java.util.*;
+import com.dgt.backend.promotions.dto.PromotionResponse;
+import com.dgt.backend.promotions.dto.CreatePromotionRequest;
+import com.dgt.backend.promotions.dto.UpdatePromotionRequest;
+import com.dgt.backend.promotions.entity.Promotion;
+import com.dgt.backend.promotions.repository.PromotionRepository;
+import com.dgt.backend.common.dto.PageResponse;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.dgt.backend.common.service.WriteValidator;
-import com.dgt.backend.promotions.repository.PromotionRepository;
-import com.dgt.backend.promotions.entity.Promotion;
-import static com.dgt.backend.promotions.database.PromotionDatabase.TABLE;
+import org.springframework.web.server.ResponseStatusException;
+
 @Service
 public class PromotionService {
     private final PromotionRepository repository;
-    private final WriteValidator validator;
-    public PromotionService(PromotionRepository repository,WriteValidator validator) { this.repository=repository; this.validator=validator; }
-    public Map<String,Object> list(int page,int size) { return repository.list(page,size); }
-    public Promotion get(Long id) { return repository.findById(id); }
+    public PromotionService(PromotionRepository repository) { this.repository = repository; }
+
+    public PageResponse<PromotionResponse> list(int page, int size) {
+        var p = repository.findAll(PageRequest.of(page, size, Sort.by("promotionId")));
+        return new PageResponse<>(p.getContent().stream().map(PromotionResponse::from).toList(), page, size, p.getTotalElements());
+    }
+
+    public PromotionResponse get(Long id) {
+        return PromotionResponse.from(repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found")));
+    }
+
     @Transactional
-    public Map<String,Object> create(Map<String,Object> values) { return repository.create(validator.validate(TABLE,values,true)); }
+    public PromotionResponse create(CreatePromotionRequest req) {
+        var entity = Promotion.builder()
+                .dgtId(req.dgtId())
+                .promotionName(req.promotionName())
+                .promotionType(req.promotionType())
+                .startDate(req.startDate())
+                .endDate(req.endDate())
+                .status(req.status())
+                .discountValue(req.discountValue())
+                .build();
+        return PromotionResponse.from(repository.save(entity));
+    }
+
     @Transactional
-    public Map<String,Object> update(Long id,Map<String,Object> values,String expected) { var validated=validator.validate(TABLE,values,false); validator.validateUpdate(TABLE,id,validated); return repository.update(id,validated,expected); }
+    public PromotionResponse update(Long id, UpdatePromotionRequest req) {
+        var entity = repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found"));
+        if (req.dgtId() != null) entity.setDgtId(req.dgtId());
+        if (req.promotionName() != null) entity.setPromotionName(req.promotionName());
+        if (req.promotionType() != null) entity.setPromotionType(req.promotionType());
+        if (req.startDate() != null) entity.setStartDate(req.startDate());
+        if (req.endDate() != null) entity.setEndDate(req.endDate());
+        if (req.status() != null) entity.setStatus(req.status());
+        if (req.discountValue() != null) entity.setDiscountValue(req.discountValue());
+        return PromotionResponse.from(repository.save(entity));
+    }
 }

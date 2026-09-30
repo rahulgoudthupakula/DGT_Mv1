@@ -1,38 +1,51 @@
 package com.dgt.backend.fuel.entity;
 
-import java.util.Map;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import java.math.BigDecimal;
 import java.time.*;
-import tools.jackson.databind.JsonNode;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.dgt.backend.common.entity.Rows;
-/** Persistence model for public.fuel_invoice_details; IDs and types follow the inspected database. */
-public record FuelInvoiceDetail(
-        @JsonProperty("_version") String rowVersion,
-        @JsonProperty("fuel_invoice_details_id") Long fuelInvoiceDetailsId,
-        @JsonProperty("invoice_id") Long invoiceId,
-        @JsonProperty("delivery_number") String deliveryNumber,
-        @JsonProperty("bill_of_lading_number") String billOfLadingNumber,
-        @JsonProperty("carrier_name") String carrierName,
-        @JsonProperty("delivery_date") LocalDate deliveryDate,
-        @JsonProperty("total_gallons") BigDecimal totalGallons,
-        @JsonProperty("fuel_subtotal") BigDecimal fuelSubtotal,
-        @JsonProperty("freight_amount") BigDecimal freightAmount,
-        @JsonProperty("created_at") OffsetDateTime createdAt,
-        @JsonProperty("updated_at") OffsetDateTime updatedAt) {
-    public static FuelInvoiceDetail fromRow(Map<String,Object> row) {
-        return new FuelInvoiceDetail(
-            Rows.value(row,"_version",String.class),
-            Rows.value(row,"fuel_invoice_details_id",Long.class),
-            Rows.value(row,"invoice_id",Long.class),
-            Rows.value(row,"delivery_number",String.class),
-            Rows.value(row,"bill_of_lading_number",String.class),
-            Rows.value(row,"carrier_name",String.class),
-            Rows.value(row,"delivery_date",LocalDate.class),
-            Rows.value(row,"total_gallons",BigDecimal.class),
-            Rows.value(row,"fuel_subtotal",BigDecimal.class),
-            Rows.value(row,"freight_amount",BigDecimal.class),
-            Rows.value(row,"created_at",OffsetDateTime.class),
-            Rows.value(row,"updated_at",OffsetDateTime.class));
-    }
+
+@Entity
+@Table(name = "fuel_invoice_details")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+public class FuelInvoiceDetail {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "fuel_invoice_details_id")
+    private Long fuelInvoiceDetailsId;
+
+    @Column(name = "invoice_id", nullable = false)
+    private Long invoiceId;
+
+    @Column(name = "delivery_number", length = 100)
+    private String deliveryNumber;
+
+    @Column(name = "bill_of_lading_number", length = 100)
+    private String billOfLadingNumber;
+
+    @Column(name = "carrier_name", length = 100)
+    private String carrierName;
+
+    @Column(name = "delivery_date")
+    private LocalDate deliveryDate;
+
+    @Column(name = "total_gallons", precision = 12, scale = 3)
+    private BigDecimal totalGallons;
+
+    @Column(name = "fuel_subtotal", precision = 12, scale = 2)
+    private BigDecimal fuelSubtotal;
+
+    @Column(name = "freight_amount", precision = 12, scale = 2)
+    private BigDecimal freightAmount;
+
+    @Column(name = "created_at", updatable = false)
+    @CreationTimestamp
+    private OffsetDateTime createdAt;
+
+    @Column(name = "updated_at")
+    @UpdateTimestamp
+    private OffsetDateTime updatedAt;
 }

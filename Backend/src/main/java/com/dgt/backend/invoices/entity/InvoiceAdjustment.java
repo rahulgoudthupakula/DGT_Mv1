@@ -1,30 +1,39 @@
 package com.dgt.backend.invoices.entity;
 
-import java.util.Map;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import java.math.BigDecimal;
 import java.time.*;
-import tools.jackson.databind.JsonNode;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.dgt.backend.common.entity.Rows;
-/** Persistence model for public.invoice_adjustments; IDs and types follow the inspected database. */
-public record InvoiceAdjustment(
-        @JsonProperty("_version") String rowVersion,
-        @JsonProperty("invoice_adjustment_id") Long invoiceAdjustmentId,
-        @JsonProperty("invoice_id") Long invoiceId,
-        @JsonProperty("adjustment_type") String adjustmentType,
-        @JsonProperty("adjusted_amount") BigDecimal adjustedAmount,
-        @JsonProperty("reason") String reason,
-        @JsonProperty("created_at") OffsetDateTime createdAt,
-        @JsonProperty("updated_at") OffsetDateTime updatedAt) {
-    public static InvoiceAdjustment fromRow(Map<String,Object> row) {
-        return new InvoiceAdjustment(
-            Rows.value(row,"_version",String.class),
-            Rows.value(row,"invoice_adjustment_id",Long.class),
-            Rows.value(row,"invoice_id",Long.class),
-            Rows.value(row,"adjustment_type",String.class),
-            Rows.value(row,"adjusted_amount",BigDecimal.class),
-            Rows.value(row,"reason",String.class),
-            Rows.value(row,"created_at",OffsetDateTime.class),
-            Rows.value(row,"updated_at",OffsetDateTime.class));
-    }
+
+@Entity
+@Table(name = "invoice_adjustments")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+public class InvoiceAdjustment {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "invoice_adjustment_id")
+    private Long invoiceAdjustmentId;
+
+    @Column(name = "invoice_id", nullable = false)
+    private Long invoiceId;
+
+    @Column(name = "adjustment_type", nullable = false, length = 50)
+    private String adjustmentType;
+
+    @Column(name = "adjusted_amount", precision = 12, scale = 2)
+    private BigDecimal adjustedAmount;
+
+    @Column(name = "reason")
+    private String reason;
+
+    @Column(name = "created_at", updatable = false)
+    @CreationTimestamp
+    private OffsetDateTime createdAt;
+
+    @Column(name = "updated_at")
+    @UpdateTimestamp
+    private OffsetDateTime updatedAt;
 }
