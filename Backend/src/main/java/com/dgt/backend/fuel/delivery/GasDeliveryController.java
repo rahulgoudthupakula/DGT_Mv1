@@ -13,7 +13,9 @@ import org.springframework.transaction.annotation.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @RestController
 @ConditionalOnProperty(name="app.gas.delivery.enabled", havingValue="true")
 @RequestMapping("/api/v1/access/stores/{store}/gas-deliveries")

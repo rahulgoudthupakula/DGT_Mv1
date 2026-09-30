@@ -6,15 +6,19 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import com.dgt.backend.common.entity.Rows;
+import lombok.extern.slf4j.Slf4j;
+@Slf4j
 @Service
 public class StoreHoursService {
  private final JdbcTemplate db;
  public StoreHoursService(JdbcTemplate db) { this.db=db; }
  public List<Map<String,Object>> get(String id) {
+  log.debug("Fetching store hours id={}", id);
   return db.queryForList("SELECT day_of_week,status,open_time,close_time,xmin::text AS _version FROM store_business_hours WHERE dgt_id=? ORDER BY day_of_week",id).stream().map(Rows::normalize).toList();
  }
  public record Day(String day_of_week,String status,LocalTime open_time,LocalTime close_time) {}
  public void save(String id,List<Day> days,Map<String,String> versions) {
+  log.info("Saving store hours id={}", id);
   var current=new HashMap<String,String>();
   for(var row:db.queryForList("SELECT day_of_week,xmin::text AS version FROM store_business_hours WHERE dgt_id=? FOR UPDATE",id)) current.put((String)row.get("day_of_week"),(String)row.get("version"));
   if(!Objects.equals(current,versions)) throw new ResponseStatusException(HttpStatus.CONFLICT,"Business hours changed; reload before editing");

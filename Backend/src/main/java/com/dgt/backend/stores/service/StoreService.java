@@ -12,14 +12,18 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 public class StoreService {
     private final StoreRepository repository;
     public StoreService(StoreRepository repository) { this.repository = repository; }
 
     public PageResponse<StoreResponse> list(int page, int size) {
+        log.debug("Listing store page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("dgtId")));
+        log.debug("Store list: {} items total={}", p.getContent().size(), p.getTotalElements());
         return new PageResponse<>(p.getContent().stream().map(StoreResponse::from).toList(), page, size, p.getTotalElements());
     }
 
@@ -30,6 +34,7 @@ public class StoreService {
 
     @Transactional
     public StoreResponse create(CreateStoreRequest req) {
+        log.info("Creating store");
         var entity = Store.builder()
                 .dgtId(req.dgtId())
                 .storeId(req.storeId())
@@ -40,7 +45,9 @@ public class StoreService {
                 .timezone(req.timezone())
                 .companyId(req.companyId())
                 .build();
-        return StoreResponse.from(repository.save(entity));
+        var saved = repository.save(entity);
+        log.info("Created store id={}", saved.getStoreId());
+        return StoreResponse.from(saved);
     }
 
     @Transactional

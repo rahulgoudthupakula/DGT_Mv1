@@ -16,7 +16,9 @@ import com.dgt.backend.stores.service.StoreContactInfoService;
 import com.dgt.backend.stores.dto.StoreContactInfoResponse;
 import com.dgt.backend.stores.dto.CreateStoreContactInfoRequest;
 import com.dgt.backend.stores.dto.UpdateStoreContactInfoRequest;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/stores/{dgtId}/settings")
 public class StoreSettingsController {

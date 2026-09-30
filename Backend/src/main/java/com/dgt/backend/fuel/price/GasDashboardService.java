@@ -4,13 +4,16 @@ import com.dgt.backend.access.ScopedAccess;
 import com.dgt.backend.common.entity.Rows;
 import java.util.*;
 import org.springframework.stereotype.Service;
+import lombok.extern.slf4j.Slf4j;
 
 /** Read-only recorded tank state. Authorization is enforced by the price controller. */
+@Slf4j
 @Service
 public class GasDashboardService {
  private final ScopedAccess a;
  public GasDashboardService(ScopedAccess a){this.a=a;}
  public Map<String,Object> tanks(String store){
+  log.debug("Fetching gas dashboard tanks store={}", store);
   var context=a.db.queryForMap("SELECT timezone,(CURRENT_TIMESTAMP AT TIME ZONE timezone)::date AS today,CURRENT_TIMESTAMP AS \"asOf\" FROM stores WHERE dgt_id=?",store);
   var tanks=a.db.queryForList("""
    SELECT t.tank_id::text AS id,t.tank_number AS number,t.capacity_gallons AS capacity,

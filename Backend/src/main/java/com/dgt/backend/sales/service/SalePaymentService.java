@@ -12,24 +12,34 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 public class SalePaymentService {
     private final SalePaymentRepository repository;
     public SalePaymentService(SalePaymentRepository repository) { this.repository = repository; }
 
     public PageResponse<SalePaymentResponse> list(int page, int size) {
+        log.debug("Listing sale payment page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("salePaymentId")));
+        log.debug("SalePayment list: {} items total={}", p.getContent().size(), p.getTotalElements());
         return new PageResponse<>(p.getContent().stream().map(SalePaymentResponse::from).toList(), page, size, p.getTotalElements());
     }
 
     public SalePaymentResponse get(Long id) {
+        log.debug("Fetching sale payment id={}", id);
         return SalePaymentResponse.from(repository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found")));
+                .orElseThrow(() -> {
+                    log.warn("SalePayment not found id={}", id);
+                    return new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found");
+                }));
+    
     }
 
     @Transactional
     public SalePaymentResponse create(CreateSalePaymentRequest req) {
+        log.info("Creating sale payment");
         var entity = SalePayment.builder()
                 .saleId(req.saleId())
                 .tenderTypeId(req.tenderTypeId())
@@ -41,13 +51,19 @@ public class SalePaymentService {
                 .authorizationCode(req.authorizationCode())
                 .paymentDatetime(req.paymentDatetime())
                 .build();
-        return SalePaymentResponse.from(repository.save(entity));
+        var saved = repository.save(entity);
+        log.info("Created sale payment id={}", saved.getSalePaymentId());
+        return SalePaymentResponse.from(saved);
     }
 
     @Transactional
     public SalePaymentResponse update(Long id, UpdateSalePaymentRequest req) {
+        log.info("Updating sale payment id={}", id);
         var entity = repository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found"));
+                .orElseThrow(() -> {
+                    log.warn("SalePayment not found for update id={}", id);
+                    return new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found");
+                });
         if (req.saleId() != null) entity.setSaleId(req.saleId());
         if (req.tenderTypeId() != null) entity.setTenderTypeId(req.tenderTypeId());
         if (req.paymentAmount() != null) entity.setPaymentAmount(req.paymentAmount());
@@ -57,6 +73,8 @@ public class SalePaymentService {
         if (req.processorReference() != null) entity.setProcessorReference(req.processorReference());
         if (req.authorizationCode() != null) entity.setAuthorizationCode(req.authorizationCode());
         if (req.paymentDatetime() != null) entity.setPaymentDatetime(req.paymentDatetime());
-        return SalePaymentResponse.from(repository.save(entity));
+        var saved = repository.save(entity);
+        log.info("Updated sale payment id={}", id);
+        return SalePaymentResponse.from(saved);
     }
 }

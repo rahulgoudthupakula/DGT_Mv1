@@ -12,24 +12,34 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 public class LotterySettlementService {
     private final LotterySettlementRepository repository;
     public LotterySettlementService(LotterySettlementRepository repository) { this.repository = repository; }
 
     public PageResponse<LotterySettlementResponse> list(int page, int size) {
+        log.debug("Listing lottery settlement page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("lotterySettlementId")));
+        log.debug("LotterySettlement list: {} items total={}", p.getContent().size(), p.getTotalElements());
         return new PageResponse<>(p.getContent().stream().map(LotterySettlementResponse::from).toList(), page, size, p.getTotalElements());
     }
 
     public LotterySettlementResponse get(Long id) {
+        log.debug("Fetching lottery settlement id={}", id);
         return LotterySettlementResponse.from(repository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found")));
+                .orElseThrow(() -> {
+                    log.warn("LotterySettlement not found id={}", id);
+                    return new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found");
+                }));
+    
     }
 
     @Transactional
     public LotterySettlementResponse create(CreateLotterySettlementRequest req) {
+        log.info("Creating lottery settlement");
         var entity = LotterySettlement.builder()
                 .dgtId(req.dgtId())
                 .vendorId(req.vendorId())
@@ -43,13 +53,19 @@ public class LotterySettlementService {
                 .createdBy(req.createdBy())
                 .paidAt(req.paidAt())
                 .build();
-        return LotterySettlementResponse.from(repository.save(entity));
+        var saved = repository.save(entity);
+        log.info("Created lottery settlement id={}", saved.getLotterySettlementId());
+        return LotterySettlementResponse.from(saved);
     }
 
     @Transactional
     public LotterySettlementResponse update(Long id, UpdateLotterySettlementRequest req) {
+        log.info("Updating lottery settlement id={}", id);
         var entity = repository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found"));
+                .orElseThrow(() -> {
+                    log.warn("LotterySettlement not found for update id={}", id);
+                    return new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found");
+                });
         if (req.dgtId() != null) entity.setDgtId(req.dgtId());
         if (req.vendorId() != null) entity.setVendorId(req.vendorId());
         if (req.settlementReference() != null) entity.setSettlementReference(req.settlementReference());
@@ -61,6 +77,8 @@ public class LotterySettlementService {
         if (req.statusTypeId() != null) entity.setStatusTypeId(req.statusTypeId());
         if (req.createdBy() != null) entity.setCreatedBy(req.createdBy());
         if (req.paidAt() != null) entity.setPaidAt(req.paidAt());
-        return LotterySettlementResponse.from(repository.save(entity));
+        var saved = repository.save(entity);
+        log.info("Updated lottery settlement id={}", id);
+        return LotterySettlementResponse.from(saved);
     }
 }

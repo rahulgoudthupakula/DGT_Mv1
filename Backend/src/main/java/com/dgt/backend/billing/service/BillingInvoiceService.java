@@ -12,24 +12,34 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 public class BillingInvoiceService {
     private final BillingInvoiceRepository repository;
     public BillingInvoiceService(BillingInvoiceRepository repository) { this.repository = repository; }
 
     public PageResponse<BillingInvoiceResponse> list(int page, int size) {
+        log.debug("Listing billing invoice page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("invoiceId")));
+        log.debug("BillingInvoice list: {} items total={}", p.getContent().size(), p.getTotalElements());
         return new PageResponse<>(p.getContent().stream().map(BillingInvoiceResponse::from).toList(), page, size, p.getTotalElements());
     }
 
     public BillingInvoiceResponse get(Long id) {
+        log.debug("Fetching billing invoice id={}", id);
         return BillingInvoiceResponse.from(repository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found")));
+                .orElseThrow(() -> {
+                    log.warn("BillingInvoice not found id={}", id);
+                    return new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found");
+                }));
+    
     }
 
     @Transactional
     public BillingInvoiceResponse create(CreateBillingInvoiceRequest req) {
+        log.info("Creating billing invoice");
         var entity = BillingInvoice.builder()
                 .storeId(req.storeId())
                 .subscriptionPlanId(req.subscriptionPlanId())
@@ -44,13 +54,19 @@ public class BillingInvoiceService {
                 .paidAt(req.paidAt())
                 .invoiceDocumentUrl(req.invoiceDocumentUrl())
                 .build();
-        return BillingInvoiceResponse.from(repository.save(entity));
+        var saved = repository.save(entity);
+        log.info("Created billing invoice id={}", saved.getBillingInvoiceId());
+        return BillingInvoiceResponse.from(saved);
     }
 
     @Transactional
     public BillingInvoiceResponse update(Long id, UpdateBillingInvoiceRequest req) {
+        log.info("Updating billing invoice id={}", id);
         var entity = repository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found"));
+                .orElseThrow(() -> {
+                    log.warn("BillingInvoice not found for update id={}", id);
+                    return new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found");
+                });
         if (req.storeId() != null) entity.setStoreId(req.storeId());
         if (req.subscriptionPlanId() != null) entity.setSubscriptionPlanId(req.subscriptionPlanId());
         if (req.invoiceNumber() != null) entity.setInvoiceNumber(req.invoiceNumber());
@@ -63,6 +79,8 @@ public class BillingInvoiceService {
         if (req.dgtInvoiceStatus() != null) entity.setDgtInvoiceStatus(req.dgtInvoiceStatus());
         if (req.paidAt() != null) entity.setPaidAt(req.paidAt());
         if (req.invoiceDocumentUrl() != null) entity.setInvoiceDocumentUrl(req.invoiceDocumentUrl());
-        return BillingInvoiceResponse.from(repository.save(entity));
+        var saved = repository.save(entity);
+        log.info("Updated billing invoice id={}", id);
+        return BillingInvoiceResponse.from(saved);
     }
 }

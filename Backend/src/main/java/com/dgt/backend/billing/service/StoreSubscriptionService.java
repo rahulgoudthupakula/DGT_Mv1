@@ -12,24 +12,34 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 public class StoreSubscriptionService {
     private final StoreSubscriptionRepository repository;
     public StoreSubscriptionService(StoreSubscriptionRepository repository) { this.repository = repository; }
 
     public PageResponse<StoreSubscriptionResponse> list(int page, int size) {
+        log.debug("Listing store subscription page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("subscriptionId")));
+        log.debug("StoreSubscription list: {} items total={}", p.getContent().size(), p.getTotalElements());
         return new PageResponse<>(p.getContent().stream().map(StoreSubscriptionResponse::from).toList(), page, size, p.getTotalElements());
     }
 
     public StoreSubscriptionResponse get(Long id) {
+        log.debug("Fetching store subscription id={}", id);
         return StoreSubscriptionResponse.from(repository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found")));
+                .orElseThrow(() -> {
+                    log.warn("StoreSubscription not found id={}", id);
+                    return new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found");
+                }));
+    
     }
 
     @Transactional
     public StoreSubscriptionResponse create(CreateStoreSubscriptionRequest req) {
+        log.info("Creating store subscription");
         var entity = StoreSubscription.builder()
                 .storeId(req.storeId())
                 .subscriptionPlanId(req.subscriptionPlanId())
@@ -41,13 +51,19 @@ public class StoreSubscriptionService {
                 .autoRenewal(req.autoRenewal())
                 .cancelledAt(req.cancelledAt())
                 .build();
-        return StoreSubscriptionResponse.from(repository.save(entity));
+        var saved = repository.save(entity);
+        log.info("Created store subscription id={}", saved.getStoreSubscriptionId());
+        return StoreSubscriptionResponse.from(saved);
     }
 
     @Transactional
     public StoreSubscriptionResponse update(Long id, UpdateStoreSubscriptionRequest req) {
+        log.info("Updating store subscription id={}", id);
         var entity = repository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found"));
+                .orElseThrow(() -> {
+                    log.warn("StoreSubscription not found for update id={}", id);
+                    return new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found");
+                });
         if (req.storeId() != null) entity.setStoreId(req.storeId());
         if (req.subscriptionPlanId() != null) entity.setSubscriptionPlanId(req.subscriptionPlanId());
         if (req.subscriptionStatus() != null) entity.setSubscriptionStatus(req.subscriptionStatus());
@@ -57,6 +73,8 @@ public class StoreSubscriptionService {
         if (req.nextBillingDate() != null) entity.setNextBillingDate(req.nextBillingDate());
         if (req.autoRenewal() != null) entity.setAutoRenewal(req.autoRenewal());
         if (req.cancelledAt() != null) entity.setCancelledAt(req.cancelledAt());
-        return StoreSubscriptionResponse.from(repository.save(entity));
+        var saved = repository.save(entity);
+        log.info("Updated store subscription id={}", id);
+        return StoreSubscriptionResponse.from(saved);
     }
 }

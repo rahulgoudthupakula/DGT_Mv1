@@ -5,7 +5,9 @@ import com.dgt.backend.common.entity.Rows;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.*;
 import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @RestController
 @ConditionalOnProperty(name="app.pricebook.enabled",havingValue="true")
 @RequestMapping("/api/v1/access/stores/{store}/new-arrivals")

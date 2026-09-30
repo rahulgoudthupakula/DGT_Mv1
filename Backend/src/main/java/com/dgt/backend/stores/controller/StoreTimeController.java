@@ -4,7 +4,9 @@ import java.time.LocalDate;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import com.dgt.backend.stores.service.StoreTimeService;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/stores/{id}/business-day")
 public class StoreTimeController {

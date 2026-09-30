@@ -12,24 +12,34 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 public class VendorContactService {
     private final VendorContactRepository repository;
     public VendorContactService(VendorContactRepository repository) { this.repository = repository; }
 
     public PageResponse<VendorContactResponse> list(int page, int size) {
+        log.debug("Listing vendor contact page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("contactId")));
+        log.debug("VendorContact list: {} items total={}", p.getContent().size(), p.getTotalElements());
         return new PageResponse<>(p.getContent().stream().map(VendorContactResponse::from).toList(), page, size, p.getTotalElements());
     }
 
     public VendorContactResponse get(Long id) {
+        log.debug("Fetching vendor contact id={}", id);
         return VendorContactResponse.from(repository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found")));
+                .orElseThrow(() -> {
+                    log.warn("VendorContact not found id={}", id);
+                    return new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found");
+                }));
+    
     }
 
     @Transactional
     public VendorContactResponse create(CreateVendorContactRequest req) {
+        log.info("Creating vendor contact");
         var entity = VendorContact.builder()
                 .vendorId(req.vendorId())
                 .dgtId(req.dgtId())
@@ -44,13 +54,19 @@ public class VendorContactService {
                 .documentUrl(req.documentUrl())
                 .forceEndDate(req.forceEndDate())
                 .build();
-        return VendorContactResponse.from(repository.save(entity));
+        var saved = repository.save(entity);
+        log.info("Created vendor contact id={}", saved.getVendorContactId());
+        return VendorContactResponse.from(saved);
     }
 
     @Transactional
     public VendorContactResponse update(Long id, UpdateVendorContactRequest req) {
+        log.info("Updating vendor contact id={}", id);
         var entity = repository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found"));
+                .orElseThrow(() -> {
+                    log.warn("VendorContact not found for update id={}", id);
+                    return new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found");
+                });
         if (req.vendorId() != null) entity.setVendorId(req.vendorId());
         if (req.dgtId() != null) entity.setDgtId(req.dgtId());
         if (req.contractNumber() != null) entity.setContractNumber(req.contractNumber());
@@ -63,6 +79,8 @@ public class VendorContactService {
         if (req.status() != null) entity.setStatus(req.status());
         if (req.documentUrl() != null) entity.setDocumentUrl(req.documentUrl());
         if (req.forceEndDate() != null) entity.setForceEndDate(req.forceEndDate());
-        return VendorContactResponse.from(repository.save(entity));
+        var saved = repository.save(entity);
+        log.info("Updated vendor contact id={}", id);
+        return VendorContactResponse.from(saved);
     }
 }

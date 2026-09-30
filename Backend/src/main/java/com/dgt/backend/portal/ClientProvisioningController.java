@@ -1,6 +1,8 @@
 package com.dgt.backend.portal;
 import java.util.*;import java.time.ZoneId;
 import org.springframework.web.bind.annotation.*;import org.springframework.transaction.annotation.Transactional;import org.springframework.http.HttpStatus;import org.springframework.web.server.ResponseStatusException;import org.springframework.jdbc.core.JdbcTemplate;import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;import tools.jackson.databind.ObjectMapper;import com.dgt.backend.common.entity.Rows;
+import lombok.extern.slf4j.Slf4j;
+@Slf4j
 @RestController @RequestMapping("/api/v1/internal/client-handling")
 public class ClientProvisioningController {
  private final PortalBridge bridge;private final JdbcTemplate db;private final ObjectMapper json;
