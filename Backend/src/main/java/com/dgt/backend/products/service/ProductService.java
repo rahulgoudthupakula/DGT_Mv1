@@ -1,21 +1,62 @@
 package com.dgt.backend.products.service;
 
-import java.util.*;
+import com.dgt.backend.products.dto.ProductResponse;
+import com.dgt.backend.products.dto.CreateProductRequest;
+import com.dgt.backend.products.dto.UpdateProductRequest;
+import com.dgt.backend.products.entity.Product;
+import com.dgt.backend.products.repository.ProductRepository;
+import com.dgt.backend.common.dto.PageResponse;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.dgt.backend.common.service.WriteValidator;
-import com.dgt.backend.products.repository.ProductRepository;
-import com.dgt.backend.products.entity.Product;
-import static com.dgt.backend.products.database.ProductDatabase.TABLE;
+import org.springframework.web.server.ResponseStatusException;
+
 @Service
 public class ProductService {
     private final ProductRepository repository;
-    private final WriteValidator validator;
-    public ProductService(ProductRepository repository,WriteValidator validator) { this.repository=repository; this.validator=validator; }
-    public Map<String,Object> list(int page,int size) { return repository.list(page,size); }
-    public Product get(Long id) { return repository.findById(id); }
+    public ProductService(ProductRepository repository) { this.repository = repository; }
+
+    public PageResponse<ProductResponse> list(int page, int size) {
+        var p = repository.findAll(PageRequest.of(page, size, Sort.by("productId")));
+        return new PageResponse<>(p.getContent().stream().map(ProductResponse::from).toList(), page, size, p.getTotalElements());
+    }
+
+    public ProductResponse get(Long id) {
+        return ProductResponse.from(repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found")));
+    }
+
     @Transactional
-    public Map<String,Object> create(Map<String,Object> values) { return repository.create(validator.validate(TABLE,values,true)); }
+    public ProductResponse create(CreateProductRequest req) {
+        var entity = Product.builder()
+                .storeSubDepartmentId(req.storeSubDepartmentId())
+                .productName(req.productName())
+                .productSku(req.productSku())
+                .isReturnable(req.isReturnable())
+                .brandId(req.brandId())
+                .unitOfMeasure(req.unitOfMeasure())
+                .isActive(req.isActive())
+                .isTaxable(req.isTaxable())
+                .isEbt(req.isEbt())
+                .build();
+        return ProductResponse.from(repository.save(entity));
+    }
+
     @Transactional
-    public Map<String,Object> update(Long id,Map<String,Object> values,String expected) { var validated=validator.validate(TABLE,values,false); validator.validateUpdate(TABLE,id,validated); return repository.update(id,validated,expected); }
+    public ProductResponse update(Long id, UpdateProductRequest req) {
+        var entity = repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found"));
+        if (req.storeSubDepartmentId() != null) entity.setStoreSubDepartmentId(req.storeSubDepartmentId());
+        if (req.productName() != null) entity.setProductName(req.productName());
+        if (req.productSku() != null) entity.setProductSku(req.productSku());
+        if (req.isReturnable() != null) entity.setIsReturnable(req.isReturnable());
+        if (req.brandId() != null) entity.setBrandId(req.brandId());
+        if (req.unitOfMeasure() != null) entity.setUnitOfMeasure(req.unitOfMeasure());
+        if (req.isActive() != null) entity.setIsActive(req.isActive());
+        if (req.isTaxable() != null) entity.setIsTaxable(req.isTaxable());
+        if (req.isEbt() != null) entity.setIsEbt(req.isEbt());
+        return ProductResponse.from(repository.save(entity));
+    }
 }

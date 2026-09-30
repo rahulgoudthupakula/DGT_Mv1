@@ -1,21 +1,56 @@
 package com.dgt.backend.products.service;
 
-import java.util.*;
+import com.dgt.backend.products.dto.NewArrivalResponse;
+import com.dgt.backend.products.dto.CreateNewArrivalRequest;
+import com.dgt.backend.products.dto.UpdateNewArrivalRequest;
+import com.dgt.backend.products.entity.NewArrival;
+import com.dgt.backend.products.repository.NewArrivalRepository;
+import com.dgt.backend.common.dto.PageResponse;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.dgt.backend.common.service.WriteValidator;
-import com.dgt.backend.products.repository.NewArrivalRepository;
-import com.dgt.backend.products.entity.NewArrival;
-import static com.dgt.backend.products.database.NewArrivalDatabase.TABLE;
+import org.springframework.web.server.ResponseStatusException;
+
 @Service
 public class NewArrivalService {
     private final NewArrivalRepository repository;
-    private final WriteValidator validator;
-    public NewArrivalService(NewArrivalRepository repository,WriteValidator validator) { this.repository=repository; this.validator=validator; }
-    public Map<String,Object> list(int page,int size) { return repository.list(page,size); }
-    public NewArrival get(Long id) { return repository.findById(id); }
+    public NewArrivalService(NewArrivalRepository repository) { this.repository = repository; }
+
+    public PageResponse<NewArrivalResponse> list(int page, int size) {
+        var p = repository.findAll(PageRequest.of(page, size, Sort.by("newArrivalsId")));
+        return new PageResponse<>(p.getContent().stream().map(NewArrivalResponse::from).toList(), page, size, p.getTotalElements());
+    }
+
+    public NewArrivalResponse get(Long id) {
+        return NewArrivalResponse.from(repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found")));
+    }
+
     @Transactional
-    public Map<String,Object> create(Map<String,Object> values) { return repository.create(validator.validate(TABLE,values,true)); }
+    public NewArrivalResponse create(CreateNewArrivalRequest req) {
+        var entity = NewArrival.builder()
+                .invoiceItemId(req.invoiceItemId())
+                .productName(req.productName())
+                .departmentId(req.departmentId())
+                .storeSubDepartmentId(req.storeSubDepartmentId())
+                .suggestedRetailPrice(req.suggestedRetailPrice())
+                .statusId(req.statusId())
+                .build();
+        return NewArrivalResponse.from(repository.save(entity));
+    }
+
     @Transactional
-    public Map<String,Object> update(Long id,Map<String,Object> values,String expected) { var validated=validator.validate(TABLE,values,false); validator.validateUpdate(TABLE,id,validated); return repository.update(id,validated,expected); }
+    public NewArrivalResponse update(Long id, UpdateNewArrivalRequest req) {
+        var entity = repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found"));
+        if (req.invoiceItemId() != null) entity.setInvoiceItemId(req.invoiceItemId());
+        if (req.productName() != null) entity.setProductName(req.productName());
+        if (req.departmentId() != null) entity.setDepartmentId(req.departmentId());
+        if (req.storeSubDepartmentId() != null) entity.setStoreSubDepartmentId(req.storeSubDepartmentId());
+        if (req.suggestedRetailPrice() != null) entity.setSuggestedRetailPrice(req.suggestedRetailPrice());
+        if (req.statusId() != null) entity.setStatusId(req.statusId());
+        return NewArrivalResponse.from(repository.save(entity));
+    }
 }

@@ -1,26 +1,35 @@
 package com.dgt.backend.vendors.controller;
 
-import java.util.*;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.dgt.backend.vendors.dto.VendorContactResponse;
+import com.dgt.backend.vendors.dto.CreateVendorContactRequest;
+import com.dgt.backend.vendors.dto.UpdateVendorContactRequest;
 import com.dgt.backend.vendors.service.VendorContactService;
-import com.dgt.backend.vendors.entity.VendorContact;
+import com.dgt.backend.common.dto.PageResponse;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
 @RestController
 @RequestMapping("/api/v1/vendor-contacts")
 public class VendorContactController {
     private final VendorContactService service;
-    public VendorContactController(VendorContactService service) { this.service=service; }
+    public VendorContactController(VendorContactService service) { this.service = service; }
+
     @GetMapping
     @PreAuthorize("@accessPolicy.check(authentication, 'vendor_contacts', 'READ')")
-    public Map<String,Object> list(@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="50") int size) { return service.list(page,size); }
+    public PageResponse<VendorContactResponse> list(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) { return service.list(page, size); }
+
     @GetMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'vendor_contacts', 'READ')")
-    public VendorContact get(@PathVariable Long id) { return service.get(id); }
+    public VendorContactResponse get(@PathVariable Long id) { return service.get(id); }
+
     @PostMapping
-    @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
+    @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("@accessPolicy.check(authentication, 'vendor_contacts', 'WRITE')")
-    public Map<String,Object> create(@RequestBody Map<String,Object> values) { return service.create(values); }
+    public VendorContactResponse create(@Valid @RequestBody CreateVendorContactRequest request) { return service.create(request); }
+
     @PatchMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'vendor_contacts', 'WRITE')")
-    public Map<String,Object> update(@PathVariable Long id,@RequestHeader("If-Match") String expected,@RequestBody Map<String,Object> values) { return service.update(id,values,expected); }
+    public VendorContactResponse update(@PathVariable Long id, @RequestBody UpdateVendorContactRequest request) { return service.update(id, request); }
 }

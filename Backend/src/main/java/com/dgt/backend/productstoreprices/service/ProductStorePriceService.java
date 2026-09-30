@@ -1,21 +1,54 @@
 package com.dgt.backend.productstoreprices.service;
 
-import java.util.*;
+import com.dgt.backend.productstoreprices.dto.ProductStorePriceResponse;
+import com.dgt.backend.productstoreprices.dto.CreateProductStorePriceRequest;
+import com.dgt.backend.productstoreprices.dto.UpdateProductStorePriceRequest;
+import com.dgt.backend.productstoreprices.entity.ProductStorePrice;
+import com.dgt.backend.productstoreprices.repository.ProductStorePriceRepository;
+import com.dgt.backend.common.dto.PageResponse;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.dgt.backend.common.service.WriteValidator;
-import com.dgt.backend.productstoreprices.repository.ProductStorePriceRepository;
-import com.dgt.backend.productstoreprices.entity.ProductStorePrice;
-import static com.dgt.backend.productstoreprices.database.ProductStorePriceDatabase.TABLE;
+import org.springframework.web.server.ResponseStatusException;
+
 @Service
 public class ProductStorePriceService {
     private final ProductStorePriceRepository repository;
-    private final WriteValidator validator;
-    public ProductStorePriceService(ProductStorePriceRepository repository,WriteValidator validator) { this.repository=repository; this.validator=validator; }
-    public Map<String,Object> list(int page,int size) { return repository.list(page,size); }
-    public ProductStorePrice get(Long id) { return repository.findById(id); }
+    public ProductStorePriceService(ProductStorePriceRepository repository) { this.repository = repository; }
+
+    public PageResponse<ProductStorePriceResponse> list(int page, int size) {
+        var p = repository.findAll(PageRequest.of(page, size, Sort.by("storePriceId")));
+        return new PageResponse<>(p.getContent().stream().map(ProductStorePriceResponse::from).toList(), page, size, p.getTotalElements());
+    }
+
+    public ProductStorePriceResponse get(Long id) {
+        return ProductStorePriceResponse.from(repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found")));
+    }
+
     @Transactional
-    public Map<String,Object> create(Map<String,Object> values) { return repository.create(validator.validate(TABLE,values,true)); }
+    public ProductStorePriceResponse create(CreateProductStorePriceRequest req) {
+        var entity = ProductStorePrice.builder()
+                .dgtId(req.dgtId())
+                .productId(req.productId())
+                .retailPrice(req.retailPrice())
+                .isActive(req.isActive())
+                .rebateId(req.rebateId())
+                .build();
+        return ProductStorePriceResponse.from(repository.save(entity));
+    }
+
     @Transactional
-    public Map<String,Object> update(Long id,Map<String,Object> values,String expected) { var validated=validator.validate(TABLE,values,false); validator.validateUpdate(TABLE,id,validated); return repository.update(id,validated,expected); }
+    public ProductStorePriceResponse update(Long id, UpdateProductStorePriceRequest req) {
+        var entity = repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found"));
+        if (req.dgtId() != null) entity.setDgtId(req.dgtId());
+        if (req.productId() != null) entity.setProductId(req.productId());
+        if (req.retailPrice() != null) entity.setRetailPrice(req.retailPrice());
+        if (req.isActive() != null) entity.setIsActive(req.isActive());
+        if (req.rebateId() != null) entity.setRebateId(req.rebateId());
+        return ProductStorePriceResponse.from(repository.save(entity));
+    }
 }

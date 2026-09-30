@@ -1,21 +1,54 @@
 package com.dgt.backend.inventory.service;
 
-import java.util.*;
+import com.dgt.backend.inventory.dto.InventoryReturnItemResponse;
+import com.dgt.backend.inventory.dto.CreateInventoryReturnItemRequest;
+import com.dgt.backend.inventory.dto.UpdateInventoryReturnItemRequest;
+import com.dgt.backend.inventory.entity.InventoryReturnItem;
+import com.dgt.backend.inventory.repository.InventoryReturnItemRepository;
+import com.dgt.backend.common.dto.PageResponse;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.dgt.backend.common.service.WriteValidator;
-import com.dgt.backend.inventory.repository.InventoryReturnItemRepository;
-import com.dgt.backend.inventory.entity.InventoryReturnItem;
-import static com.dgt.backend.inventory.database.InventoryReturnItemDatabase.TABLE;
+import org.springframework.web.server.ResponseStatusException;
+
 @Service
 public class InventoryReturnItemService {
     private final InventoryReturnItemRepository repository;
-    private final WriteValidator validator;
-    public InventoryReturnItemService(InventoryReturnItemRepository repository,WriteValidator validator) { this.repository=repository; this.validator=validator; }
-    public Map<String,Object> list(int page,int size) { return repository.list(page,size); }
-    public InventoryReturnItem get(Long id) { return repository.findById(id); }
+    public InventoryReturnItemService(InventoryReturnItemRepository repository) { this.repository = repository; }
+
+    public PageResponse<InventoryReturnItemResponse> list(int page, int size) {
+        var p = repository.findAll(PageRequest.of(page, size, Sort.by("returnItemId")));
+        return new PageResponse<>(p.getContent().stream().map(InventoryReturnItemResponse::from).toList(), page, size, p.getTotalElements());
+    }
+
+    public InventoryReturnItemResponse get(Long id) {
+        return InventoryReturnItemResponse.from(repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found")));
+    }
+
     @Transactional
-    public Map<String,Object> create(Map<String,Object> values) { return repository.create(validator.validate(TABLE,values,true)); }
+    public InventoryReturnItemResponse create(CreateInventoryReturnItemRequest req) {
+        var entity = InventoryReturnItem.builder()
+                .returnId(req.returnId())
+                .productId(req.productId())
+                .qty(req.qty())
+                .unitCost(req.unitCost())
+                .reason(req.reason())
+                .build();
+        return InventoryReturnItemResponse.from(repository.save(entity));
+    }
+
     @Transactional
-    public Map<String,Object> update(Long id,Map<String,Object> values,String expected) { var validated=validator.validate(TABLE,values,false); validator.validateUpdate(TABLE,id,validated); return repository.update(id,validated,expected); }
+    public InventoryReturnItemResponse update(Long id, UpdateInventoryReturnItemRequest req) {
+        var entity = repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found"));
+        if (req.returnId() != null) entity.setReturnId(req.returnId());
+        if (req.productId() != null) entity.setProductId(req.productId());
+        if (req.qty() != null) entity.setQty(req.qty());
+        if (req.unitCost() != null) entity.setUnitCost(req.unitCost());
+        if (req.reason() != null) entity.setReason(req.reason());
+        return InventoryReturnItemResponse.from(repository.save(entity));
+    }
 }

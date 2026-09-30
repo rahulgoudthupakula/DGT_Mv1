@@ -1,26 +1,35 @@
 package com.dgt.backend.stores.controller;
 
-import java.util.*;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.dgt.backend.stores.dto.StoreResponse;
+import com.dgt.backend.stores.dto.CreateStoreRequest;
+import com.dgt.backend.stores.dto.UpdateStoreRequest;
 import com.dgt.backend.stores.service.StoreService;
-import com.dgt.backend.stores.entity.Store;
+import com.dgt.backend.common.dto.PageResponse;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
 @RestController
 @RequestMapping("/api/v1/stores")
 public class StoreController {
     private final StoreService service;
-    public StoreController(StoreService service) { this.service=service; }
+    public StoreController(StoreService service) { this.service = service; }
+
     @GetMapping
     @PreAuthorize("@accessPolicy.check(authentication, 'stores', 'READ')")
-    public Map<String,Object> list(@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="50") int size) { return service.list(page,size); }
+    public PageResponse<StoreResponse> list(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) { return service.list(page, size); }
+
     @GetMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'stores', 'READ')")
-    public Store get(@PathVariable String id) { return service.get(id); }
+    public StoreResponse get(@PathVariable String id) { return service.get(id); }
+
     @PostMapping
-    @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
+    @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("@accessPolicy.check(authentication, 'stores', 'WRITE')")
-    public Map<String,Object> create(@RequestBody Map<String,Object> values) { return service.create(values); }
+    public StoreResponse create(@Valid @RequestBody CreateStoreRequest request) { return service.create(request); }
+
     @PatchMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'stores', 'WRITE')")
-    public Map<String,Object> update(@PathVariable String id,@RequestHeader("If-Match") String expected,@RequestBody Map<String,Object> values) { return service.update(id,values,expected); }
+    public StoreResponse update(@PathVariable String id, @RequestBody UpdateStoreRequest request) { return service.update(id, request); }
 }

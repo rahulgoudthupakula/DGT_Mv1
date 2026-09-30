@@ -1,30 +1,38 @@
 package com.dgt.backend.inventory.entity;
 
-import java.util.Map;
-import java.math.BigDecimal;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import java.time.*;
-import tools.jackson.databind.JsonNode;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.dgt.backend.common.entity.Rows;
-/** Persistence model for public.inventory_shrinkage; IDs and types follow the inspected database. */
-public record InventoryShrinkage(
-        @JsonProperty("_version") String rowVersion,
-        @JsonProperty("shrinkage_id") Long shrinkageId,
-        @JsonProperty("dgt_id") String dgtId,
-        @JsonProperty("shrinkage_date") OffsetDateTime shrinkageDate,
-        @JsonProperty("reason_type") String reasonType,
-        @JsonProperty("created_by") Long createdBy,
-        @JsonProperty("created_at") OffsetDateTime createdAt,
-        @JsonProperty("updated_at") OffsetDateTime updatedAt) {
-    public static InventoryShrinkage fromRow(Map<String,Object> row) {
-        return new InventoryShrinkage(
-            Rows.value(row,"_version",String.class),
-            Rows.value(row,"shrinkage_id",Long.class),
-            Rows.value(row,"dgt_id",String.class),
-            Rows.value(row,"shrinkage_date",OffsetDateTime.class),
-            Rows.value(row,"reason_type",String.class),
-            Rows.value(row,"created_by",Long.class),
-            Rows.value(row,"created_at",OffsetDateTime.class),
-            Rows.value(row,"updated_at",OffsetDateTime.class));
-    }
+
+@Entity
+@Table(name = "inventory_shrinkage")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+public class InventoryShrinkage {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "shrinkage_id")
+    private Long shrinkageId;
+
+    @Column(name = "dgt_id", nullable = false, length = 50)
+    private String dgtId;
+
+    @Column(name = "shrinkage_date")
+    private OffsetDateTime shrinkageDate;
+
+    @Column(name = "reason_type", length = 100)
+    private String reasonType;
+
+    @Column(name = "created_by")
+    private Long createdBy;
+
+    @Column(name = "created_at", updatable = false)
+    @CreationTimestamp
+    private OffsetDateTime createdAt;
+
+    @Column(name = "updated_at")
+    @UpdateTimestamp
+    private OffsetDateTime updatedAt;
 }

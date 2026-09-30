@@ -1,21 +1,54 @@
 package com.dgt.backend.stores.service;
 
-import java.util.*;
+import com.dgt.backend.stores.dto.StoreBusinessHourResponse;
+import com.dgt.backend.stores.dto.CreateStoreBusinessHourRequest;
+import com.dgt.backend.stores.dto.UpdateStoreBusinessHourRequest;
+import com.dgt.backend.stores.entity.StoreBusinessHour;
+import com.dgt.backend.stores.repository.StoreBusinessHourRepository;
+import com.dgt.backend.common.dto.PageResponse;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.dgt.backend.common.service.WriteValidator;
-import com.dgt.backend.stores.repository.StoreBusinessHourRepository;
-import com.dgt.backend.stores.entity.StoreBusinessHour;
-import static com.dgt.backend.stores.database.StoreBusinessHourDatabase.TABLE;
+import org.springframework.web.server.ResponseStatusException;
+
 @Service
 public class StoreBusinessHourService {
     private final StoreBusinessHourRepository repository;
-    private final WriteValidator validator;
-    public StoreBusinessHourService(StoreBusinessHourRepository repository,WriteValidator validator) { this.repository=repository; this.validator=validator; }
-    public Map<String,Object> list(int page,int size) { return repository.list(page,size); }
-    public StoreBusinessHour get(Long id) { return repository.findById(id); }
+    public StoreBusinessHourService(StoreBusinessHourRepository repository) { this.repository = repository; }
+
+    public PageResponse<StoreBusinessHourResponse> list(int page, int size) {
+        var p = repository.findAll(PageRequest.of(page, size, Sort.by("businessHoursId")));
+        return new PageResponse<>(p.getContent().stream().map(StoreBusinessHourResponse::from).toList(), page, size, p.getTotalElements());
+    }
+
+    public StoreBusinessHourResponse get(Long id) {
+        return StoreBusinessHourResponse.from(repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found")));
+    }
+
     @Transactional
-    public Map<String,Object> create(Map<String,Object> values) { return repository.create(validator.validate(TABLE,values,true)); }
+    public StoreBusinessHourResponse create(CreateStoreBusinessHourRequest req) {
+        var entity = StoreBusinessHour.builder()
+                .dgtId(req.dgtId())
+                .dayOfWeek(req.dayOfWeek())
+                .openTime(req.openTime())
+                .closeTime(req.closeTime())
+                .status(req.status())
+                .build();
+        return StoreBusinessHourResponse.from(repository.save(entity));
+    }
+
     @Transactional
-    public Map<String,Object> update(Long id,Map<String,Object> values,String expected) { var validated=validator.validate(TABLE,values,false); validator.validateUpdate(TABLE,id,validated); return repository.update(id,validated,expected); }
+    public StoreBusinessHourResponse update(Long id, UpdateStoreBusinessHourRequest req) {
+        var entity = repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found"));
+        if (req.dgtId() != null) entity.setDgtId(req.dgtId());
+        if (req.dayOfWeek() != null) entity.setDayOfWeek(req.dayOfWeek());
+        if (req.openTime() != null) entity.setOpenTime(req.openTime());
+        if (req.closeTime() != null) entity.setCloseTime(req.closeTime());
+        if (req.status() != null) entity.setStatus(req.status());
+        return StoreBusinessHourResponse.from(repository.save(entity));
+    }
 }

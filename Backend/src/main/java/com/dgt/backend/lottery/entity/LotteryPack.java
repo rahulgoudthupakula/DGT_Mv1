@@ -1,40 +1,53 @@
 package com.dgt.backend.lottery.entity;
 
-import java.util.Map;
-import java.math.BigDecimal;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import java.time.*;
-import tools.jackson.databind.JsonNode;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.dgt.backend.common.entity.Rows;
-/** Persistence model for public.lottery_packs; IDs and types follow the inspected database. */
-public record LotteryPack(
-        @JsonProperty("_version") String rowVersion,
-        @JsonProperty("lottery_pack_id") Long lotteryPackId,
-        @JsonProperty("invoice_id") Long invoiceId,
-        @JsonProperty("dgt_id") String dgtId,
-        @JsonProperty("vendor_id") Long vendorId,
-        @JsonProperty("start_ticket_number") Integer startTicketNumber,
-        @JsonProperty("end_ticket_number") Integer endTicketNumber,
-        @JsonProperty("total_tickets") Integer totalTickets,
-        @JsonProperty("status_id") Long statusId,
-        @JsonProperty("return_date") OffsetDateTime returnDate,
-        @JsonProperty("created_at") OffsetDateTime createdAt,
-        @JsonProperty("updated_at") OffsetDateTime updatedAt,
-        @JsonProperty("performed_by") Long performedBy) {
-    public static LotteryPack fromRow(Map<String,Object> row) {
-        return new LotteryPack(
-            Rows.value(row,"_version",String.class),
-            Rows.value(row,"lottery_pack_id",Long.class),
-            Rows.value(row,"invoice_id",Long.class),
-            Rows.value(row,"dgt_id",String.class),
-            Rows.value(row,"vendor_id",Long.class),
-            Rows.value(row,"start_ticket_number",Integer.class),
-            Rows.value(row,"end_ticket_number",Integer.class),
-            Rows.value(row,"total_tickets",Integer.class),
-            Rows.value(row,"status_id",Long.class),
-            Rows.value(row,"return_date",OffsetDateTime.class),
-            Rows.value(row,"created_at",OffsetDateTime.class),
-            Rows.value(row,"updated_at",OffsetDateTime.class),
-            Rows.value(row,"performed_by",Long.class));
-    }
+
+@Entity
+@Table(name = "lottery_packs")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+public class LotteryPack {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "lottery_pack_id")
+    private Long lotteryPackId;
+
+    @Column(name = "invoice_id")
+    private Long invoiceId;
+
+    @Column(name = "dgt_id", nullable = false, length = 50)
+    private String dgtId;
+
+    @Column(name = "vendor_id")
+    private Long vendorId;
+
+    @Column(name = "start_ticket_number")
+    private Integer startTicketNumber;
+
+    @Column(name = "end_ticket_number")
+    private Integer endTicketNumber;
+
+    @Column(name = "total_tickets")
+    private Integer totalTickets;
+
+    @Column(name = "status_id")
+    private Long statusId;
+
+    @Column(name = "return_date")
+    private OffsetDateTime returnDate;
+
+    @Column(name = "performed_by")
+    private Long performedBy;
+
+    @Column(name = "created_at", updatable = false)
+    @CreationTimestamp
+    private OffsetDateTime createdAt;
+
+    @Column(name = "updated_at")
+    @UpdateTimestamp
+    private OffsetDateTime updatedAt;
 }

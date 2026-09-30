@@ -1,28 +1,37 @@
 package com.dgt.backend.inventory.entity;
 
-import java.util.Map;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
 import java.math.BigDecimal;
 import java.time.*;
-import tools.jackson.databind.JsonNode;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.dgt.backend.common.entity.Rows;
-/** Persistence model for public.inventory_return_items; IDs and types follow the inspected database. */
-public record InventoryReturnItem(
-        @JsonProperty("_version") String rowVersion,
-        @JsonProperty("return_item_id") Long returnItemId,
-        @JsonProperty("return_id") Long returnId,
-        @JsonProperty("product_id") Long productId,
-        @JsonProperty("qty") BigDecimal qty,
-        @JsonProperty("unit_cost") BigDecimal unitCost,
-        @JsonProperty("reason") String reason) {
-    public static InventoryReturnItem fromRow(Map<String,Object> row) {
-        return new InventoryReturnItem(
-            Rows.value(row,"_version",String.class),
-            Rows.value(row,"return_item_id",Long.class),
-            Rows.value(row,"return_id",Long.class),
-            Rows.value(row,"product_id",Long.class),
-            Rows.value(row,"qty",BigDecimal.class),
-            Rows.value(row,"unit_cost",BigDecimal.class),
-            Rows.value(row,"reason",String.class));
-    }
+
+@Entity
+@Table(name = "inventory_return_items")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+public class InventoryReturnItem {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "return_item_id")
+    private Long returnItemId;
+
+    @Column(name = "return_id", nullable = false)
+    private Long returnId;
+
+    @Column(name = "product_id", nullable = false)
+    private Long productId;
+
+    @Column(name = "qty", precision = 12, scale = 3)
+    private BigDecimal qty;
+
+    @Column(name = "unit_cost", precision = 12, scale = 2)
+    private BigDecimal unitCost;
+
+    @Column(name = "reason")
+    private String reason;
+
+    @Column(name = "created_at", updatable = false)
+    @CreationTimestamp
+    private OffsetDateTime createdAt;
 }

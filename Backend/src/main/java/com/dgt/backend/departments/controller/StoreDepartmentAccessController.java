@@ -1,6 +1,9 @@
 package com.dgt.backend.departments.controller;
 import java.util.*;
 import com.dgt.backend.access.ApprovalService;
+import com.dgt.backend.departments.dto.CreateStoreDepartmentRequest;
+import com.dgt.backend.departments.dto.UpdateStoreDepartmentRequest;
+import com.dgt.backend.departments.dto.StoreDepartmentResponse;
 import com.dgt.backend.departments.service.DefaultDepartmentCatalog;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
@@ -25,7 +28,6 @@ public class StoreDepartmentAccessController {
   var result=new ArrayList<Map<String,Object>>();
   for(var row:rows){
    String name=(String)row.get("name");boolean defaults="DEFAULT".equals(row.get("source_type"));
-   // Keep unrelated test fixtures out of the original default catalog display.
    if(defaults&&!catalog.contains(name))continue;
    if(defaults){
     var overrides=db.queryForList("SELECT is_active,xmin::text AS version FROM store_departments WHERE dgt_id=? AND department_id=? AND source_type='DEFAULT'",dgtId,Long.parseLong(((String)row.get("id")).substring(8)));
@@ -42,13 +44,13 @@ public class StoreDepartmentAccessController {
  @Transactional
  @PreAuthorize("@scopedAccess.can(authentication,#dgtId,'DEPARTMENTS',true)")
  public Object create(@PathVariable String dgtId,@RequestBody Create input,@RequestHeader("Idempotency-Key") String key){return approvals.submit(dgtId,"DEPARTMENT_CREATE",null,null,input,key);}
- public Map<String,Object> applyCreate(String dgtId,Create input){
+ public Object applyCreate(String dgtId,Create input){
   stores.get(dgtId);db.queryForList("SELECT dgt_id FROM stores WHERE dgt_id=? FOR UPDATE",dgtId);
   String name=input.name()==null?"":input.name().trim();
   if(name.isBlank()||name.length()>150)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Department name must contain 1–150 characters");
   Integer count=db.queryForObject("SELECT (SELECT count(*) FROM departments WHERE is_default=true AND lower(trim(department_name))=lower(?))+(SELECT count(*) FROM store_departments WHERE dgt_id=? AND lower(trim(store_department_name))=lower(?))",Integer.class,name,dgtId,name);
   if(count!=null&&count>0)throw new ResponseStatusException(HttpStatus.CONFLICT,"A department with this name already exists for this store");
-  return departments.create(Map.of("dgt_id",dgtId,"store_department_name",name,"source_type","CUSTOM","is_active",true));
+  return departments.create(new CreateStoreDepartmentRequest(dgtId, null, name, true, "CUSTOM"));
  }
 
  public record Toggle(Boolean active){}
@@ -63,12 +65,16 @@ public class StoreDepartmentAccessController {
   if(!Objects.equals(version,current.get("version")))throw new ResponseStatusException(HttpStatus.CONFLICT,"Department changed; reload and retry");
   if(id.startsWith("default-")){
    Long definition=Long.parseLong(id.substring(8));
-   if("0".equals(version))departments.create(Map.of("dgt_id",dgtId,"department_id",definition,"store_department_name",current.get("name"),"source_type","DEFAULT","is_active",input.active()));
-   else {
+   if("0".equals(version)){
+    departments.create(new CreateStoreDepartmentRequest(dgtId, definition, (String)current.get("name"), input.active(), "DEFAULT"));
+   } else {
     int updated=db.update("UPDATE store_departments SET is_active=?,updated_at=CURRENT_TIMESTAMP WHERE dgt_id=? AND department_id=? AND source_type='DEFAULT' AND xmin::text=?",input.active(),dgtId,definition,version);
     if(updated!=1)throw new ResponseStatusException(HttpStatus.CONFLICT,"Department changed; reload and retry");
    }
-  }else departments.update(Long.parseLong(id.substring(6)),Map.of("is_active",input.active()),version);
+  }else{
+   StoreDepartmentResponse existing=departments.get(Long.parseLong(id.substring(6)));
+   departments.update(existing.storeDepartmentId(), new UpdateStoreDepartmentRequest(existing.dgtId(), existing.departmentId(), existing.storeDepartmentName(), input.active(), existing.sourceType()));
+  }
   return list(dgtId).stream().filter(r->id.equals(r.get("id"))).findFirst().orElseThrow();
  }
 }

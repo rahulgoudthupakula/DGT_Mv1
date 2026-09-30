@@ -5,6 +5,7 @@ import com.dgt.backend.common.entity.Rows;
 import java.time.*;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.stream.Collectors;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.*;
@@ -87,7 +88,7 @@ public class LiveActivityController {
    FROM valued v JOIN pos_terminals t ON t.terminal_id=v.terminal_id AND t.store_id=v.store_id LEFT JOIN employees e ON e.employee_id=v.cashier_id
    ORDER BY v.sale_datetime DESC,v.sale_id DESC LIMIT ? OFFSET ?
    """,queryParams.toArray());
-  for(var tx:transactions){long id=Long.parseLong(tx.get("id").toString());tx.put("payments",payments(store,id));}
+  if(!transactions.isEmpty()){var ids=transactions.stream().map(tx->Long.parseLong(tx.get("id").toString())).collect(Collectors.toList());String ph=ids.stream().map(id->"?").collect(Collectors.joining(","));List<Object> pp=new ArrayList<>();pp.add(store);pp.addAll(ids);var allPayments=a.db.queryForList("SELECT s.sale_id,t.tender_code AS code,t.tender_name AS name,p.payment_amount AS amount,p.payment_status AS status,p.card_brand AS brand,p.card_last4 AS last4,p.payment_datetime AS time FROM sale_payments p JOIN sales s USING(sale_id) JOIN tender_types t USING(tender_type_id) WHERE s.store_id=? AND p.sale_id IN ("+ph+") ORDER BY p.sale_payment_id",pp.toArray());var byId=new java.util.HashMap<Long,List<Map<String,Object>>>();for(var p:allPayments){long sid=((Number)p.get("sale_id")).longValue();byId.computeIfAbsent(sid,k->new ArrayList<>()).add(Rows.normalize(p));}for(var tx:transactions){long id=Long.parseLong(tx.get("id").toString());tx.put("payments",byId.getOrDefault(id,List.of()));}}
   var range=Rows.normalize(a.db.queryForMap("SELECT min(sale_datetime AT TIME ZONE ?)::date AS first,max(sale_datetime AT TIME ZONE ?)::date AS last FROM sales WHERE store_id=?",zone.getId(),zone.getId(),store));
   var result=new LinkedHashMap<String,Object>();result.put("start",start.toString());result.put("end",end.toString());result.put("today",today.toString());result.put("timezone",zone.getId());result.put("asOf",now.toString());result.put("stats",Rows.normalize(stats));result.put("tenders",tenders);result.put("topItems",top);result.put("departments",departments);result.put("transactions",transactions.stream().map(Rows::normalize).toList());result.put("range",range);result.put("page",page);result.put("size",size);result.put("terminals",a.db.queryForList("SELECT terminal_id::text AS id,terminal_code AS code,terminal_name AS name FROM pos_terminals WHERE store_id=? ORDER BY terminal_code",store));
   result.put("importedWorkbook",Boolean.TRUE.equals(a.db.queryForObject("SELECT EXISTS(SELECT 1 FROM access_audit_events WHERE dgt_id=? AND event_type='SALES_WORKBOOK_IMPORTED')",Boolean.class,store)));return result;

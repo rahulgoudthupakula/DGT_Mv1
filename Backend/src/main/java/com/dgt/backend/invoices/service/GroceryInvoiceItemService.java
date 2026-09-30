@@ -1,21 +1,66 @@
 package com.dgt.backend.invoices.service;
 
-import java.util.*;
+import com.dgt.backend.invoices.dto.GroceryInvoiceItemResponse;
+import com.dgt.backend.invoices.dto.CreateGroceryInvoiceItemRequest;
+import com.dgt.backend.invoices.dto.UpdateGroceryInvoiceItemRequest;
+import com.dgt.backend.invoices.entity.GroceryInvoiceItem;
+import com.dgt.backend.invoices.repository.GroceryInvoiceItemRepository;
+import com.dgt.backend.common.dto.PageResponse;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.dgt.backend.common.service.WriteValidator;
-import com.dgt.backend.invoices.repository.GroceryInvoiceItemRepository;
-import com.dgt.backend.invoices.entity.GroceryInvoiceItem;
-import static com.dgt.backend.invoices.database.GroceryInvoiceItemDatabase.TABLE;
+import org.springframework.web.server.ResponseStatusException;
+
 @Service
 public class GroceryInvoiceItemService {
     private final GroceryInvoiceItemRepository repository;
-    private final WriteValidator validator;
-    public GroceryInvoiceItemService(GroceryInvoiceItemRepository repository,WriteValidator validator) { this.repository=repository; this.validator=validator; }
-    public Map<String,Object> list(int page,int size) { return repository.list(page,size); }
-    public GroceryInvoiceItem get(Long id) { return repository.findById(id); }
+    public GroceryInvoiceItemService(GroceryInvoiceItemRepository repository) { this.repository = repository; }
+
+    public PageResponse<GroceryInvoiceItemResponse> list(int page, int size) {
+        var p = repository.findAll(PageRequest.of(page, size, Sort.by("groceryInvoiceItemId")));
+        return new PageResponse<>(p.getContent().stream().map(GroceryInvoiceItemResponse::from).toList(), page, size, p.getTotalElements());
+    }
+
+    public GroceryInvoiceItemResponse get(Long id) {
+        return GroceryInvoiceItemResponse.from(repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found")));
+    }
+
     @Transactional
-    public Map<String,Object> create(Map<String,Object> values) { return repository.create(validator.validate(TABLE,values,true)); }
+    public GroceryInvoiceItemResponse create(CreateGroceryInvoiceItemRequest req) {
+        var entity = GroceryInvoiceItem.builder()
+                .invoiceId(req.invoiceId())
+                .productId(req.productId())
+                .vendorItemCode(req.vendorItemCode())
+                .quantity(req.quantity())
+                .unitType(req.unitType())
+                .casePackQuantity(req.casePackQuantity())
+                .msrp(req.msrp())
+                .unitCost(req.unitCost())
+                .itemLineDiscount(req.itemLineDiscount())
+                .itemLineTotal(req.itemLineTotal())
+                .isProductNew(req.isProductNew())
+                .build();
+        return GroceryInvoiceItemResponse.from(repository.save(entity));
+    }
+
     @Transactional
-    public Map<String,Object> update(Long id,Map<String,Object> values,String expected) { var validated=validator.validate(TABLE,values,false); validator.validateUpdate(TABLE,id,validated); return repository.update(id,validated,expected); }
+    public GroceryInvoiceItemResponse update(Long id, UpdateGroceryInvoiceItemRequest req) {
+        var entity = repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found"));
+        if (req.invoiceId() != null) entity.setInvoiceId(req.invoiceId());
+        if (req.productId() != null) entity.setProductId(req.productId());
+        if (req.vendorItemCode() != null) entity.setVendorItemCode(req.vendorItemCode());
+        if (req.quantity() != null) entity.setQuantity(req.quantity());
+        if (req.unitType() != null) entity.setUnitType(req.unitType());
+        if (req.casePackQuantity() != null) entity.setCasePackQuantity(req.casePackQuantity());
+        if (req.msrp() != null) entity.setMsrp(req.msrp());
+        if (req.unitCost() != null) entity.setUnitCost(req.unitCost());
+        if (req.itemLineDiscount() != null) entity.setItemLineDiscount(req.itemLineDiscount());
+        if (req.itemLineTotal() != null) entity.setItemLineTotal(req.itemLineTotal());
+        if (req.isProductNew() != null) entity.setIsProductNew(req.isProductNew());
+        return GroceryInvoiceItemResponse.from(repository.save(entity));
+    }
 }

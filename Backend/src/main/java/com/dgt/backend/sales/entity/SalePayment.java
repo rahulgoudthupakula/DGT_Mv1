@@ -1,40 +1,54 @@
 package com.dgt.backend.sales.entity;
 
-import java.util.Map;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import java.math.BigDecimal;
 import java.time.*;
-import tools.jackson.databind.JsonNode;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.dgt.backend.common.entity.Rows;
-/** Persistence model for public.sale_payments; IDs and types follow the inspected database. */
-public record SalePayment(
-        @JsonProperty("_version") String rowVersion,
-        @JsonProperty("sale_payment_id") Long salePaymentId,
-        @JsonProperty("sale_id") Long saleId,
-        @JsonProperty("tender_type_id") Long tenderTypeId,
-        @JsonProperty("payment_amount") BigDecimal paymentAmount,
-        @JsonProperty("payment_status") String paymentStatus,
-        @JsonProperty("card_brand") String cardBrand,
-        @JsonProperty("card_last4") String cardLast4,
-        @JsonProperty("processor_reference") String processorReference,
-        @JsonProperty("authorization_code") String authorizationCode,
-        @JsonProperty("payment_datetime") OffsetDateTime paymentDatetime,
-        @JsonProperty("created_at") OffsetDateTime createdAt,
-        @JsonProperty("updated_at") OffsetDateTime updatedAt) {
-    public static SalePayment fromRow(Map<String,Object> row) {
-        return new SalePayment(
-            Rows.value(row,"_version",String.class),
-            Rows.value(row,"sale_payment_id",Long.class),
-            Rows.value(row,"sale_id",Long.class),
-            Rows.value(row,"tender_type_id",Long.class),
-            Rows.value(row,"payment_amount",BigDecimal.class),
-            Rows.value(row,"payment_status",String.class),
-            Rows.value(row,"card_brand",String.class),
-            Rows.value(row,"card_last4",String.class),
-            Rows.value(row,"processor_reference",String.class),
-            Rows.value(row,"authorization_code",String.class),
-            Rows.value(row,"payment_datetime",OffsetDateTime.class),
-            Rows.value(row,"created_at",OffsetDateTime.class),
-            Rows.value(row,"updated_at",OffsetDateTime.class));
-    }
+
+@Entity
+@Table(name = "sale_payments")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+public class SalePayment {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "sale_payment_id")
+    private Long salePaymentId;
+
+    @Column(name = "sale_id", nullable = false)
+    private Long saleId;
+
+    @Column(name = "tender_type_id")
+    private Long tenderTypeId;
+
+    @Column(name = "payment_amount", nullable = false, precision = 12, scale = 2)
+    private BigDecimal paymentAmount;
+
+    @Column(name = "payment_status", length = 50)
+    private String paymentStatus;
+
+    @Column(name = "card_brand", length = 50)
+    private String cardBrand;
+
+    @Column(name = "card_last4", length = 10)
+    private String cardLast4;
+
+    @Column(name = "processor_reference", length = 100)
+    private String processorReference;
+
+    @Column(name = "authorization_code", length = 100)
+    private String authorizationCode;
+
+    @Column(name = "payment_datetime")
+    private OffsetDateTime paymentDatetime;
+
+    @Column(name = "created_at", updatable = false)
+    @CreationTimestamp
+    private OffsetDateTime createdAt;
+
+    @Column(name = "updated_at")
+    @UpdateTimestamp
+    private OffsetDateTime updatedAt;
 }

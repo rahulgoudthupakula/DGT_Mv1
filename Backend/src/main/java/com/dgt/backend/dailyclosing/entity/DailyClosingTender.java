@@ -1,34 +1,50 @@
 package com.dgt.backend.dailyclosing.entity;
 
-import java.util.Map;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.annotations.SQLRestriction;
 import java.math.BigDecimal;
 import java.time.*;
-import tools.jackson.databind.JsonNode;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.dgt.backend.common.entity.Rows;
-/** Persistence model for public.daily_closing_tenders; IDs and types follow the inspected database. */
-public record DailyClosingTender(
-        @JsonProperty("_version") String rowVersion,
-        @JsonProperty("tender_id") Long tenderId,
-        @JsonProperty("everyday_closing_id") Long everydayClosingId,
-        @JsonProperty("tender_type") String tenderType,
-        @JsonProperty("expected_amount") BigDecimal expectedAmount,
-        @JsonProperty("actual_amount") BigDecimal actualAmount,
-        @JsonProperty("amount_difference") BigDecimal amountDifference,
-        @JsonProperty("transaction_count") Integer transactionCount,
-        @JsonProperty("created_at") OffsetDateTime createdAt,
-        @JsonProperty("updated_at") OffsetDateTime updatedAt) {
-    public static DailyClosingTender fromRow(Map<String,Object> row) {
-        return new DailyClosingTender(
-            Rows.value(row,"_version",String.class),
-            Rows.value(row,"tender_id",Long.class),
-            Rows.value(row,"everyday_closing_id",Long.class),
-            Rows.value(row,"tender_type",String.class),
-            Rows.value(row,"expected_amount",BigDecimal.class),
-            Rows.value(row,"actual_amount",BigDecimal.class),
-            Rows.value(row,"amount_difference",BigDecimal.class),
-            Rows.value(row,"transaction_count",Integer.class),
-            Rows.value(row,"created_at",OffsetDateTime.class),
-            Rows.value(row,"updated_at",OffsetDateTime.class));
-    }
+
+@Entity
+@Table(name = "daily_closing_tenders")
+@SQLRestriction("archived_at IS NULL")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+public class DailyClosingTender {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "tender_id")
+    private Long tenderId;
+
+    @Column(name = "everyday_closing_id", nullable = false)
+    private Long everydayClosingId;
+
+    @Column(name = "tender_type", nullable = false, length = 50)
+    private String tenderType;
+
+    @Column(name = "expected_amount", nullable = false, precision = 12, scale = 2)
+    private BigDecimal expectedAmount;
+
+    @Column(name = "actual_amount", nullable = false, precision = 12, scale = 2)
+    private BigDecimal actualAmount;
+
+    @Column(name = "amount_difference", precision = 12, scale = 2)
+    private BigDecimal amountDifference;
+
+    @Column(name = "transaction_count")
+    private Integer transactionCount;
+
+    @Column(name = "archived_at")
+    private OffsetDateTime archivedAt;
+
+    @Column(name = "created_at", updatable = false)
+    @CreationTimestamp
+    private OffsetDateTime createdAt;
+
+    @Column(name = "updated_at")
+    @UpdateTimestamp
+    private OffsetDateTime updatedAt;
 }

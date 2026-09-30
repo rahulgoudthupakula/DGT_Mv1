@@ -56,9 +56,11 @@ public class PagePermissions {
  private final ScopedAccess access;
  public PagePermissions(ScopedAccess access){this.access=access;}
  public Map<String,Boolean> context(String store){
+  var cached=access.cachedPageRights(store);if(cached!=null)return cached;
   access.assigned(store);
   boolean admin=access.admin(access.user(),access.company(store));
-  return evaluate(store,access.user(),admin,true);
+  var result=evaluate(store,access.user(),admin,true);
+  access.putPageRights(store,result);return result;
  }
  public Map<String,Boolean> evaluate(String store,long user,boolean admin,boolean includeOverrides){
   var result=new LinkedHashMap<String,Boolean>();

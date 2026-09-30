@@ -1,34 +1,44 @@
 package com.dgt.backend.employees.entity;
 
-import java.util.Map;
-import java.math.BigDecimal;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import java.time.*;
-import tools.jackson.databind.JsonNode;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.dgt.backend.common.entity.Rows;
-/** Persistence model for public.employee_store_assignments; IDs and types follow the inspected database. */
-public record EmployeeStoreAssignment(
-        @JsonProperty("_version") String rowVersion,
-        @JsonProperty("employee_store_assignment_id") Long employeeStoreAssignmentId,
-        @JsonProperty("employee_id") Long employeeId,
-        @JsonProperty("dgt_id") String dgtId,
-        @JsonProperty("is_primary") Boolean isPrimary,
-        @JsonProperty("effective_from") LocalDate effectiveFrom,
-        @JsonProperty("effective_to") LocalDate effectiveTo,
-        @JsonProperty("created_at") OffsetDateTime createdAt,
-        @JsonProperty("updated_at") OffsetDateTime updatedAt,
-        @JsonProperty("role_type_id") Long roleTypeId) {
-    public static EmployeeStoreAssignment fromRow(Map<String,Object> row) {
-        return new EmployeeStoreAssignment(
-            Rows.value(row,"_version",String.class),
-            Rows.value(row,"employee_store_assignment_id",Long.class),
-            Rows.value(row,"employee_id",Long.class),
-            Rows.value(row,"dgt_id",String.class),
-            Rows.value(row,"is_primary",Boolean.class),
-            Rows.value(row,"effective_from",LocalDate.class),
-            Rows.value(row,"effective_to",LocalDate.class),
-            Rows.value(row,"created_at",OffsetDateTime.class),
-            Rows.value(row,"updated_at",OffsetDateTime.class),
-            Rows.value(row,"role_type_id",Long.class));
-    }
+
+@Entity
+@Table(name = "employee_store_assignments")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+public class EmployeeStoreAssignment {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "employee_store_assignment_id")
+    private Long employeeStoreAssignmentId;
+
+    @Column(name = "employee_id", nullable = false)
+    private Long employeeId;
+
+    @Column(name = "dgt_id", nullable = false, length = 50)
+    private String dgtId;
+
+    @Column(name = "is_primary")
+    private Boolean isPrimary;
+
+    @Column(name = "effective_from", nullable = false)
+    private LocalDate effectiveFrom;
+
+    @Column(name = "effective_to")
+    private LocalDate effectiveTo;
+
+    @Column(name = "role_type_id")
+    private Long roleTypeId;
+
+    @Column(name = "created_at", updatable = false)
+    @CreationTimestamp
+    private OffsetDateTime createdAt;
+
+    @Column(name = "updated_at")
+    @UpdateTimestamp
+    private OffsetDateTime updatedAt;
 }

@@ -12,6 +12,17 @@ spring:
     baseline-on-migrate: false
     clean-disabled: true
     validate-on-migrate: true
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc:
+          time_zone: UTC
+  jackson:
+    property-naming-strategy: SNAKE_CASE
   sql:
     init:
       mode: never
@@ -24,3 +35,14 @@ app:
   cors-origins: ${CORS_ORIGINS:http://localhost:5173,http://localhost:8081}
   access:
     administrator-emails: ${SCHEMA_ADMIN_EMAILS:}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    try-it-out-enabled: true
+    filter: true
+    display-request-duration: true
+    enabled: false
+  api-docs:
+    path: /v3/api-docs
+    enabled: false

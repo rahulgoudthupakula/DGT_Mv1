@@ -1,21 +1,50 @@
 package com.dgt.backend.identity.service;
 
-import java.util.*;
+import com.dgt.backend.identity.dto.RoleTypeResponse;
+import com.dgt.backend.identity.dto.CreateRoleTypeRequest;
+import com.dgt.backend.identity.dto.UpdateRoleTypeRequest;
+import com.dgt.backend.identity.entity.RoleType;
+import com.dgt.backend.identity.repository.RoleTypeRepository;
+import com.dgt.backend.common.dto.PageResponse;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.dgt.backend.common.service.WriteValidator;
-import com.dgt.backend.identity.repository.RoleTypeRepository;
-import com.dgt.backend.identity.entity.RoleType;
-import static com.dgt.backend.identity.database.RoleTypeDatabase.TABLE;
+import org.springframework.web.server.ResponseStatusException;
+
 @Service
 public class RoleTypeService {
     private final RoleTypeRepository repository;
-    private final WriteValidator validator;
-    public RoleTypeService(RoleTypeRepository repository,WriteValidator validator) { this.repository=repository; this.validator=validator; }
-    public Map<String,Object> list(int page,int size) { return repository.list(page,size); }
-    public RoleType get(Long id) { return repository.findById(id); }
+    public RoleTypeService(RoleTypeRepository repository) { this.repository = repository; }
+
+    public PageResponse<RoleTypeResponse> list(int page, int size) {
+        var p = repository.findAll(PageRequest.of(page, size, Sort.by("roleTypeId")));
+        return new PageResponse<>(p.getContent().stream().map(RoleTypeResponse::from).toList(), page, size, p.getTotalElements());
+    }
+
+    public RoleTypeResponse get(Long id) {
+        return RoleTypeResponse.from(repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found")));
+    }
+
     @Transactional
-    public Map<String,Object> create(Map<String,Object> values) { return repository.create(validator.validate(TABLE,values,true)); }
+    public RoleTypeResponse create(CreateRoleTypeRequest req) {
+        var entity = RoleType.builder()
+                .roleTypeName(req.roleTypeName())
+                .description(req.description())
+                .isActive(req.isActive())
+                .build();
+        return RoleTypeResponse.from(repository.save(entity));
+    }
+
     @Transactional
-    public Map<String,Object> update(Long id,Map<String,Object> values,String expected) { var validated=validator.validate(TABLE,values,false); validator.validateUpdate(TABLE,id,validated); return repository.update(id,validated,expected); }
+    public RoleTypeResponse update(Long id, UpdateRoleTypeRequest req) {
+        var entity = repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found"));
+        if (req.roleTypeName() != null) entity.setRoleTypeName(req.roleTypeName());
+        if (req.description() != null) entity.setDescription(req.description());
+        if (req.isActive() != null) entity.setIsActive(req.isActive());
+        return RoleTypeResponse.from(repository.save(entity));
+    }
 }

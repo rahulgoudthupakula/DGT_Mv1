@@ -1,26 +1,35 @@
 package com.dgt.backend.products.controller;
 
-import java.util.*;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.dgt.backend.products.dto.BrandResponse;
+import com.dgt.backend.products.dto.CreateBrandRequest;
+import com.dgt.backend.products.dto.UpdateBrandRequest;
 import com.dgt.backend.products.service.BrandService;
-import com.dgt.backend.products.entity.Brand;
+import com.dgt.backend.common.dto.PageResponse;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
 @RestController
 @RequestMapping("/api/v1/brands")
 public class BrandController {
     private final BrandService service;
-    public BrandController(BrandService service) { this.service=service; }
+    public BrandController(BrandService service) { this.service = service; }
+
     @GetMapping
     @PreAuthorize("@accessPolicy.check(authentication, 'brands', 'READ')")
-    public Map<String,Object> list(@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="50") int size) { return service.list(page,size); }
+    public PageResponse<BrandResponse> list(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) { return service.list(page, size); }
+
     @GetMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'brands', 'READ')")
-    public Brand get(@PathVariable Long id) { return service.get(id); }
+    public BrandResponse get(@PathVariable Long id) { return service.get(id); }
+
     @PostMapping
-    @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
+    @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("@accessPolicy.check(authentication, 'brands', 'WRITE')")
-    public Map<String,Object> create(@RequestBody Map<String,Object> values) { return service.create(values); }
+    public BrandResponse create(@Valid @RequestBody CreateBrandRequest request) { return service.create(request); }
+
     @PatchMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'brands', 'WRITE')")
-    public Map<String,Object> update(@PathVariable Long id,@RequestHeader("If-Match") String expected,@RequestBody Map<String,Object> values) { return service.update(id,values,expected); }
+    public BrandResponse update(@PathVariable Long id, @RequestBody UpdateBrandRequest request) { return service.update(id, request); }
 }

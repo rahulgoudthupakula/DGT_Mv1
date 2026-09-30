@@ -1,21 +1,58 @@
 package com.dgt.backend.fuel.service;
 
-import java.util.*;
+import com.dgt.backend.fuel.dto.FuelTankReadingResponse;
+import com.dgt.backend.fuel.dto.CreateFuelTankReadingRequest;
+import com.dgt.backend.fuel.dto.UpdateFuelTankReadingRequest;
+import com.dgt.backend.fuel.entity.FuelTankReading;
+import com.dgt.backend.fuel.repository.FuelTankReadingRepository;
+import com.dgt.backend.common.dto.PageResponse;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.dgt.backend.common.service.WriteValidator;
-import com.dgt.backend.fuel.repository.FuelTankReadingRepository;
-import com.dgt.backend.fuel.entity.FuelTankReading;
-import static com.dgt.backend.fuel.database.FuelTankReadingDatabase.TABLE;
+import org.springframework.web.server.ResponseStatusException;
+
 @Service
 public class FuelTankReadingService {
     private final FuelTankReadingRepository repository;
-    private final WriteValidator validator;
-    public FuelTankReadingService(FuelTankReadingRepository repository,WriteValidator validator) { this.repository=repository; this.validator=validator; }
-    public Map<String,Object> list(int page,int size) { return repository.list(page,size); }
-    public FuelTankReading get(Long id) { return repository.findById(id); }
+    public FuelTankReadingService(FuelTankReadingRepository repository) { this.repository = repository; }
+
+    public PageResponse<FuelTankReadingResponse> list(int page, int size) {
+        var p = repository.findAll(PageRequest.of(page, size, Sort.by("tankReadingId")));
+        return new PageResponse<>(p.getContent().stream().map(FuelTankReadingResponse::from).toList(), page, size, p.getTotalElements());
+    }
+
+    public FuelTankReadingResponse get(Long id) {
+        return FuelTankReadingResponse.from(repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found")));
+    }
+
     @Transactional
-    public Map<String,Object> create(Map<String,Object> values) { return repository.create(validator.validate(TABLE,values,true)); }
+    public FuelTankReadingResponse create(CreateFuelTankReadingRequest req) {
+        var entity = FuelTankReading.builder()
+                .tankId(req.tankId())
+                .readingDatetime(req.readingDatetime())
+                .volumeGallons(req.volumeGallons())
+                .temperature(req.temperature())
+                .ullage(req.ullage())
+                .createdBy(req.createdBy())
+                .imageUrl(req.imageUrl())
+                .build();
+        return FuelTankReadingResponse.from(repository.save(entity));
+    }
+
     @Transactional
-    public Map<String,Object> update(Long id,Map<String,Object> values,String expected) { var validated=validator.validate(TABLE,values,false); validator.validateUpdate(TABLE,id,validated); return repository.update(id,validated,expected); }
+    public FuelTankReadingResponse update(Long id, UpdateFuelTankReadingRequest req) {
+        var entity = repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found"));
+        if (req.tankId() != null) entity.setTankId(req.tankId());
+        if (req.readingDatetime() != null) entity.setReadingDatetime(req.readingDatetime());
+        if (req.volumeGallons() != null) entity.setVolumeGallons(req.volumeGallons());
+        if (req.temperature() != null) entity.setTemperature(req.temperature());
+        if (req.ullage() != null) entity.setUllage(req.ullage());
+        if (req.createdBy() != null) entity.setCreatedBy(req.createdBy());
+        if (req.imageUrl() != null) entity.setImageUrl(req.imageUrl());
+        return FuelTankReadingResponse.from(repository.save(entity));
+    }
 }

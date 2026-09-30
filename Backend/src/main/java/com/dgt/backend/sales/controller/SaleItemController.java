@@ -1,26 +1,35 @@
 package com.dgt.backend.sales.controller;
 
-import java.util.*;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.dgt.backend.sales.dto.SaleItemResponse;
+import com.dgt.backend.sales.dto.CreateSaleItemRequest;
+import com.dgt.backend.sales.dto.UpdateSaleItemRequest;
 import com.dgt.backend.sales.service.SaleItemService;
-import com.dgt.backend.sales.entity.SaleItem;
+import com.dgt.backend.common.dto.PageResponse;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
 @RestController
-@RequestMapping("/api/v1/sales-items")
+@RequestMapping("/api/v1/sale-items")
 public class SaleItemController {
     private final SaleItemService service;
-    public SaleItemController(SaleItemService service) { this.service=service; }
+    public SaleItemController(SaleItemService service) { this.service = service; }
+
     @GetMapping
     @PreAuthorize("@accessPolicy.check(authentication, 'sales_items', 'READ')")
-    public Map<String,Object> list(@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="50") int size) { return service.list(page,size); }
+    public PageResponse<SaleItemResponse> list(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) { return service.list(page, size); }
+
     @GetMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'sales_items', 'READ')")
-    public SaleItem get(@PathVariable Long id) { return service.get(id); }
+    public SaleItemResponse get(@PathVariable Long id) { return service.get(id); }
+
     @PostMapping
-    @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
+    @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("@accessPolicy.check(authentication, 'sales_items', 'WRITE')")
-    public Map<String,Object> create(@RequestBody Map<String,Object> values) { return service.create(values); }
+    public SaleItemResponse create(@Valid @RequestBody CreateSaleItemRequest request) { return service.create(request); }
+
     @PatchMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'sales_items', 'WRITE')")
-    public Map<String,Object> update(@PathVariable Long id,@RequestHeader("If-Match") String expected,@RequestBody Map<String,Object> values) { return service.update(id,values,expected); }
+    public SaleItemResponse update(@PathVariable Long id, @RequestBody UpdateSaleItemRequest request) { return service.update(id, request); }
 }

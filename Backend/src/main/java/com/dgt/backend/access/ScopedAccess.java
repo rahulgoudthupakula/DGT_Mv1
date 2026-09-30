@@ -1,18 +1,26 @@
 package com.dgt.backend.access;
 import java.util.*;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.server.ResponseStatusException;
 @Component("scopedAccess")
 public class ScopedAccess {
  public final JdbcTemplate db;
- public ScopedAccess(JdbcTemplate db){this.db=db;}
- public long user(){var a=SecurityContextHolder.getContext().getAuthentication();if(a==null)throw denied();return user(a);}
+ private final ObjectProvider<ScopedAccessCache> cacheProvider;
+ public ScopedAccess(JdbcTemplate db,ObjectProvider<ScopedAccessCache> cacheProvider){this.db=db;this.cacheProvider=cacheProvider;}
+ private ScopedAccessCache cache(){if(RequestContextHolder.getRequestAttributes()==null)return null;try{return cacheProvider.getIfAvailable();}catch(Exception ignored){return null;}}
+ public long user(){var c=cache();if(c!=null){if(c.userId==null)c.userId=resolveUser();return c.userId;}return resolveUser();}
+ private long resolveUser(){var a=SecurityContextHolder.getContext().getAuthentication();if(a==null)throw denied();return user(a);}
  public long user(Authentication a){var ids=db.queryForList("SELECT user_id FROM users WHERE email=? AND account_status='ACTIVE' AND two_factor_authentication=false",Long.class,a.getName());if(ids.size()!=1)throw denied();return ids.getFirst();}
- public long company(String store){var ids=db.queryForList("SELECT s.company_id FROM stores s JOIN companies c ON c.company_id=s.company_id WHERE s.dgt_id=? AND c.is_active",Long.class,store);if(ids.size()!=1)throw denied();return ids.getFirst();}
+ public long company(String store){var c=cache();if(c!=null)return c.companyByStore.computeIfAbsent(store,this::resolveCompany);return resolveCompany(store);}
+ private long resolveCompany(String store){var ids=db.queryForList("SELECT s.company_id FROM stores s JOIN companies c ON c.company_id=s.company_id WHERE s.dgt_id=? AND c.is_active",Long.class,store);if(ids.size()!=1)throw denied();return ids.getFirst();}
+ public Map<String,Boolean> cachedPageRights(String store){var c=cache();return c!=null&&c.pageRightsByStore!=null?c.pageRightsByStore.get(store):null;}
+ public void putPageRights(String store,Map<String,Boolean> rights){var c=cache();if(c!=null){if(c.pageRightsByStore==null)c.pageRightsByStore=new HashMap<>();c.pageRightsByStore.put(store,rights);}}
  public boolean admin(long uid,long company){return Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM company_admins ca JOIN companies c USING(company_id) JOIN users u ON u.user_id=ca.user_id WHERE ca.user_id=? AND ca.company_id=? AND ca.is_active AND c.is_active AND u.account_status='ACTIVE' AND NOT u.two_factor_authentication)",Boolean.class,uid,company));}
  public void requireAdmin(String store){if(!admin(user(),company(store)))throw denied();}
  public record Grant(long roleId,String role){}

@@ -1,26 +1,35 @@
 package com.dgt.backend.inventory.controller;
 
-import java.util.*;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.dgt.backend.inventory.dto.InventoryShrinkageResponse;
+import com.dgt.backend.inventory.dto.CreateInventoryShrinkageRequest;
+import com.dgt.backend.inventory.dto.UpdateInventoryShrinkageRequest;
 import com.dgt.backend.inventory.service.InventoryShrinkageService;
-import com.dgt.backend.inventory.entity.InventoryShrinkage;
+import com.dgt.backend.common.dto.PageResponse;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
 @RestController
-@RequestMapping("/api/v1/inventory-shrinkage")
+@RequestMapping("/api/v1/inventory-shrinkages")
 public class InventoryShrinkageController {
     private final InventoryShrinkageService service;
-    public InventoryShrinkageController(InventoryShrinkageService service) { this.service=service; }
+    public InventoryShrinkageController(InventoryShrinkageService service) { this.service = service; }
+
     @GetMapping
     @PreAuthorize("@accessPolicy.check(authentication, 'inventory_shrinkage', 'READ')")
-    public Map<String,Object> list(@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="50") int size) { return service.list(page,size); }
+    public PageResponse<InventoryShrinkageResponse> list(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) { return service.list(page, size); }
+
     @GetMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'inventory_shrinkage', 'READ')")
-    public InventoryShrinkage get(@PathVariable Long id) { return service.get(id); }
+    public InventoryShrinkageResponse get(@PathVariable Long id) { return service.get(id); }
+
     @PostMapping
-    @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
+    @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("@accessPolicy.check(authentication, 'inventory_shrinkage', 'WRITE')")
-    public Map<String,Object> create(@RequestBody Map<String,Object> values) { return service.create(values); }
+    public InventoryShrinkageResponse create(@Valid @RequestBody CreateInventoryShrinkageRequest request) { return service.create(request); }
+
     @PatchMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'inventory_shrinkage', 'WRITE')")
-    public Map<String,Object> update(@PathVariable Long id,@RequestHeader("If-Match") String expected,@RequestBody Map<String,Object> values) { return service.update(id,values,expected); }
+    public InventoryShrinkageResponse update(@PathVariable Long id, @RequestBody UpdateInventoryShrinkageRequest request) { return service.update(id, request); }
 }

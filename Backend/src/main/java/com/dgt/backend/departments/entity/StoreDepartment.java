@@ -1,32 +1,41 @@
 package com.dgt.backend.departments.entity;
 
-import java.util.Map;
-import java.math.BigDecimal;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import java.time.*;
-import tools.jackson.databind.JsonNode;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.dgt.backend.common.entity.Rows;
-/** Persistence model for public.store_departments; IDs and types follow the inspected database. */
-public record StoreDepartment(
-        @JsonProperty("_version") String rowVersion,
-        @JsonProperty("store_department_id") Long storeDepartmentId,
-        @JsonProperty("dgt_id") String dgtId,
-        @JsonProperty("department_id") Long departmentId,
-        @JsonProperty("store_department_name") String storeDepartmentName,
-        @JsonProperty("is_active") Boolean isActive,
-        @JsonProperty("source_type") String sourceType,
-        @JsonProperty("created_at") OffsetDateTime createdAt,
-        @JsonProperty("updated_at") OffsetDateTime updatedAt) {
-    public static StoreDepartment fromRow(Map<String,Object> row) {
-        return new StoreDepartment(
-            Rows.value(row,"_version",String.class),
-            Rows.value(row,"store_department_id",Long.class),
-            Rows.value(row,"dgt_id",String.class),
-            Rows.value(row,"department_id",Long.class),
-            Rows.value(row,"store_department_name",String.class),
-            Rows.value(row,"is_active",Boolean.class),
-            Rows.value(row,"source_type",String.class),
-            Rows.value(row,"created_at",OffsetDateTime.class),
-            Rows.value(row,"updated_at",OffsetDateTime.class));
-    }
+
+@Entity
+@Table(name = "store_departments")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+public class StoreDepartment {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "store_department_id")
+    private Long storeDepartmentId;
+
+    @Column(name = "dgt_id", nullable = false, length = 50)
+    private String dgtId;
+
+    @Column(name = "department_id")
+    private Long departmentId;
+
+    @Column(name = "store_department_name", nullable = false, length = 100)
+    private String storeDepartmentName;
+
+    @Column(name = "is_active")
+    private Boolean isActive;
+
+    @Column(name = "source_type", length = 20)
+    private String sourceType;
+
+    @Column(name = "created_at", updatable = false)
+    @CreationTimestamp
+    private OffsetDateTime createdAt;
+
+    @Column(name = "updated_at")
+    @UpdateTimestamp
+    private OffsetDateTime updatedAt;
 }

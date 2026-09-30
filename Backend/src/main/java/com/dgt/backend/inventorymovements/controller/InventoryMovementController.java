@@ -1,26 +1,35 @@
 package com.dgt.backend.inventorymovements.controller;
 
-import java.util.*;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.dgt.backend.inventorymovements.dto.InventoryMovementResponse;
+import com.dgt.backend.inventorymovements.dto.CreateInventoryMovementRequest;
+import com.dgt.backend.inventorymovements.dto.UpdateInventoryMovementRequest;
 import com.dgt.backend.inventorymovements.service.InventoryMovementService;
-import com.dgt.backend.inventorymovements.entity.InventoryMovement;
+import com.dgt.backend.common.dto.PageResponse;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
 @RestController
 @RequestMapping("/api/v1/inventory-movements")
 public class InventoryMovementController {
     private final InventoryMovementService service;
-    public InventoryMovementController(InventoryMovementService service) { this.service=service; }
+    public InventoryMovementController(InventoryMovementService service) { this.service = service; }
+
     @GetMapping
     @PreAuthorize("@accessPolicy.check(authentication, 'inventory_movements', 'READ')")
-    public Map<String,Object> list(@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="50") int size) { return service.list(page,size); }
+    public PageResponse<InventoryMovementResponse> list(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) { return service.list(page, size); }
+
     @GetMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'inventory_movements', 'READ')")
-    public InventoryMovement get(@PathVariable Long id) { return service.get(id); }
+    public InventoryMovementResponse get(@PathVariable Long id) { return service.get(id); }
+
     @PostMapping
-    @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
+    @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("@accessPolicy.check(authentication, 'inventory_movements', 'WRITE')")
-    public Map<String,Object> create(@RequestBody Map<String,Object> values) { return service.create(values); }
+    public InventoryMovementResponse create(@Valid @RequestBody CreateInventoryMovementRequest request) { return service.create(request); }
+
     @PatchMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'inventory_movements', 'WRITE')")
-    public Map<String,Object> update(@PathVariable Long id,@RequestHeader("If-Match") String expected,@RequestBody Map<String,Object> values) { return service.update(id,values,expected); }
+    public InventoryMovementResponse update(@PathVariable Long id, @RequestBody UpdateInventoryMovementRequest request) { return service.update(id, request); }
 }

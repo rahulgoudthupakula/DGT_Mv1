@@ -1,21 +1,50 @@
 package com.dgt.backend.sales.service;
 
-import java.util.*;
+import com.dgt.backend.sales.dto.TenderTypeResponse;
+import com.dgt.backend.sales.dto.CreateTenderTypeRequest;
+import com.dgt.backend.sales.dto.UpdateTenderTypeRequest;
+import com.dgt.backend.sales.entity.TenderType;
+import com.dgt.backend.sales.repository.TenderTypeRepository;
+import com.dgt.backend.common.dto.PageResponse;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.dgt.backend.common.service.WriteValidator;
-import com.dgt.backend.sales.repository.TenderTypeRepository;
-import com.dgt.backend.sales.entity.TenderType;
-import static com.dgt.backend.sales.database.TenderTypeDatabase.TABLE;
+import org.springframework.web.server.ResponseStatusException;
+
 @Service
 public class TenderTypeService {
     private final TenderTypeRepository repository;
-    private final WriteValidator validator;
-    public TenderTypeService(TenderTypeRepository repository,WriteValidator validator) { this.repository=repository; this.validator=validator; }
-    public Map<String,Object> list(int page,int size) { return repository.list(page,size); }
-    public TenderType get(Long id) { return repository.findById(id); }
+    public TenderTypeService(TenderTypeRepository repository) { this.repository = repository; }
+
+    public PageResponse<TenderTypeResponse> list(int page, int size) {
+        var p = repository.findAll(PageRequest.of(page, size, Sort.by("tenderTypeId")));
+        return new PageResponse<>(p.getContent().stream().map(TenderTypeResponse::from).toList(), page, size, p.getTotalElements());
+    }
+
+    public TenderTypeResponse get(Long id) {
+        return TenderTypeResponse.from(repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found")));
+    }
+
     @Transactional
-    public Map<String,Object> create(Map<String,Object> values) { return repository.create(validator.validate(TABLE,values,true)); }
+    public TenderTypeResponse create(CreateTenderTypeRequest req) {
+        var entity = TenderType.builder()
+                .tenderCode(req.tenderCode())
+                .tenderName(req.tenderName())
+                .isActive(req.isActive())
+                .build();
+        return TenderTypeResponse.from(repository.save(entity));
+    }
+
     @Transactional
-    public Map<String,Object> update(Long id,Map<String,Object> values,String expected) { var validated=validator.validate(TABLE,values,false); validator.validateUpdate(TABLE,id,validated); return repository.update(id,validated,expected); }
+    public TenderTypeResponse update(Long id, UpdateTenderTypeRequest req) {
+        var entity = repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found"));
+        if (req.tenderCode() != null) entity.setTenderCode(req.tenderCode());
+        if (req.tenderName() != null) entity.setTenderName(req.tenderName());
+        if (req.isActive() != null) entity.setIsActive(req.isActive());
+        return TenderTypeResponse.from(repository.save(entity));
+    }
 }

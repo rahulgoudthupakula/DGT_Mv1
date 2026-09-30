@@ -1,21 +1,54 @@
 package com.dgt.backend.fuel.service;
 
-import java.util.*;
+import com.dgt.backend.fuel.dto.FuelTankResponse;
+import com.dgt.backend.fuel.dto.CreateFuelTankRequest;
+import com.dgt.backend.fuel.dto.UpdateFuelTankRequest;
+import com.dgt.backend.fuel.entity.FuelTank;
+import com.dgt.backend.fuel.repository.FuelTankRepository;
+import com.dgt.backend.common.dto.PageResponse;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.dgt.backend.common.service.WriteValidator;
-import com.dgt.backend.fuel.repository.FuelTankRepository;
-import com.dgt.backend.fuel.entity.FuelTank;
-import static com.dgt.backend.fuel.database.FuelTankDatabase.TABLE;
+import org.springframework.web.server.ResponseStatusException;
+
 @Service
 public class FuelTankService {
     private final FuelTankRepository repository;
-    private final WriteValidator validator;
-    public FuelTankService(FuelTankRepository repository,WriteValidator validator) { this.repository=repository; this.validator=validator; }
-    public Map<String,Object> list(int page,int size) { return repository.list(page,size); }
-    public FuelTank get(Long id) { return repository.findById(id); }
+    public FuelTankService(FuelTankRepository repository) { this.repository = repository; }
+
+    public PageResponse<FuelTankResponse> list(int page, int size) {
+        var p = repository.findAll(PageRequest.of(page, size, Sort.by("tankId")));
+        return new PageResponse<>(p.getContent().stream().map(FuelTankResponse::from).toList(), page, size, p.getTotalElements());
+    }
+
+    public FuelTankResponse get(Long id) {
+        return FuelTankResponse.from(repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found")));
+    }
+
     @Transactional
-    public Map<String,Object> create(Map<String,Object> values) { return repository.create(validator.validate(TABLE,values,true)); }
+    public FuelTankResponse create(CreateFuelTankRequest req) {
+        var entity = FuelTank.builder()
+                .dgtId(req.dgtId())
+                .tankNumber(req.tankNumber())
+                .tankName(req.tankName())
+                .capacityGallons(req.capacityGallons())
+                .safeFillCapacity(req.safeFillCapacity())
+                .build();
+        return FuelTankResponse.from(repository.save(entity));
+    }
+
     @Transactional
-    public Map<String,Object> update(Long id,Map<String,Object> values,String expected) { var validated=validator.validate(TABLE,values,false); validator.validateUpdate(TABLE,id,validated); return repository.update(id,validated,expected); }
+    public FuelTankResponse update(Long id, UpdateFuelTankRequest req) {
+        var entity = repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found"));
+        if (req.dgtId() != null) entity.setDgtId(req.dgtId());
+        if (req.tankNumber() != null) entity.setTankNumber(req.tankNumber());
+        if (req.tankName() != null) entity.setTankName(req.tankName());
+        if (req.capacityGallons() != null) entity.setCapacityGallons(req.capacityGallons());
+        if (req.safeFillCapacity() != null) entity.setSafeFillCapacity(req.safeFillCapacity());
+        return FuelTankResponse.from(repository.save(entity));
+    }
 }

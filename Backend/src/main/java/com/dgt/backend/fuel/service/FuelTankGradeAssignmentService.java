@@ -1,21 +1,52 @@
 package com.dgt.backend.fuel.service;
 
-import java.util.*;
+import com.dgt.backend.fuel.dto.FuelTankGradeAssignmentResponse;
+import com.dgt.backend.fuel.dto.CreateFuelTankGradeAssignmentRequest;
+import com.dgt.backend.fuel.dto.UpdateFuelTankGradeAssignmentRequest;
+import com.dgt.backend.fuel.entity.FuelTankGradeAssignment;
+import com.dgt.backend.fuel.repository.FuelTankGradeAssignmentRepository;
+import com.dgt.backend.common.dto.PageResponse;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.dgt.backend.common.service.WriteValidator;
-import com.dgt.backend.fuel.repository.FuelTankGradeAssignmentRepository;
-import com.dgt.backend.fuel.entity.FuelTankGradeAssignment;
-import static com.dgt.backend.fuel.database.FuelTankGradeAssignmentDatabase.TABLE;
+import org.springframework.web.server.ResponseStatusException;
+
 @Service
 public class FuelTankGradeAssignmentService {
     private final FuelTankGradeAssignmentRepository repository;
-    private final WriteValidator validator;
-    public FuelTankGradeAssignmentService(FuelTankGradeAssignmentRepository repository,WriteValidator validator) { this.repository=repository; this.validator=validator; }
-    public Map<String,Object> list(int page,int size) { return repository.list(page,size); }
-    public FuelTankGradeAssignment get(Long id) { return repository.findById(id); }
+    public FuelTankGradeAssignmentService(FuelTankGradeAssignmentRepository repository) { this.repository = repository; }
+
+    public PageResponse<FuelTankGradeAssignmentResponse> list(int page, int size) {
+        var p = repository.findAll(PageRequest.of(page, size, Sort.by("assignmentId")));
+        return new PageResponse<>(p.getContent().stream().map(FuelTankGradeAssignmentResponse::from).toList(), page, size, p.getTotalElements());
+    }
+
+    public FuelTankGradeAssignmentResponse get(Long id) {
+        return FuelTankGradeAssignmentResponse.from(repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found")));
+    }
+
     @Transactional
-    public Map<String,Object> create(Map<String,Object> values) { return repository.create(validator.validate(TABLE,values,true)); }
+    public FuelTankGradeAssignmentResponse create(CreateFuelTankGradeAssignmentRequest req) {
+        var entity = FuelTankGradeAssignment.builder()
+                .tankId(req.tankId())
+                .fuelGradeId(req.fuelGradeId())
+                .effectiveFrom(req.effectiveFrom())
+                .effectiveTo(req.effectiveTo())
+                .build();
+        return FuelTankGradeAssignmentResponse.from(repository.save(entity));
+    }
+
     @Transactional
-    public Map<String,Object> update(Long id,Map<String,Object> values,String expected) { var validated=validator.validate(TABLE,values,false); validator.validateUpdate(TABLE,id,validated); return repository.update(id,validated,expected); }
+    public FuelTankGradeAssignmentResponse update(Long id, UpdateFuelTankGradeAssignmentRequest req) {
+        var entity = repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found"));
+        if (req.tankId() != null) entity.setTankId(req.tankId());
+        if (req.fuelGradeId() != null) entity.setFuelGradeId(req.fuelGradeId());
+        if (req.effectiveFrom() != null) entity.setEffectiveFrom(req.effectiveFrom());
+        if (req.effectiveTo() != null) entity.setEffectiveTo(req.effectiveTo());
+        return FuelTankGradeAssignmentResponse.from(repository.save(entity));
+    }
 }

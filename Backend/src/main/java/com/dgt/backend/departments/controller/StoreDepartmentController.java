@@ -1,26 +1,35 @@
 package com.dgt.backend.departments.controller;
 
-import java.util.*;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.dgt.backend.departments.dto.StoreDepartmentResponse;
+import com.dgt.backend.departments.dto.CreateStoreDepartmentRequest;
+import com.dgt.backend.departments.dto.UpdateStoreDepartmentRequest;
 import com.dgt.backend.departments.service.StoreDepartmentService;
-import com.dgt.backend.departments.entity.StoreDepartment;
+import com.dgt.backend.common.dto.PageResponse;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
 @RestController
 @RequestMapping("/api/v1/store-departments")
 public class StoreDepartmentController {
     private final StoreDepartmentService service;
-    public StoreDepartmentController(StoreDepartmentService service) { this.service=service; }
+    public StoreDepartmentController(StoreDepartmentService service) { this.service = service; }
+
     @GetMapping
     @PreAuthorize("@accessPolicy.check(authentication, 'store_departments', 'READ')")
-    public Map<String,Object> list(@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="50") int size) { return service.list(page,size); }
+    public PageResponse<StoreDepartmentResponse> list(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) { return service.list(page, size); }
+
     @GetMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'store_departments', 'READ')")
-    public StoreDepartment get(@PathVariable Long id) { return service.get(id); }
+    public StoreDepartmentResponse get(@PathVariable Long id) { return service.get(id); }
+
     @PostMapping
-    @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
+    @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("@accessPolicy.check(authentication, 'store_departments', 'WRITE')")
-    public Map<String,Object> create(@RequestBody Map<String,Object> values) { return service.create(values); }
+    public StoreDepartmentResponse create(@Valid @RequestBody CreateStoreDepartmentRequest request) { return service.create(request); }
+
     @PatchMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'store_departments', 'WRITE')")
-    public Map<String,Object> update(@PathVariable Long id,@RequestHeader("If-Match") String expected,@RequestBody Map<String,Object> values) { return service.update(id,values,expected); }
+    public StoreDepartmentResponse update(@PathVariable Long id, @RequestBody UpdateStoreDepartmentRequest request) { return service.update(id, request); }
 }

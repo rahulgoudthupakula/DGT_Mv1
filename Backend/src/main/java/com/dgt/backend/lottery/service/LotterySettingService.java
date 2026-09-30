@@ -1,21 +1,54 @@
 package com.dgt.backend.lottery.service;
 
-import java.util.*;
+import com.dgt.backend.lottery.dto.LotterySettingResponse;
+import com.dgt.backend.lottery.dto.CreateLotterySettingRequest;
+import com.dgt.backend.lottery.dto.UpdateLotterySettingRequest;
+import com.dgt.backend.lottery.entity.LotterySetting;
+import com.dgt.backend.lottery.repository.LotterySettingRepository;
+import com.dgt.backend.common.dto.PageResponse;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.dgt.backend.common.service.WriteValidator;
-import com.dgt.backend.lottery.repository.LotterySettingRepository;
-import com.dgt.backend.lottery.entity.LotterySetting;
-import static com.dgt.backend.lottery.database.LotterySettingDatabase.TABLE;
+import org.springframework.web.server.ResponseStatusException;
+
 @Service
 public class LotterySettingService {
     private final LotterySettingRepository repository;
-    private final WriteValidator validator;
-    public LotterySettingService(LotterySettingRepository repository,WriteValidator validator) { this.repository=repository; this.validator=validator; }
-    public Map<String,Object> list(int page,int size) { return repository.list(page,size); }
-    public LotterySetting get(Long id) { return repository.findById(id); }
+    public LotterySettingService(LotterySettingRepository repository) { this.repository = repository; }
+
+    public PageResponse<LotterySettingResponse> list(int page, int size) {
+        var p = repository.findAll(PageRequest.of(page, size, Sort.by("lotterySettingId")));
+        return new PageResponse<>(p.getContent().stream().map(LotterySettingResponse::from).toList(), page, size, p.getTotalElements());
+    }
+
+    public LotterySettingResponse get(Long id) {
+        return LotterySettingResponse.from(repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found")));
+    }
+
     @Transactional
-    public Map<String,Object> create(Map<String,Object> values) { return repository.create(validator.validate(TABLE,values,true)); }
+    public LotterySettingResponse create(CreateLotterySettingRequest req) {
+        var entity = LotterySetting.builder()
+                .dgtId(req.dgtId())
+                .maxOpenPacksPerGame(req.maxOpenPacksPerGame())
+                .allowPartialReturns(req.allowPartialReturns())
+                .defaultCommissionPerPack(req.defaultCommissionPerPack())
+                .settlementFrequency(req.settlementFrequency())
+                .build();
+        return LotterySettingResponse.from(repository.save(entity));
+    }
+
     @Transactional
-    public Map<String,Object> update(Long id,Map<String,Object> values,String expected) { var validated=validator.validate(TABLE,values,false); validator.validateUpdate(TABLE,id,validated); return repository.update(id,validated,expected); }
+    public LotterySettingResponse update(Long id, UpdateLotterySettingRequest req) {
+        var entity = repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found"));
+        if (req.dgtId() != null) entity.setDgtId(req.dgtId());
+        if (req.maxOpenPacksPerGame() != null) entity.setMaxOpenPacksPerGame(req.maxOpenPacksPerGame());
+        if (req.allowPartialReturns() != null) entity.setAllowPartialReturns(req.allowPartialReturns());
+        if (req.defaultCommissionPerPack() != null) entity.setDefaultCommissionPerPack(req.defaultCommissionPerPack());
+        if (req.settlementFrequency() != null) entity.setSettlementFrequency(req.settlementFrequency());
+        return LotterySettingResponse.from(repository.save(entity));
+    }
 }

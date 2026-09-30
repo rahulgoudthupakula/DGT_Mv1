@@ -1,21 +1,48 @@
 package com.dgt.backend.products.service;
 
-import java.util.*;
+import com.dgt.backend.products.dto.BrandResponse;
+import com.dgt.backend.products.dto.CreateBrandRequest;
+import com.dgt.backend.products.dto.UpdateBrandRequest;
+import com.dgt.backend.products.entity.Brand;
+import com.dgt.backend.products.repository.BrandRepository;
+import com.dgt.backend.common.dto.PageResponse;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.dgt.backend.common.service.WriteValidator;
-import com.dgt.backend.products.repository.BrandRepository;
-import com.dgt.backend.products.entity.Brand;
-import static com.dgt.backend.products.database.BrandDatabase.TABLE;
+import org.springframework.web.server.ResponseStatusException;
+
 @Service
 public class BrandService {
     private final BrandRepository repository;
-    private final WriteValidator validator;
-    public BrandService(BrandRepository repository,WriteValidator validator) { this.repository=repository; this.validator=validator; }
-    public Map<String,Object> list(int page,int size) { return repository.list(page,size); }
-    public Brand get(Long id) { return repository.findById(id); }
+    public BrandService(BrandRepository repository) { this.repository = repository; }
+
+    public PageResponse<BrandResponse> list(int page, int size) {
+        var p = repository.findAll(PageRequest.of(page, size, Sort.by("brandId")));
+        return new PageResponse<>(p.getContent().stream().map(BrandResponse::from).toList(), page, size, p.getTotalElements());
+    }
+
+    public BrandResponse get(Long id) {
+        return BrandResponse.from(repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found")));
+    }
+
     @Transactional
-    public Map<String,Object> create(Map<String,Object> values) { return repository.create(validator.validate(TABLE,values,true)); }
+    public BrandResponse create(CreateBrandRequest req) {
+        var entity = Brand.builder()
+                .brandName(req.brandName())
+                .description(req.description())
+                .build();
+        return BrandResponse.from(repository.save(entity));
+    }
+
     @Transactional
-    public Map<String,Object> update(Long id,Map<String,Object> values,String expected) { var validated=validator.validate(TABLE,values,false); validator.validateUpdate(TABLE,id,validated); return repository.update(id,validated,expected); }
+    public BrandResponse update(Long id, UpdateBrandRequest req) {
+        var entity = repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found"));
+        if (req.brandName() != null) entity.setBrandName(req.brandName());
+        if (req.description() != null) entity.setDescription(req.description());
+        return BrandResponse.from(repository.save(entity));
+    }
 }

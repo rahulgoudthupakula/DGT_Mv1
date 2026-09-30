@@ -1,21 +1,54 @@
 package com.dgt.backend.departments.service;
 
-import java.util.*;
+import com.dgt.backend.departments.dto.StoreSubDepartmentResponse;
+import com.dgt.backend.departments.dto.CreateStoreSubDepartmentRequest;
+import com.dgt.backend.departments.dto.UpdateStoreSubDepartmentRequest;
+import com.dgt.backend.departments.entity.StoreSubDepartment;
+import com.dgt.backend.departments.repository.StoreSubDepartmentRepository;
+import com.dgt.backend.common.dto.PageResponse;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.dgt.backend.common.service.WriteValidator;
-import com.dgt.backend.departments.repository.StoreSubDepartmentRepository;
-import com.dgt.backend.departments.entity.StoreSubDepartment;
-import static com.dgt.backend.departments.database.StoreSubDepartmentDatabase.TABLE;
+import org.springframework.web.server.ResponseStatusException;
+
 @Service
 public class StoreSubDepartmentService {
     private final StoreSubDepartmentRepository repository;
-    private final WriteValidator validator;
-    public StoreSubDepartmentService(StoreSubDepartmentRepository repository,WriteValidator validator) { this.repository=repository; this.validator=validator; }
-    public Map<String,Object> list(int page,int size) { return repository.list(page,size); }
-    public StoreSubDepartment get(Long id) { return repository.findById(id); }
+    public StoreSubDepartmentService(StoreSubDepartmentRepository repository) { this.repository = repository; }
+
+    public PageResponse<StoreSubDepartmentResponse> list(int page, int size) {
+        var p = repository.findAll(PageRequest.of(page, size, Sort.by("storeSubDepartmentId")));
+        return new PageResponse<>(p.getContent().stream().map(StoreSubDepartmentResponse::from).toList(), page, size, p.getTotalElements());
+    }
+
+    public StoreSubDepartmentResponse get(Long id) {
+        return StoreSubDepartmentResponse.from(repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found")));
+    }
+
     @Transactional
-    public Map<String,Object> create(Map<String,Object> values) { return repository.create(validator.validate(TABLE,values,true)); }
+    public StoreSubDepartmentResponse create(CreateStoreSubDepartmentRequest req) {
+        var entity = StoreSubDepartment.builder()
+                .storeDepartmentId(req.storeDepartmentId())
+                .storeSubDepartmentName(req.storeSubDepartmentName())
+                .isTaxable(req.isTaxable())
+                .isActive(req.isActive())
+                .sourceType(req.sourceType())
+                .build();
+        return StoreSubDepartmentResponse.from(repository.save(entity));
+    }
+
     @Transactional
-    public Map<String,Object> update(Long id,Map<String,Object> values,String expected) { var validated=validator.validate(TABLE,values,false); validator.validateUpdate(TABLE,id,validated); return repository.update(id,validated,expected); }
+    public StoreSubDepartmentResponse update(Long id, UpdateStoreSubDepartmentRequest req) {
+        var entity = repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found"));
+        if (req.storeDepartmentId() != null) entity.setStoreDepartmentId(req.storeDepartmentId());
+        if (req.storeSubDepartmentName() != null) entity.setStoreSubDepartmentName(req.storeSubDepartmentName());
+        if (req.isTaxable() != null) entity.setIsTaxable(req.isTaxable());
+        if (req.isActive() != null) entity.setIsActive(req.isActive());
+        if (req.sourceType() != null) entity.setSourceType(req.sourceType());
+        return StoreSubDepartmentResponse.from(repository.save(entity));
+    }
 }

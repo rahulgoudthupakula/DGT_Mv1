@@ -1,26 +1,32 @@
 package com.dgt.backend.products.entity;
 
-import java.util.Map;
-import java.math.BigDecimal;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import java.time.*;
-import tools.jackson.databind.JsonNode;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.dgt.backend.common.entity.Rows;
-/** Persistence model for public.brands; IDs and types follow the inspected database. */
-public record Brand(
-        @JsonProperty("_version") String rowVersion,
-        @JsonProperty("brand_id") Long brandId,
-        @JsonProperty("brand_name") String brandName,
-        @JsonProperty("created_at") OffsetDateTime createdAt,
-        @JsonProperty("updated_at") OffsetDateTime updatedAt,
-        @JsonProperty("description") String description) {
-    public static Brand fromRow(Map<String,Object> row) {
-        return new Brand(
-            Rows.value(row,"_version",String.class),
-            Rows.value(row,"brand_id",Long.class),
-            Rows.value(row,"brand_name",String.class),
-            Rows.value(row,"created_at",OffsetDateTime.class),
-            Rows.value(row,"updated_at",OffsetDateTime.class),
-            Rows.value(row,"description",String.class));
-    }
+
+@Entity
+@Table(name = "brands")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+public class Brand {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "brand_id")
+    private Long brandId;
+
+    @Column(name = "brand_name", nullable = false, length = 100)
+    private String brandName;
+
+    @Column(name = "description")
+    private String description;
+
+    @Column(name = "created_at", updatable = false)
+    @CreationTimestamp
+    private OffsetDateTime createdAt;
+
+    @Column(name = "updated_at")
+    @UpdateTimestamp
+    private OffsetDateTime updatedAt;
 }

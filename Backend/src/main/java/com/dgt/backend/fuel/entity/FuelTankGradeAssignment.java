@@ -1,30 +1,38 @@
 package com.dgt.backend.fuel.entity;
 
-import java.util.Map;
-import java.math.BigDecimal;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import java.time.*;
-import tools.jackson.databind.JsonNode;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.dgt.backend.common.entity.Rows;
-/** Persistence model for public.fuel_tank_grade_assignments; IDs and types follow the inspected database. */
-public record FuelTankGradeAssignment(
-        @JsonProperty("_version") String rowVersion,
-        @JsonProperty("assignment_id") Long assignmentId,
-        @JsonProperty("tank_id") Long tankId,
-        @JsonProperty("fuel_grade_id") Long fuelGradeId,
-        @JsonProperty("effective_from") LocalDate effectiveFrom,
-        @JsonProperty("effective_to") LocalDate effectiveTo,
-        @JsonProperty("created_at") OffsetDateTime createdAt,
-        @JsonProperty("updated_at") OffsetDateTime updatedAt) {
-    public static FuelTankGradeAssignment fromRow(Map<String,Object> row) {
-        return new FuelTankGradeAssignment(
-            Rows.value(row,"_version",String.class),
-            Rows.value(row,"assignment_id",Long.class),
-            Rows.value(row,"tank_id",Long.class),
-            Rows.value(row,"fuel_grade_id",Long.class),
-            Rows.value(row,"effective_from",LocalDate.class),
-            Rows.value(row,"effective_to",LocalDate.class),
-            Rows.value(row,"created_at",OffsetDateTime.class),
-            Rows.value(row,"updated_at",OffsetDateTime.class));
-    }
+
+@Entity
+@Table(name = "fuel_tank_grade_assignments")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+public class FuelTankGradeAssignment {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "assignment_id")
+    private Long assignmentId;
+
+    @Column(name = "tank_id", nullable = false)
+    private Long tankId;
+
+    @Column(name = "fuel_grade_id", nullable = false)
+    private Long fuelGradeId;
+
+    @Column(name = "effective_from", nullable = false)
+    private LocalDate effectiveFrom;
+
+    @Column(name = "effective_to")
+    private LocalDate effectiveTo;
+
+    @Column(name = "created_at", updatable = false)
+    @CreationTimestamp
+    private OffsetDateTime createdAt;
+
+    @Column(name = "updated_at")
+    @UpdateTimestamp
+    private OffsetDateTime updatedAt;
 }

@@ -1,21 +1,52 @@
 package com.dgt.backend.invoices.service;
 
-import java.util.*;
+import com.dgt.backend.invoices.dto.InvoiceAdjustmentResponse;
+import com.dgt.backend.invoices.dto.CreateInvoiceAdjustmentRequest;
+import com.dgt.backend.invoices.dto.UpdateInvoiceAdjustmentRequest;
+import com.dgt.backend.invoices.entity.InvoiceAdjustment;
+import com.dgt.backend.invoices.repository.InvoiceAdjustmentRepository;
+import com.dgt.backend.common.dto.PageResponse;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.dgt.backend.common.service.WriteValidator;
-import com.dgt.backend.invoices.repository.InvoiceAdjustmentRepository;
-import com.dgt.backend.invoices.entity.InvoiceAdjustment;
-import static com.dgt.backend.invoices.database.InvoiceAdjustmentDatabase.TABLE;
+import org.springframework.web.server.ResponseStatusException;
+
 @Service
 public class InvoiceAdjustmentService {
     private final InvoiceAdjustmentRepository repository;
-    private final WriteValidator validator;
-    public InvoiceAdjustmentService(InvoiceAdjustmentRepository repository,WriteValidator validator) { this.repository=repository; this.validator=validator; }
-    public Map<String,Object> list(int page,int size) { return repository.list(page,size); }
-    public InvoiceAdjustment get(Long id) { return repository.findById(id); }
+    public InvoiceAdjustmentService(InvoiceAdjustmentRepository repository) { this.repository = repository; }
+
+    public PageResponse<InvoiceAdjustmentResponse> list(int page, int size) {
+        var p = repository.findAll(PageRequest.of(page, size, Sort.by("invoiceAdjustmentId")));
+        return new PageResponse<>(p.getContent().stream().map(InvoiceAdjustmentResponse::from).toList(), page, size, p.getTotalElements());
+    }
+
+    public InvoiceAdjustmentResponse get(Long id) {
+        return InvoiceAdjustmentResponse.from(repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found")));
+    }
+
     @Transactional
-    public Map<String,Object> create(Map<String,Object> values) { return repository.create(validator.validate(TABLE,values,true)); }
+    public InvoiceAdjustmentResponse create(CreateInvoiceAdjustmentRequest req) {
+        var entity = InvoiceAdjustment.builder()
+                .invoiceId(req.invoiceId())
+                .adjustmentType(req.adjustmentType())
+                .adjustedAmount(req.adjustedAmount())
+                .reason(req.reason())
+                .build();
+        return InvoiceAdjustmentResponse.from(repository.save(entity));
+    }
+
     @Transactional
-    public Map<String,Object> update(Long id,Map<String,Object> values,String expected) { var validated=validator.validate(TABLE,values,false); validator.validateUpdate(TABLE,id,validated); return repository.update(id,validated,expected); }
+    public InvoiceAdjustmentResponse update(Long id, UpdateInvoiceAdjustmentRequest req) {
+        var entity = repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found"));
+        if (req.invoiceId() != null) entity.setInvoiceId(req.invoiceId());
+        if (req.adjustmentType() != null) entity.setAdjustmentType(req.adjustmentType());
+        if (req.adjustedAmount() != null) entity.setAdjustedAmount(req.adjustedAmount());
+        if (req.reason() != null) entity.setReason(req.reason());
+        return InvoiceAdjustmentResponse.from(repository.save(entity));
+    }
 }

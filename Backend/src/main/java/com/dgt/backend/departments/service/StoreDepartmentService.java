@@ -1,21 +1,54 @@
 package com.dgt.backend.departments.service;
 
-import java.util.*;
+import com.dgt.backend.departments.dto.StoreDepartmentResponse;
+import com.dgt.backend.departments.dto.CreateStoreDepartmentRequest;
+import com.dgt.backend.departments.dto.UpdateStoreDepartmentRequest;
+import com.dgt.backend.departments.entity.StoreDepartment;
+import com.dgt.backend.departments.repository.StoreDepartmentRepository;
+import com.dgt.backend.common.dto.PageResponse;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.dgt.backend.common.service.WriteValidator;
-import com.dgt.backend.departments.repository.StoreDepartmentRepository;
-import com.dgt.backend.departments.entity.StoreDepartment;
-import static com.dgt.backend.departments.database.StoreDepartmentDatabase.TABLE;
+import org.springframework.web.server.ResponseStatusException;
+
 @Service
 public class StoreDepartmentService {
     private final StoreDepartmentRepository repository;
-    private final WriteValidator validator;
-    public StoreDepartmentService(StoreDepartmentRepository repository,WriteValidator validator) { this.repository=repository; this.validator=validator; }
-    public Map<String,Object> list(int page,int size) { return repository.list(page,size); }
-    public StoreDepartment get(Long id) { return repository.findById(id); }
+    public StoreDepartmentService(StoreDepartmentRepository repository) { this.repository = repository; }
+
+    public PageResponse<StoreDepartmentResponse> list(int page, int size) {
+        var p = repository.findAll(PageRequest.of(page, size, Sort.by("storeDepartmentId")));
+        return new PageResponse<>(p.getContent().stream().map(StoreDepartmentResponse::from).toList(), page, size, p.getTotalElements());
+    }
+
+    public StoreDepartmentResponse get(Long id) {
+        return StoreDepartmentResponse.from(repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found")));
+    }
+
     @Transactional
-    public Map<String,Object> create(Map<String,Object> values) { return repository.create(validator.validate(TABLE,values,true)); }
+    public StoreDepartmentResponse create(CreateStoreDepartmentRequest req) {
+        var entity = StoreDepartment.builder()
+                .dgtId(req.dgtId())
+                .departmentId(req.departmentId())
+                .storeDepartmentName(req.storeDepartmentName())
+                .isActive(req.isActive())
+                .sourceType(req.sourceType())
+                .build();
+        return StoreDepartmentResponse.from(repository.save(entity));
+    }
+
     @Transactional
-    public Map<String,Object> update(Long id,Map<String,Object> values,String expected) { var validated=validator.validate(TABLE,values,false); validator.validateUpdate(TABLE,id,validated); return repository.update(id,validated,expected); }
+    public StoreDepartmentResponse update(Long id, UpdateStoreDepartmentRequest req) {
+        var entity = repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found"));
+        if (req.dgtId() != null) entity.setDgtId(req.dgtId());
+        if (req.departmentId() != null) entity.setDepartmentId(req.departmentId());
+        if (req.storeDepartmentName() != null) entity.setStoreDepartmentName(req.storeDepartmentName());
+        if (req.isActive() != null) entity.setIsActive(req.isActive());
+        if (req.sourceType() != null) entity.setSourceType(req.sourceType());
+        return StoreDepartmentResponse.from(repository.save(entity));
+    }
 }

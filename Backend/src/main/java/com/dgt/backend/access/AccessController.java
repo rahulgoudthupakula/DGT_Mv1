@@ -3,15 +3,18 @@ import java.util.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.server.ResponseStatusException;
 @RestController
 @RequestMapping("/api/v1/access")
 public class AccessController {
  private final ScopedAccess access;
- public AccessController(ScopedAccess access){this.access=access;}
+ private final PagePermissions pages;
+ private final PasswordEncoder encoder;
+ public AccessController(ScopedAccess access,PagePermissions pages,PasswordEncoder encoder){this.access=access;this.pages=pages;this.encoder=encoder;}
  @GetMapping("/me") public Map<String,Object> me(){return Map.of("userId",access.user());}
  @GetMapping("/stores") public Object stores(){return access.stores().stream().map(com.dgt.backend.common.entity.Rows::normalize).toList();}
- @GetMapping("/stores/{store}/context") public Object context(@PathVariable String store){access.assigned(store);var rights=new LinkedHashMap<String,Object>();for(String module:List.of("STORE_SETTINGS","DEPARTMENTS","PRICE_BOOK")){boolean view=false,edit=false;String approval=null;try{access.grant(access.user(),store,module,false);view=true;}catch(ResponseStatusException ignored){}try{approval=access.required(access.user(),store,module);edit=true;}catch(ResponseStatusException ignored){}var r=new LinkedHashMap<String,Object>();r.put("view",view);r.put("edit",edit);r.put("approval",approval);rights.put(module,r);}return Map.of("admin",access.admin(access.user(),access.company(store)),"modules",rights,"pages",new PagePermissions(access).context(store),"roles",access.db.queryForList("SELECT DISTINCT upper(t.role_type_name) FROM user_roles r JOIN role_types t USING(role_type_id) WHERE r.user_id=? AND r.dgt_id=? AND r.is_active AND t.is_active",String.class,access.user(),store));}
+ @GetMapping("/stores/{store}/context") public Object context(@PathVariable String store){access.assigned(store);var rights=new LinkedHashMap<String,Object>();for(String module:List.of("STORE_SETTINGS","DEPARTMENTS","PRICE_BOOK")){boolean view=false,edit=false;String approval=null;try{access.grant(access.user(),store,module,false);view=true;}catch(ResponseStatusException ignored){}try{approval=access.required(access.user(),store,module);edit=true;}catch(ResponseStatusException ignored){}var r=new LinkedHashMap<String,Object>();r.put("view",view);r.put("edit",edit);r.put("approval",approval);rights.put(module,r);}return Map.of("admin",access.admin(access.user(),access.company(store)),"modules",rights,"pages",pages.context(store),"roles",access.db.queryForList("SELECT DISTINCT upper(t.role_type_name) FROM user_roles r JOIN role_types t USING(role_type_id) WHERE r.user_id=? AND r.dgt_id=? AND r.is_active AND t.is_active",String.class,access.user(),store));}
  @GetMapping("/stores/{store}/permissions") public Object permissions(@PathVariable String store){access.requireAdmin(store);return Map.of(
  "users",access.db.queryForList("SELECT u.user_id,u.email FROM users u JOIN stores s ON s.dgt_id=u.dgt_id WHERE s.company_id=? AND u.account_status='ACTIVE' AND NOT u.two_factor_authentication ORDER BY u.email",access.company(store)),
  "roles",access.db.queryForList("SELECT role_type_id,role_type_name FROM role_types WHERE is_active AND role_type_name IN ('MANAGER','CASHIER','ACCOUNTANT') ORDER BY role_type_name"),
@@ -51,7 +54,7 @@ public class AccessController {
   if(input.modules()!=null&&!input.modules().isEmpty())throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Users inherit store role permissions; do not provide individual modules");
   if(Boolean.TRUE.equals(access.db.queryForObject("SELECT EXISTS(SELECT 1 FROM users WHERE lower(email)=? OR (dgt_id=? AND employee_id=?))",Boolean.class,email,store,employee)))throw new ResponseStatusException(HttpStatus.CONFLICT,"Email or employee ID already exists");
   try {
-   String hash=new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder(12).encode(input.password());
+   String hash=encoder.encode(input.password());
    Long uid=access.db.queryForObject("INSERT INTO users(dgt_id,employee_id,first_name,last_name,email,password_hash) VALUES (?,?,?,?,?,?) RETURNING user_id",Long.class,store,employee,first,last,email,hash);
    for(String target:input.stores()){
     Long role=access.db.queryForObject("INSERT INTO user_roles(user_id,role_type_id,dgt_id,is_active) VALUES (?,?,?,true) RETURNING user_role_id",Long.class,uid,input.roleTypeId(),target);

@@ -1,21 +1,62 @@
 package com.dgt.backend.billing.service;
 
-import java.util.*;
+import com.dgt.backend.billing.dto.StoreSubscriptionResponse;
+import com.dgt.backend.billing.dto.CreateStoreSubscriptionRequest;
+import com.dgt.backend.billing.dto.UpdateStoreSubscriptionRequest;
+import com.dgt.backend.billing.entity.StoreSubscription;
+import com.dgt.backend.billing.repository.StoreSubscriptionRepository;
+import com.dgt.backend.common.dto.PageResponse;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.dgt.backend.common.service.WriteValidator;
-import com.dgt.backend.billing.repository.StoreSubscriptionRepository;
-import com.dgt.backend.billing.entity.StoreSubscription;
-import static com.dgt.backend.billing.database.StoreSubscriptionDatabase.TABLE;
+import org.springframework.web.server.ResponseStatusException;
+
 @Service
 public class StoreSubscriptionService {
     private final StoreSubscriptionRepository repository;
-    private final WriteValidator validator;
-    public StoreSubscriptionService(StoreSubscriptionRepository repository,WriteValidator validator) { this.repository=repository; this.validator=validator; }
-    public Map<String,Object> list(int page,int size) { return repository.list(page,size); }
-    public StoreSubscription get(Long id) { return repository.findById(id); }
+    public StoreSubscriptionService(StoreSubscriptionRepository repository) { this.repository = repository; }
+
+    public PageResponse<StoreSubscriptionResponse> list(int page, int size) {
+        var p = repository.findAll(PageRequest.of(page, size, Sort.by("subscriptionId")));
+        return new PageResponse<>(p.getContent().stream().map(StoreSubscriptionResponse::from).toList(), page, size, p.getTotalElements());
+    }
+
+    public StoreSubscriptionResponse get(Long id) {
+        return StoreSubscriptionResponse.from(repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found")));
+    }
+
     @Transactional
-    public Map<String,Object> create(Map<String,Object> values) { return repository.create(validator.validate(TABLE,values,true)); }
+    public StoreSubscriptionResponse create(CreateStoreSubscriptionRequest req) {
+        var entity = StoreSubscription.builder()
+                .storeId(req.storeId())
+                .subscriptionPlanId(req.subscriptionPlanId())
+                .subscriptionStatus(req.subscriptionStatus())
+                .startDate(req.startDate())
+                .currentPeriodStart(req.currentPeriodStart())
+                .currentPeriodEnd(req.currentPeriodEnd())
+                .nextBillingDate(req.nextBillingDate())
+                .autoRenewal(req.autoRenewal())
+                .cancelledAt(req.cancelledAt())
+                .build();
+        return StoreSubscriptionResponse.from(repository.save(entity));
+    }
+
     @Transactional
-    public Map<String,Object> update(Long id,Map<String,Object> values,String expected) { var validated=validator.validate(TABLE,values,false); validator.validateUpdate(TABLE,id,validated); return repository.update(id,validated,expected); }
+    public StoreSubscriptionResponse update(Long id, UpdateStoreSubscriptionRequest req) {
+        var entity = repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found"));
+        if (req.storeId() != null) entity.setStoreId(req.storeId());
+        if (req.subscriptionPlanId() != null) entity.setSubscriptionPlanId(req.subscriptionPlanId());
+        if (req.subscriptionStatus() != null) entity.setSubscriptionStatus(req.subscriptionStatus());
+        if (req.startDate() != null) entity.setStartDate(req.startDate());
+        if (req.currentPeriodStart() != null) entity.setCurrentPeriodStart(req.currentPeriodStart());
+        if (req.currentPeriodEnd() != null) entity.setCurrentPeriodEnd(req.currentPeriodEnd());
+        if (req.nextBillingDate() != null) entity.setNextBillingDate(req.nextBillingDate());
+        if (req.autoRenewal() != null) entity.setAutoRenewal(req.autoRenewal());
+        if (req.cancelledAt() != null) entity.setCancelledAt(req.cancelledAt());
+        return StoreSubscriptionResponse.from(repository.save(entity));
+    }
 }

@@ -1,21 +1,52 @@
 package com.dgt.backend.productbarcodes.service;
 
-import java.util.*;
+import com.dgt.backend.productbarcodes.dto.ProductBarcodeResponse;
+import com.dgt.backend.productbarcodes.dto.CreateProductBarcodeRequest;
+import com.dgt.backend.productbarcodes.dto.UpdateProductBarcodeRequest;
+import com.dgt.backend.productbarcodes.entity.ProductBarcode;
+import com.dgt.backend.productbarcodes.repository.ProductBarcodeRepository;
+import com.dgt.backend.common.dto.PageResponse;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.dgt.backend.common.service.WriteValidator;
-import com.dgt.backend.productbarcodes.repository.ProductBarcodeRepository;
-import com.dgt.backend.productbarcodes.entity.ProductBarcode;
-import static com.dgt.backend.productbarcodes.database.ProductBarcodeDatabase.TABLE;
+import org.springframework.web.server.ResponseStatusException;
+
 @Service
 public class ProductBarcodeService {
     private final ProductBarcodeRepository repository;
-    private final WriteValidator validator;
-    public ProductBarcodeService(ProductBarcodeRepository repository,WriteValidator validator) { this.repository=repository; this.validator=validator; }
-    public Map<String,Object> list(int page,int size) { return repository.list(page,size); }
-    public ProductBarcode get(Long id) { return repository.findById(id); }
+    public ProductBarcodeService(ProductBarcodeRepository repository) { this.repository = repository; }
+
+    public PageResponse<ProductBarcodeResponse> list(int page, int size) {
+        var p = repository.findAll(PageRequest.of(page, size, Sort.by("productBarcodeId")));
+        return new PageResponse<>(p.getContent().stream().map(ProductBarcodeResponse::from).toList(), page, size, p.getTotalElements());
+    }
+
+    public ProductBarcodeResponse get(Long id) {
+        return ProductBarcodeResponse.from(repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found")));
+    }
+
     @Transactional
-    public Map<String,Object> create(Map<String,Object> values) { return repository.create(validator.validate(TABLE,values,true)); }
+    public ProductBarcodeResponse create(CreateProductBarcodeRequest req) {
+        var entity = ProductBarcode.builder()
+                .productId(req.productId())
+                .productBarcodeType(req.productBarcodeType())
+                .productBarcodeValue(req.productBarcodeValue())
+                .isPrimary(req.isPrimary())
+                .build();
+        return ProductBarcodeResponse.from(repository.save(entity));
+    }
+
     @Transactional
-    public Map<String,Object> update(Long id,Map<String,Object> values,String expected) { var validated=validator.validate(TABLE,values,false); validator.validateUpdate(TABLE,id,validated); return repository.update(id,validated,expected); }
+    public ProductBarcodeResponse update(Long id, UpdateProductBarcodeRequest req) {
+        var entity = repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found"));
+        if (req.productId() != null) entity.setProductId(req.productId());
+        if (req.productBarcodeType() != null) entity.setProductBarcodeType(req.productBarcodeType());
+        if (req.productBarcodeValue() != null) entity.setProductBarcodeValue(req.productBarcodeValue());
+        if (req.isPrimary() != null) entity.setIsPrimary(req.isPrimary());
+        return ProductBarcodeResponse.from(repository.save(entity));
+    }
 }

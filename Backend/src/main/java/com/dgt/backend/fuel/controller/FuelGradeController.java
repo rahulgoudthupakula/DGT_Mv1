@@ -1,26 +1,35 @@
 package com.dgt.backend.fuel.controller;
 
-import java.util.*;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.dgt.backend.fuel.dto.FuelGradeResponse;
+import com.dgt.backend.fuel.dto.CreateFuelGradeRequest;
+import com.dgt.backend.fuel.dto.UpdateFuelGradeRequest;
 import com.dgt.backend.fuel.service.FuelGradeService;
-import com.dgt.backend.fuel.entity.FuelGrade;
+import com.dgt.backend.common.dto.PageResponse;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
 @RestController
 @RequestMapping("/api/v1/fuel-grades")
 public class FuelGradeController {
     private final FuelGradeService service;
-    public FuelGradeController(FuelGradeService service) { this.service=service; }
+    public FuelGradeController(FuelGradeService service) { this.service = service; }
+
     @GetMapping
     @PreAuthorize("@accessPolicy.check(authentication, 'fuel_grades', 'READ')")
-    public Map<String,Object> list(@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="50") int size) { return service.list(page,size); }
+    public PageResponse<FuelGradeResponse> list(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) { return service.list(page, size); }
+
     @GetMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'fuel_grades', 'READ')")
-    public FuelGrade get(@PathVariable Long id) { return service.get(id); }
+    public FuelGradeResponse get(@PathVariable Long id) { return service.get(id); }
+
     @PostMapping
-    @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
+    @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("@accessPolicy.check(authentication, 'fuel_grades', 'WRITE')")
-    public Map<String,Object> create(@RequestBody Map<String,Object> values) { return service.create(values); }
+    public FuelGradeResponse create(@Valid @RequestBody CreateFuelGradeRequest request) { return service.create(request); }
+
     @PatchMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'fuel_grades', 'WRITE')")
-    public Map<String,Object> update(@PathVariable Long id,@RequestHeader("If-Match") String expected,@RequestBody Map<String,Object> values) { return service.update(id,values,expected); }
+    public FuelGradeResponse update(@PathVariable Long id, @RequestBody UpdateFuelGradeRequest request) { return service.update(id, request); }
 }
