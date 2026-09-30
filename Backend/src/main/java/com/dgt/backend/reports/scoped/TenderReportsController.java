@@ -10,7 +10,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @RestController
 @ConditionalOnProperty(name={"app.tender.credit-card.enabled","app.tender.ebt.enabled","app.tender.fleet.enabled"},havingValue="true")
 @RequestMapping("/api/v1/access/stores/{store}/tender-reports")

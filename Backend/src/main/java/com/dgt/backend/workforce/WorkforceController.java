@@ -2,6 +2,8 @@ package com.dgt.backend.workforce;
 import java.time.LocalDate;import java.util.UUID;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import lombok.extern.slf4j.Slf4j;
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/access/stores/{store}/workforce")
 @ConditionalOnProperty(name="app.workforce.enabled",havingValue="true")

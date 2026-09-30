@@ -12,24 +12,34 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 public class EmployeeTimeOffRequestService {
     private final EmployeeTimeOffRequestRepository repository;
     public EmployeeTimeOffRequestService(EmployeeTimeOffRequestRepository repository) { this.repository = repository; }
 
     public PageResponse<EmployeeTimeOffRequestResponse> list(int page, int size) {
+        log.debug("Listing employee time off request page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("timeOffRequestId")));
+        log.debug("EmployeeTimeOffRequest list: {} items total={}", p.getContent().size(), p.getTotalElements());
         return new PageResponse<>(p.getContent().stream().map(EmployeeTimeOffRequestResponse::from).toList(), page, size, p.getTotalElements());
     }
 
     public EmployeeTimeOffRequestResponse get(Long id) {
+        log.debug("Fetching employee time off request id={}", id);
         return EmployeeTimeOffRequestResponse.from(repository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found")));
+                .orElseThrow(() -> {
+                    log.warn("EmployeeTimeOffRequest not found id={}", id);
+                    return new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found");
+                }));
+    
     }
 
     @Transactional
     public EmployeeTimeOffRequestResponse create(CreateEmployeeTimeOffRequestRequest req) {
+        log.info("Creating employee time off request");
         var entity = EmployeeTimeOffRequest.builder()
                 .employeeId(req.employeeId())
                 .requestType(req.requestType())
@@ -43,13 +53,19 @@ public class EmployeeTimeOffRequestService {
                 .reviewedAt(req.reviewedAt())
                 .rejectedReason(req.rejectedReason())
                 .build();
-        return EmployeeTimeOffRequestResponse.from(repository.save(entity));
+        var saved = repository.save(entity);
+        log.info("Created employee time off request id={}", saved.getEmployeeTimeOffRequestId());
+        return EmployeeTimeOffRequestResponse.from(saved);
     }
 
     @Transactional
     public EmployeeTimeOffRequestResponse update(Long id, UpdateEmployeeTimeOffRequestRequest req) {
+        log.info("Updating employee time off request id={}", id);
         var entity = repository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found"));
+                .orElseThrow(() -> {
+                    log.warn("EmployeeTimeOffRequest not found for update id={}", id);
+                    return new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found");
+                });
         if (req.employeeId() != null) entity.setEmployeeId(req.employeeId());
         if (req.requestType() != null) entity.setRequestType(req.requestType());
         if (req.startDate() != null) entity.setStartDate(req.startDate());
@@ -61,6 +77,8 @@ public class EmployeeTimeOffRequestService {
         if (req.reviewedBy() != null) entity.setReviewedBy(req.reviewedBy());
         if (req.reviewedAt() != null) entity.setReviewedAt(req.reviewedAt());
         if (req.rejectedReason() != null) entity.setRejectedReason(req.rejectedReason());
-        return EmployeeTimeOffRequestResponse.from(repository.save(entity));
+        var saved = repository.save(entity);
+        log.info("Updated employee time off request id={}", id);
+        return EmployeeTimeOffRequestResponse.from(saved);
     }
 }

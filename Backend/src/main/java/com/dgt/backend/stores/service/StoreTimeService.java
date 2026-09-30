@@ -5,14 +5,20 @@ import org.springframework.stereotype.Service;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import com.dgt.backend.stores.repository.StoreRepository;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 public class StoreTimeService {
     private final StoreRepository repository;
     public StoreTimeService(StoreRepository repository) { this.repository=repository; }
     public record BusinessDay(String dgtId,String timezone,LocalDate date,Instant startInclusive,Instant endExclusive) {}
     public BusinessDay businessDay(String id,LocalDate date) {
-        String timezone=repository.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Store not found")).getTimezone();
+        log.debug("Resolving business day store={} date={}", id, date);
+        String timezone=repository.findById(id).orElseThrow(() -> {
+            log.warn("Store not found for business day id={}", id);
+            return new ResponseStatusException(HttpStatus.NOT_FOUND, "Store not found");
+        }).getTimezone();
         if(timezone==null) throw new ResponseStatusException(HttpStatus.CONFLICT,"Set this store's timezone before using local business dates");
         return window(id,timezone,date);
     }

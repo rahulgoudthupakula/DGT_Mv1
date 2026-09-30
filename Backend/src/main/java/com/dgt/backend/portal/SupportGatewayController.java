@@ -1,5 +1,7 @@
 package com.dgt.backend.portal;
 import java.util.*;import org.springframework.web.bind.annotation.*;import com.dgt.backend.access.ScopedAccess;
+import lombok.extern.slf4j.Slf4j;
+@Slf4j
 @RestController @RequestMapping("/api/v1/access/stores/{store}/support-tickets")
 public class SupportGatewayController {
  private final PortalBridge p;private final ScopedAccess a;

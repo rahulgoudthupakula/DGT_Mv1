@@ -3,7 +3,9 @@ package com.dgt.backend.common.controller;
 import java.util.Map;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.core.Authentication;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/v1")
 public class SystemController {

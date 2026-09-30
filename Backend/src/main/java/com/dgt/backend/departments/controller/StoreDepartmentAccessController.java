@@ -13,6 +13,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import com.dgt.backend.departments.service.StoreDepartmentService;
 import com.dgt.backend.stores.service.StoreService;
+import lombok.extern.slf4j.Slf4j;
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/stores/{dgtId}/department-access")
 public class StoreDepartmentAccessController {

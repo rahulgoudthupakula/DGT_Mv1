@@ -10,7 +10,9 @@ import org.springframework.http.HttpStatus;
 import java.util.*;
 import java.time.*;
 import java.math.BigDecimal;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/access/stores/{store}/employees")
 @ConditionalOnProperty(name="app.workweek.enabled",havingValue="true")

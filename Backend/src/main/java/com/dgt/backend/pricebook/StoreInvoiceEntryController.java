@@ -10,6 +10,8 @@ import java.util.*;
 import java.math.*;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import lombok.extern.slf4j.Slf4j;
+@Slf4j
 @RestController
 @ConditionalOnProperty(name="app.pricebook.enabled",havingValue="true")
 @RequestMapping("/api/v1/access/stores/{store}/invoice-entry")

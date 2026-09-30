@@ -6,7 +6,9 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import com.dgt.backend.reports.entity.*;
 import com.dgt.backend.reports.service.ReportsService;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/reports")
 @PreAuthorize("@accessPolicy.check(authentication, 'reports', 'READ')")

@@ -3,6 +3,8 @@ import java.util.UUID;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import com.dgt.backend.billing.service.StoreBilling;
+import lombok.extern.slf4j.Slf4j;
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/access/stores/{store}/billing")
 @ConditionalOnProperty(name="app.billing.enabled",havingValue="true")

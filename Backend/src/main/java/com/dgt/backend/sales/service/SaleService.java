@@ -12,24 +12,34 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 public class SaleService {
     private final SaleRepository repository;
     public SaleService(SaleRepository repository) { this.repository = repository; }
 
     public PageResponse<SaleResponse> list(int page, int size) {
+        log.debug("Listing sale page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("saleId")));
+        log.debug("Sale list: {} items total={}", p.getContent().size(), p.getTotalElements());
         return new PageResponse<>(p.getContent().stream().map(SaleResponse::from).toList(), page, size, p.getTotalElements());
     }
 
     public SaleResponse get(Long id) {
+        log.debug("Fetching sale id={}", id);
         return SaleResponse.from(repository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found")));
+                .orElseThrow(() -> {
+                    log.warn("Sale not found id={}", id);
+                    return new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found");
+                }));
+    
     }
 
     @Transactional
     public SaleResponse create(CreateSaleRequest req) {
+        log.info("Creating sale");
         var entity = Sale.builder()
                 .storeId(req.storeId())
                 .cashierId(req.cashierId())
@@ -46,13 +56,19 @@ public class SaleService {
                 .totalAmount(req.totalAmount())
                 .totalItems(req.totalItems())
                 .build();
-        return SaleResponse.from(repository.save(entity));
+        var saved = repository.save(entity);
+        log.info("Created sale id={}", saved.getSaleId());
+        return SaleResponse.from(saved);
     }
 
     @Transactional
     public SaleResponse update(Long id, UpdateSaleRequest req) {
+        log.info("Updating sale id={}", id);
         var entity = repository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found"));
+                .orElseThrow(() -> {
+                    log.warn("Sale not found for update id={}", id);
+                    return new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found");
+                });
         if (req.storeId() != null) entity.setStoreId(req.storeId());
         if (req.cashierId() != null) entity.setCashierId(req.cashierId());
         if (req.terminalId() != null) entity.setTerminalId(req.terminalId());
@@ -67,6 +83,8 @@ public class SaleService {
         if (req.discountAmount() != null) entity.setDiscountAmount(req.discountAmount());
         if (req.totalAmount() != null) entity.setTotalAmount(req.totalAmount());
         if (req.totalItems() != null) entity.setTotalItems(req.totalItems());
-        return SaleResponse.from(repository.save(entity));
+        var saved = repository.save(entity);
+        log.info("Updated sale id={}", id);
+        return SaleResponse.from(saved);
     }
 }

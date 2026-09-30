@@ -10,8 +10,10 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 
 /** Open-ticket discount API. Never adjusts tendered or completed sales. */
+@Slf4j
 @RestController
 @ConditionalOnProperty(name="app.pricebook.enabled",havingValue="true")
 @RequestMapping("/api/v1/access/stores/{store}/checkout-discounts")

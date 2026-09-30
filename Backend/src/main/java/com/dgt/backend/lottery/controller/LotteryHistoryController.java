@@ -6,7 +6,9 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/access/stores/{store}/lottery-pack-history")
 public class LotteryHistoryController {
