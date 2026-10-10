@@ -1,5 +1,8 @@
 spring:
   datasource:
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/dgt?sslmode=require
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     hikari:
       maximum-pool-size: 3
   flyway:
