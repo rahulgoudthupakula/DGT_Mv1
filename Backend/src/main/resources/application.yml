@@ -35,6 +35,9 @@ app:
   cors-origins: ${CORS_ORIGINS:http://localhost:5173,http://localhost:8081}
   access:
     administrator-emails: ${SCHEMA_ADMIN_EMAILS:}
+  jwt:
+    secret: ${JWT_SECRET:changeme-replace-in-production-must-be-at-least-256-bits-base64}
+    expiration-seconds: ${JWT_EXPIRATION:28800}
 
 springdoc:
   swagger-ui:

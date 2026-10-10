@@ -29,7 +29,6 @@ public class ProfileController {
   if(Boolean.TRUE.equals(access.db.queryForObject("SELECT EXISTS(SELECT 1 FROM users WHERE lower(email)=? AND user_id<>?)",Boolean.class,email,row.get("user_id"))))throw new ResponseStatusException(HttpStatus.CONFLICT,"Email is already in use");
   try{access.db.update("UPDATE users SET first_name=?,last_name=?,email=?,updated_at=CURRENT_TIMESTAMP WHERE user_id=?",first,last,email,row.get("user_id"));}
   catch(org.springframework.dao.DuplicateKeyException e){throw new ResponseStatusException(HttpStatus.CONFLICT,"Email is already in use");}
-  if(!email.equals(row.get("email")))access.db.update("UPDATE user_sessions SET revoked_at=CURRENT_TIMESTAMP WHERE user_id=? AND revoked_at IS NULL",row.get("user_id"));
   return read(((Number)row.get("user_id")).longValue());
  }
  public record Password(String currentPassword,String newPassword,String confirmPassword){}
@@ -39,7 +38,6 @@ public class ProfileController {
   if(!Objects.equals(input.newPassword(),input.confirmPassword()))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"New passwords do not match");
   if(encoder.matches(input.newPassword(),(String)row.get("password_hash")))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Choose a different password");
   access.db.update("UPDATE users SET password_hash=?,updated_at=CURRENT_TIMESTAMP WHERE user_id=?",encoder.encode(input.newPassword()),row.get("user_id"));
-  access.db.update("UPDATE user_sessions SET revoked_at=CURRENT_TIMESTAMP WHERE user_id=? AND revoked_at IS NULL",row.get("user_id"));
   return Map.of("signInAgain",true);
  }
 }
