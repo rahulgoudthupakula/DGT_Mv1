@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Shield, Smartphone, Eye, EyeOff } from "lucide-react";
+import { Shield, Eye, EyeOff } from "lucide-react";
 
 function PasswordInput({id,...props}:Omit<ComponentProps<typeof Input>,"type">){
  const [visible,setVisible]=useState(false);
@@ -22,14 +22,11 @@ function PasswordInput({id,...props}:Omit<ComponentProps<typeof Input>,"type">){
 }
 
 type LoginEvent={event_id:number;occurred_at:string;ip_address:string;user_agent:string;status:string};
-type DeviceSession={session_id:string;ip_address:string;user_agent:string;last_active_at:string;current:boolean};
 type Profile={first_name:string;last_name:string;email:string;version:string};
 export const UserProfileManagementPage = ({onSignOut,enabled=true}:{onSignOut:()=>void;enabled?:boolean}) => {
  const client=useQueryClient();
  const query=useQuery({queryKey:['self-profile'],queryFn:()=>request<Profile>('/access/profile'),enabled});
  const history=useQuery({queryKey:['profile-history'],queryFn:()=>request<LoginEvent[]>('/access/profile/history'),enabled});
- const sessions=useQuery({queryKey:['profile-sessions'],queryFn:()=>request<DeviceSession[]>('/access/profile/sessions'),enabled,refetchInterval:30000});
- async function revoke(id:string){setBusy(true);setError('');try{await request('/access/profile/sessions/'+id+'/revoke',{method:'POST'});await sessions.refetch();setMessage('Session revoked. That device can no longer access your account.');}catch(e){setError(e instanceof Error?e.message:'Could not revoke session');}finally{setBusy(false);}}
  const date=(value:string)=>new Date(value).toLocaleString();
  const [editingProfile,setEditingProfile]=useState(false),[editingPassword,setEditingPassword]=useState(false);
  const [draft,setDraft]=useState<{firstName:string;lastName:string;email:string}|null>(null);
@@ -108,8 +105,8 @@ export const UserProfileManagementPage = ({onSignOut,enabled=true}:{onSignOut:()
         </CardContent>
       </Card>
 
-      {(history.error||sessions.error)&&<p role="alert" className="text-destructive">{history.error?.message||sessions.error?.message}</p>}
-      {enabled&&<div className="flex gap-2"><Button variant="outline" onClick={()=>{void history.refetch();void sessions.refetch();}}>Refresh Activity</Button><Button variant="outline" onClick={signOut}>Sign Out</Button></div>}
+      {history.error&&<p role="alert" className="text-destructive">{history.error.message}</p>}
+      {enabled&&<div className="flex gap-2"><Button variant="outline" onClick={()=>{void history.refetch();}}>Refresh Activity</Button><Button variant="outline" onClick={signOut}>Sign Out</Button></div>}
       <p className="text-xs text-muted-foreground">Activity times use your browser timezone. Sessions expire after 8 hours. IP addresses are recorded without guessing a location.</p>
       {/* Login Activity History */}
       <Card>
@@ -135,36 +132,6 @@ export const UserProfileManagementPage = ({onSignOut,enabled=true}:{onSignOut:()
                     <Badge variant={entry.status === "SUCCESS" ? "default" : "destructive"} className="text-[10px]">
                       {entry.status}
                     </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      {/* Device Sessions */}
-      <Card>
-        <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Smartphone className="w-5 h-5" /> Device Sessions</CardTitle></CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Device</TableHead>
-                <TableHead>IP Address</TableHead>
-                <TableHead>Last Active</TableHead>
-                <TableHead className="text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {!sessions.data?.length&&<TableRow><TableCell colSpan={4} className="text-muted-foreground">{enabled?(sessions.isPending?"Loading sessions…":"No active sessions."):"Available in the profile test preview."}</TableCell></TableRow>}
-              {sessions.data?.map((s) => (
-                <TableRow key={s.session_id}>
-                  <TableCell className="text-xs">{s.user_agent} {s.current && <Badge variant="outline" className="ml-1 text-[9px]">Current</Badge>}</TableCell>
-                  <TableCell className="text-xs">{s.ip_address}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{date(s.last_active_at)}</TableCell>
-                  <TableCell className="text-right">
-                    {!s.current && <Button disabled={busy} onClick={()=>revoke(s.session_id)} variant="destructive" size="sm" className="h-6 text-[10px]">Revoke</Button>}
                   </TableCell>
                 </TableRow>
               ))}

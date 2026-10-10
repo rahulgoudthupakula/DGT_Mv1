@@ -18,15 +18,14 @@ public class SwaggerConfig {
                 .version("0.1.0")
                 .description("DGT POS & Retail Management System — multi-tenant convenience store platform")
                 .contact(new Contact().name("DGT Technologies").url("https://dgttechnologies.com")))
-            .addSecurityItem(new SecurityRequirement().addList("basicAuth"))
             .addSecurityItem(new SecurityRequirement().addList("bearerAuth"))
             .components(new Components()
                 .addSecuritySchemes("basicAuth", new SecurityScheme()
                     .type(SecurityScheme.Type.HTTP).scheme("basic")
-                    .description("Email and password (used for login)"))
+                    .description("Email : password (Base64) — used only for POST /api/v1/access/session"))
                 .addSecuritySchemes("bearerAuth", new SecurityScheme()
-                    .type(SecurityScheme.Type.HTTP).scheme("bearer")
-                    .description("Opaque session token from POST /api/v1/access/sessions")));
+                    .type(SecurityScheme.Type.HTTP).scheme("bearer").bearerFormat("JWT")
+                    .description("JWT obtained from POST /api/v1/access/session")));
     }
 
     @Bean
@@ -35,7 +34,8 @@ public class SwaggerConfig {
             .pathsToMatch(
                 "/api/v1/access/me",
                 "/api/v1/access/stores",
-                "/api/v1/access/sessions/**",
+                "/api/v1/access/session",
+                "/api/v1/access/session/logout",
                 "/api/v1/access/profile/**",
                 "/api/v1/signup-requests/**")
             .build();
