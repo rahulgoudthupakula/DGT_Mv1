@@ -50,7 +50,7 @@ public class FuelTankReadingService {
                 .imageUrl(req.imageUrl())
                 .build();
         var saved = repository.save(entity);
-        log.info("Created fuel tank reading id={}", saved.getFuelTankReadingId());
+        log.info("Created fuel tank reading id={}", saved.getTankReadingId());
         return FuelTankReadingResponse.from(saved);
     }
 

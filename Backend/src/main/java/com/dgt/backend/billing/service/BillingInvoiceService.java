@@ -55,7 +55,7 @@ public class BillingInvoiceService {
                 .invoiceDocumentUrl(req.invoiceDocumentUrl())
                 .build();
         var saved = repository.save(entity);
-        log.info("Created billing invoice id={}", saved.getBillingInvoiceId());
+        log.info("Created billing invoice id={}", saved.getInvoiceId());
         return BillingInvoiceResponse.from(saved);
     }
 

@@ -49,7 +49,7 @@ public class VendorAuditLogService {
                 .costHistoryId(req.costHistoryId())
                 .build();
         var saved = repository.save(entity);
-        log.info("Created vendor audit log id={}", saved.getVendorAuditLogId());
+        log.info("Created vendor audit log id={}", saved.getAuditId());
         return VendorAuditLogResponse.from(saved);
     }
 

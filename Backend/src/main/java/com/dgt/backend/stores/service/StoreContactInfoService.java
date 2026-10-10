@@ -48,7 +48,7 @@ public class StoreContactInfoService {
                 .storeName(req.storeName())
                 .build();
         var saved = repository.save(entity);
-        log.info("Created store contact info id={}", saved.getStoreContactInfoId());
+        log.info("Created store contact info id={}", saved.getContactInfoId());
         return StoreContactInfoResponse.from(saved);
     }
 

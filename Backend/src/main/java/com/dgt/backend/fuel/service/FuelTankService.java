@@ -48,7 +48,7 @@ public class FuelTankService {
                 .safeFillCapacity(req.safeFillCapacity())
                 .build();
         var saved = repository.save(entity);
-        log.info("Created fuel tank id={}", saved.getFuelTankId());
+        log.info("Created fuel tank id={}", saved.getTankId());
         return FuelTankResponse.from(saved);
     }
 

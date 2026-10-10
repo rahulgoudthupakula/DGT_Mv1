@@ -53,7 +53,7 @@ public class InventoryReductionRequestService {
                 .rejectionReason(req.rejectionReason())
                 .build();
         var saved = repository.save(entity);
-        log.info("Created inventory reduction request id={}", saved.getInventoryReductionRequestId());
+        log.info("Created inventory reduction request id={}", saved.getReductionRequestId());
         return InventoryReductionRequestResponse.from(saved);
     }
 

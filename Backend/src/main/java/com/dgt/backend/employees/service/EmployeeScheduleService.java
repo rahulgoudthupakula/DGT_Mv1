@@ -51,7 +51,7 @@ public class EmployeeScheduleService {
                 .createdBy(req.createdBy())
                 .build();
         var saved = repository.save(entity);
-        log.info("Created employee schedule id={}", saved.getEmployeeScheduleId());
+        log.info("Created employee schedule id={}", saved.getScheduleId());
         return EmployeeScheduleResponse.from(saved);
     }
 

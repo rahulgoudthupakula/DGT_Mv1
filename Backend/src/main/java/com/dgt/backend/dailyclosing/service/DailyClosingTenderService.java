@@ -49,7 +49,7 @@ public class DailyClosingTenderService {
                 .transactionCount(req.transactionCount())
                 .build();
         var saved = repository.save(entity);
-        log.info("Created daily closing tender id={}", saved.getDailyClosingTenderId());
+        log.info("Created daily closing tender id={}", saved.getTenderId());
         return DailyClosingTenderResponse.from(saved);
     }
 

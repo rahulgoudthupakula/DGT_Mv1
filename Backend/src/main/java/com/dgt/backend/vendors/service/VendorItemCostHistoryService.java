@@ -51,7 +51,7 @@ public class VendorItemCostHistoryService {
                 .changedBy(req.changedBy())
                 .build();
         var saved = repository.save(entity);
-        log.info("Created vendor item cost history id={}", saved.getVendorItemCostHistoryId());
+        log.info("Created vendor item cost history id={}", saved.getCostHistoryId());
         return VendorItemCostHistoryResponse.from(saved);
     }
 

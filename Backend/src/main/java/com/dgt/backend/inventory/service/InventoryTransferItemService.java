@@ -48,7 +48,7 @@ public class InventoryTransferItemService {
                 .unitCost(req.unitCost())
                 .build();
         var saved = repository.save(entity);
-        log.info("Created inventory transfer item id={}", saved.getInventoryTransferItemId());
+        log.info("Created inventory transfer item id={}", saved.getTransferItemId());
         return InventoryTransferItemResponse.from(saved);
     }
 

@@ -49,7 +49,7 @@ public class NewArrivalService {
                 .statusId(req.statusId())
                 .build();
         var saved = repository.save(entity);
-        log.info("Created new arrival id={}", saved.getNewArrivalId());
+        log.info("Created new arrival id={}", saved.getNewArrivalsId());
         return NewArrivalResponse.from(saved);
     }
 

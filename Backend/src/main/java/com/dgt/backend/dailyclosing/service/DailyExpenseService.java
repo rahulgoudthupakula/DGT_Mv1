@@ -50,7 +50,7 @@ public class DailyExpenseService {
                 .receiptNumber(req.receiptNumber())
                 .build();
         var saved = repository.save(entity);
-        log.info("Created daily expense id={}", saved.getDailyExpenseId());
+        log.info("Created daily expense id={}", saved.getExpensesId());
         return DailyExpenseResponse.from(saved);
     }
 

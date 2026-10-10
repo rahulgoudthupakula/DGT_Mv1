@@ -51,7 +51,7 @@ public class FuelInvoiceDetailService {
                 .freightAmount(req.freightAmount())
                 .build();
         var saved = repository.save(entity);
-        log.info("Created fuel invoice detail id={}", saved.getFuelInvoiceDetailId());
+        log.info("Created fuel invoice detail id={}", saved.getFuelInvoiceDetailsId());
         return FuelInvoiceDetailResponse.from(saved);
     }
 

@@ -47,7 +47,7 @@ public class EmployeeEmergencyContactService {
                 .phone(req.phone())
                 .build();
         var saved = repository.save(entity);
-        log.info("Created employee emergency contact id={}", saved.getEmployeeEmergencyContactId());
+        log.info("Created employee emergency contact id={}", saved.getEmergencyContactId());
         return EmployeeEmergencyContactResponse.from(saved);
     }
 

@@ -48,7 +48,7 @@ public class ProductStorePriceService {
                 .rebateId(req.rebateId())
                 .build();
         var saved = repository.save(entity);
-        log.info("Created product store price id={}", saved.getProductStorePriceId());
+        log.info("Created product store price id={}", saved.getStorePriceId());
         return ProductStorePriceResponse.from(saved);
     }
 

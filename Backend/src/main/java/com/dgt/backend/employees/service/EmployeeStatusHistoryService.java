@@ -46,7 +46,7 @@ public class EmployeeStatusHistoryService {
                 .statusTypeId(req.statusTypeId())
                 .build();
         var saved = repository.save(entity);
-        log.info("Created employee status history id={}", saved.getEmployeeStatusHistoryId());
+        log.info("Created employee status history id={}", saved.getStatusHistoryId());
         return EmployeeStatusHistoryResponse.from(saved);
     }
 

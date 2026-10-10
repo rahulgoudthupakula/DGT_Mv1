@@ -47,7 +47,7 @@ public class PosTerminalService {
                 .terminalStatus(req.terminalStatus())
                 .build();
         var saved = repository.save(entity);
-        log.info("Created pos terminal id={}", saved.getPosTerminalId());
+        log.info("Created pos terminal id={}", saved.getTerminalId());
         return PosTerminalResponse.from(saved);
     }
 

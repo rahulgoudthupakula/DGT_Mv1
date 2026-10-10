@@ -53,7 +53,7 @@ public class SaleItemService {
                 .lineTotal(req.lineTotal())
                 .build();
         var saved = repository.save(entity);
-        log.info("Created sale item id={}", saved.getSaleItemId());
+        log.info("Created sale item id={}", saved.getSalesItemId());
         return SaleItemResponse.from(saved);
     }
 

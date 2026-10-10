@@ -48,7 +48,7 @@ public class StoreBusinessHourService {
                 .status(req.status())
                 .build();
         var saved = repository.save(entity);
-        log.info("Created store business hour id={}", saved.getStoreBusinessHourId());
+        log.info("Created store business hour id={}", saved.getBusinessHoursId());
         return StoreBusinessHourResponse.from(saved);
     }
 

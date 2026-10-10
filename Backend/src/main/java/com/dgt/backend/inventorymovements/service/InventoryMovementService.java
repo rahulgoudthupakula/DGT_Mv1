@@ -49,7 +49,7 @@ public class InventoryMovementService {
                 .referenceId(req.referenceId())
                 .build();
         var saved = repository.save(entity);
-        log.info("Created inventory movement id={}", saved.getInventoryMovementId());
+        log.info("Created inventory movement id={}", saved.getMovementId());
         return InventoryMovementResponse.from(saved);
     }
 

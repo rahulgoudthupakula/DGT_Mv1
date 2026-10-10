@@ -48,7 +48,7 @@ public class InventoryReturnService {
                 .status(req.status())
                 .build();
         var saved = repository.save(entity);
-        log.info("Created inventory return id={}", saved.getInventoryReturnId());
+        log.info("Created inventory return id={}", saved.getReturnId());
         return InventoryReturnResponse.from(saved);
     }
 

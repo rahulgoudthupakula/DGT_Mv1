@@ -54,7 +54,7 @@ public class EmployeeTimeOffRequestService {
                 .rejectedReason(req.rejectedReason())
                 .build();
         var saved = repository.save(entity);
-        log.info("Created employee time off request id={}", saved.getEmployeeTimeOffRequestId());
+        log.info("Created employee time off request id={}", saved.getTimeOffRequestId());
         return EmployeeTimeOffRequestResponse.from(saved);
     }
 

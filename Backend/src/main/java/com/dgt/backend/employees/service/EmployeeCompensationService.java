@@ -49,7 +49,7 @@ public class EmployeeCompensationService {
                 .effectiveTo(req.effectiveTo())
                 .build();
         var saved = repository.save(entity);
-        log.info("Created employee compensation id={}", saved.getEmployeeCompensationId());
+        log.info("Created employee compensation id={}", saved.getCompensationId());
         return EmployeeCompensationResponse.from(saved);
     }
 

@@ -52,7 +52,7 @@ public class StoreSubscriptionService {
                 .cancelledAt(req.cancelledAt())
                 .build();
         var saved = repository.save(entity);
-        log.info("Created store subscription id={}", saved.getStoreSubscriptionId());
+        log.info("Created store subscription id={}", saved.getSubscriptionId());
         return StoreSubscriptionResponse.from(saved);
     }
 

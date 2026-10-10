@@ -55,7 +55,7 @@ public class VendorContactService {
                 .forceEndDate(req.forceEndDate())
                 .build();
         var saved = repository.save(entity);
-        log.info("Created vendor contact id={}", saved.getVendorContactId());
+        log.info("Created vendor contact id={}", saved.getContactId());
         return VendorContactResponse.from(saved);
     }
 

@@ -47,7 +47,7 @@ public class InventoryShrinkageService {
                 .createdBy(req.createdBy())
                 .build();
         var saved = repository.save(entity);
-        log.info("Created inventory shrinkage id={}", saved.getInventoryShrinkageId());
+        log.info("Created inventory shrinkage id={}", saved.getShrinkageId());
         return InventoryShrinkageResponse.from(saved);
     }
 

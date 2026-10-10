@@ -47,7 +47,7 @@ public class FuelPumpService {
                 .serialNumber(req.serialNumber())
                 .build();
         var saved = repository.save(entity);
-        log.info("Created fuel pump id={}", saved.getFuelPumpId());
+        log.info("Created fuel pump id={}", saved.getPumpId());
         return FuelPumpResponse.from(saved);
     }
 

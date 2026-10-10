@@ -52,7 +52,7 @@ public class VendorPriceSettingService {
                 .considerLeadTime(req.considerLeadTime())
                 .build();
         var saved = repository.save(entity);
-        log.info("Created vendor price setting id={}", saved.getVendorPriceSettingId());
+        log.info("Created vendor price setting id={}", saved.getSettingId());
         return VendorPriceSettingResponse.from(saved);
     }
 

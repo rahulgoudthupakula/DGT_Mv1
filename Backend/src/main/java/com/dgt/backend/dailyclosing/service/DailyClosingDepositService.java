@@ -50,7 +50,7 @@ public class DailyClosingDepositService {
                 .status(req.status())
                 .build();
         var saved = repository.save(entity);
-        log.info("Created daily closing deposit id={}", saved.getDailyClosingDepositId());
+        log.info("Created daily closing deposit id={}", saved.getDepositId());
         return DailyClosingDepositResponse.from(saved);
     }
 

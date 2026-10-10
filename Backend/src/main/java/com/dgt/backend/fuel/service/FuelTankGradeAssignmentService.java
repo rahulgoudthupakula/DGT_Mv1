@@ -47,7 +47,7 @@ public class FuelTankGradeAssignmentService {
                 .effectiveTo(req.effectiveTo())
                 .build();
         var saved = repository.save(entity);
-        log.info("Created fuel tank grade assignment id={}", saved.getFuelTankGradeAssignmentId());
+        log.info("Created fuel tank grade assignment id={}", saved.getAssignmentId());
         return FuelTankGradeAssignmentResponse.from(saved);
     }
 
