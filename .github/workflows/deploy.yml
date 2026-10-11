@@ -1,0 +1,97 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: temurin
+          cache: maven
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: Frontend/package-lock.json
+
+      - name: Backend tests
+        working-directory: Backend
+        run: mvn test
+
+      - name: Frontend lint
+        working-directory: Frontend
+        run: |
+          npm ci
+          npm run lint
+
+  deploy:
+    name: Deploy
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: temurin
+          cache: maven
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: Frontend/package-lock.json
+
+      - name: Build backend JAR
+        working-directory: Backend
+        run: mvn package -DskipTests
+
+      - name: Build frontend
+        working-directory: Frontend
+        env:
+          VITE_API_BASE_URL: /api/v1
+          VITE_DATA_ENV: production
+          VITE_PROFILE_PREVIEW: 'true'
+        run: |
+          npm ci
+          npm run build
+
+      - name: Assemble release
+        run: |
+          mkdir -p release
+          cp Backend/target/dgt-backend-0.1.0-SNAPSHOT.jar release/backend.jar
+          cp -r Frontend/dist release/frontend
+          cp Backend/deploy/update.sh release/update.sh
+
+      - name: Upload artifacts to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: release/
+          target: /root/dgt-release
+          strip_components: 1
+          rm: true
+
+      - name: Run update script on EC2
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: sudo bash /root/dgt-release/update.sh
