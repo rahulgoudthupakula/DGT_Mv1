@@ -38,6 +38,7 @@ app:
   jwt:
     secret: ${JWT_SECRET:changeme-replace-in-production-must-be-at-least-256-bits-base64}
     expiration-seconds: ${JWT_EXPIRATION:28800}
+    refresh-expiration-seconds: ${REFRESH_TOKEN_EXPIRATION:2592000}
 
 springdoc:
   swagger-ui:

@@ -6,6 +6,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 @RestController
 @RequestMapping("/api/v1/access")
@@ -28,11 +29,21 @@ public class ProfileSessionController {
         return sessions.create(r);
     }
 
+    @PostMapping("/session/refresh")
+    public Map<String, Object> refresh(@RequestBody RefreshRequest body) {
+        if (body.refreshToken() == null || body.refreshToken().isBlank())
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "refreshToken required");
+        return sessions.refresh(body.refreshToken());
+    }
+
     @PostMapping("/session/logout")
-    public Map<String, Object> logout() {
-        // JWT is stateless — the client discards the token
+    public Map<String, Object> logout(@RequestBody(required = false) RefreshRequest body) {
+        if (body != null && body.refreshToken() != null)
+            sessions.revokeRefreshToken(body.refreshToken());
         return Map.of("signedOut", true);
     }
+
+    record RefreshRequest(@JsonProperty("refreshToken") String refreshToken) {}
 
     @GetMapping("/profile/history")
     public Object history() {

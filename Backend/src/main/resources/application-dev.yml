@@ -6,7 +6,7 @@ spring:
     hikari:
       maximum-pool-size: 3
   flyway:
-    enabled: false
+    enabled: ${FLYWAY_ENABLED:false}
 
 springdoc:
   swagger-ui:

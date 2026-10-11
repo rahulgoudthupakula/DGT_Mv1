@@ -42,6 +42,7 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/signup-requests").permitAll()
                         .requestMatchers("/api/v1/health").permitAll()
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/access/session/refresh").permitAll()
                         .requestMatchers("/api/v1/access/**",
                                 "/api/v1/stores/*/settings",
                                 "/api/v1/stores/*/business-day",

@@ -20,16 +20,18 @@ public class ProfileSessions {
     private final ScopedAccess access;
     private final PasswordEncoder encoder;
     private final JwtService jwt;
+    private final RefreshTokenService refreshTokens;
 
     private static final java.util.concurrent.ConcurrentHashMap<String, long[]> RATE =
             new java.util.concurrent.ConcurrentHashMap<>();
     private static final long RATE_MS = 5 * 60_000L;
     private static final int RATE_MAX = 10;
 
-    public ProfileSessions(ScopedAccess access, PasswordEncoder encoder, JwtService jwt) {
+    public ProfileSessions(ScopedAccess access, PasswordEncoder encoder, JwtService jwt, RefreshTokenService refreshTokens) {
         this.access = access;
         this.encoder = encoder;
         this.jwt = jwt;
+        this.refreshTokens = refreshTokens;
     }
 
     public static String digest(String text) {
@@ -82,9 +84,32 @@ public class ProfileSessions {
 
         String email = (String) u.get("email");
         String token = jwt.issue(email);
+        String refreshToken = refreshTokens.issue(uid);
         event(uid, request, "SUCCESS");
         log.info("JWT issued for user_id={}", uid);
-        return Map.of("token", token, "expiresIn", jwt.expirationSeconds());
+        return Map.of(
+                "token", token,
+                "expiresIn", jwt.expirationSeconds(),
+                "refreshToken", refreshToken,
+                "refreshExpiresIn", refreshTokens.expirationSeconds());
+    }
+
+    public Map<String, Object> refresh(String rawRefreshToken) {
+        var entry = refreshTokens.rotate(rawRefreshToken);
+        long uid = entry.getKey();
+        String newRefreshToken = entry.getValue();
+        var u = access.db.queryForMap("SELECT email FROM users WHERE user_id=? AND account_status='ACTIVE'", uid);
+        String token = jwt.issue((String) u.get("email"));
+        log.info("JWT refreshed for user_id={}", uid);
+        return Map.of(
+                "token", token,
+                "expiresIn", jwt.expirationSeconds(),
+                "refreshToken", newRefreshToken,
+                "refreshExpiresIn", refreshTokens.expirationSeconds());
+    }
+
+    public void revokeRefreshToken(String rawRefreshToken) {
+        refreshTokens.revoke(rawRefreshToken);
     }
 
     public void failed(HttpServletRequest request) {

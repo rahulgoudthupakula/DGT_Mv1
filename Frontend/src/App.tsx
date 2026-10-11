@@ -13,7 +13,9 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 const App = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(() => !!localStorage.getItem("dgt_jwt"));
+  const [isAuthenticated, setIsAuthenticated] = useState(
+    () => !!(localStorage.getItem("dgt_jwt") || localStorage.getItem("dgt_refresh"))
+  );
 
   return (
     <QueryClientProvider client={queryClient}>

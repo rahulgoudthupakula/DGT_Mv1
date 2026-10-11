@@ -4,10 +4,14 @@ const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8181/api/
 export const developmentDatabase = (import.meta.env.VITE_DATA_ENV || "development") === "development";
 export const profilePreview = import.meta.env.VITE_PROFILE_PREVIEW !== "false";
 
-const TOKEN_KEY = "dgt_jwt";
-const getToken   = () => localStorage.getItem(TOKEN_KEY);
-const setToken   = (t: string) => localStorage.setItem(TOKEN_KEY, t);
-const clearToken = () => localStorage.removeItem(TOKEN_KEY);
+const TOKEN_KEY   = "dgt_jwt";
+const REFRESH_KEY = "dgt_refresh";
+const getToken        = () => localStorage.getItem(TOKEN_KEY);
+const setToken        = (t: string) => localStorage.setItem(TOKEN_KEY, t);
+const clearToken      = () => localStorage.removeItem(TOKEN_KEY);
+const getRefreshToken = () => localStorage.getItem(REFRESH_KEY);
+const setRefreshToken = (t: string) => localStorage.setItem(REFRESH_KEY, t);
+const clearRefreshToken = () => localStorage.removeItem(REFRESH_KEY);
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) { super(message); }
@@ -30,11 +34,43 @@ const ERROR_MESSAGES: Record<number, string> = {
   503: "Backend access is not configured. Contact the administrator.",
 };
 
+// Queues concurrent 401s so we only call /refresh once
+let refreshPromise: Promise<string> | null = null;
+
+async function doTokenRefresh(): Promise<string> {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) throw new ApiError(401, ERROR_MESSAGES[401]);
+  const res = await api.post<{ token: string; refreshToken: string }>(
+    "/access/session/refresh",
+    { refreshToken },
+  );
+  setToken(res.data.token);
+  setRefreshToken(res.data.refreshToken);
+  return res.data.token;
+}
+
 api.interceptors.response.use(
   res => res,
-  err => {
+  async err => {
     const status: number = err.response?.status ?? 0;
-    if (status === 401) clearToken();
+    const isRefreshCall: boolean = err.config?.url?.includes("/access/session/refresh") ?? false;
+
+    if (status === 401 && !isRefreshCall && getRefreshToken()) {
+      try {
+        if (!refreshPromise) {
+          refreshPromise = doTokenRefresh().finally(() => { refreshPromise = null; });
+        }
+        const newToken = await refreshPromise;
+        err.config.headers["Authorization"] = `Bearer ${newToken}`;
+        return api.request(err.config);
+      } catch {
+        clearToken();
+        clearRefreshToken();
+        throw new ApiError(401, ERROR_MESSAGES[401]);
+      }
+    }
+
+    if (status === 401) { clearToken(); clearRefreshToken(); }
     const detail =
       (status === 400 || status === 409) && typeof err.response?.data?.detail === "string"
         ? err.response.data.detail
@@ -63,10 +99,12 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
 
 export function logout() {
   const token = getToken();
+  const refreshToken = getRefreshToken();
   clearToken();
+  clearRefreshToken();
   if (profilePreview && token)
     void api
-      .post("/access/session/logout", null, { headers: { Authorization: `Bearer ${token}` } })
+      .post("/access/session/logout", { refreshToken }, { headers: { Authorization: `Bearer ${token}` } })
       .catch(() => {});
 }
 
@@ -75,15 +113,17 @@ export async function login(email: string, password: string) {
   const basic = "Basic " + btoa(Array.from(bytes, b => String.fromCharCode(b)).join(""));
   try {
     if (profilePreview) {
-      const res = await api.post<{ token: string; expiresIn: number }>(
+      const res = await api.post<{ token: string; expiresIn: number; refreshToken: string }>(
         "/access/session", null, { headers: { Authorization: basic } }
       );
       setToken(res.data.token);
+      if (res.data.refreshToken) setRefreshToken(res.data.refreshToken);
     } else {
       await api.get("/access/me", { headers: { Authorization: basic } });
     }
   } catch (e) {
     clearToken();
+    clearRefreshToken();
     throw e instanceof ApiError ? e : new ApiError(401, "Sign-in failed.");
   }
 }
