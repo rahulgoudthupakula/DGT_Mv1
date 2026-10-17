@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { AxiosHeaders } from "axios";
 
 const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8181/api/v1";
 export const developmentDatabase = (import.meta.env.VITE_DATA_ENV || "development") === "development";
@@ -48,11 +48,16 @@ api.interceptors.response.use(
 
 export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   try {
+    const headers = new AxiosHeaders();
+    new Headers(init.headers).forEach((value, name) => headers.set(name, value));
+    if (typeof init.body === "string" && !headers.has("Content-Type")) {
+      headers.set("Content-Type", "application/json");
+    }
     const res = await api.request<T>({
       url: path,
       method: (init.method as string | undefined) ?? "GET",
       data: init.body,
-      headers: init.headers as Record<string, string> | undefined,
+      headers,
     });
     return res.data;
   } catch (e) {
