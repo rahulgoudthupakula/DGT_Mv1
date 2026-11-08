@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {useStatistics} from "@/components/reports/statistics/useStatistics";
 import {fraction,dollars,pct} from "@/components/reports/statistics/statisticsData";
 import { format } from "date-fns";

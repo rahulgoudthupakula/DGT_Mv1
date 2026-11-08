@@ -27,6 +27,7 @@ export const ZReportPage = ({data}:{data:PosReport}) => {
  const fuelGallons=['Regular','Plus','Super','Diesel'].map(grade=>({grade,value:fields[grade+' Volume']??null}));
  const fuelAmounts=['Regular','Plus','Super','Diesel'].map(grade=>({grade,value:fields[grade+' Amount Sold']??null}));
  const lotterySales=[{label:'Lottery sales',value:breakdown.lottery??null}];
+ // eslint-disable-next-line @typescript-eslint/no-explicit-any
  const tenderSummary=(source.tenders??[]).map((r:any)=>({label:r.name,value:r.amount}));
  const taxSummary=[{label:'Recorded sales tax',value:source.stats?.tax??null}];
  const cashControl={openingCash:c.openingCash,expectedCash:c.expectedCash,closingCash:c.actualCash};
