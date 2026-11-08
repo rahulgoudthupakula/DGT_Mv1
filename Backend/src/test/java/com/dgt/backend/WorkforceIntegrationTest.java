@@ -73,14 +73,14 @@ class WorkforceIntegrationTest {
  }
  long staff,replacement,boss,adminEmployee; String day="2027-06-05"; long night;
  String wf(){return access()+"/workforce";}
- Map<String,Object> shiftBody(long employee,String start,String end){return new HashMap<>(Map.of("employeeId",employee,"start",start,"end",end,"status","PUBLISHED"));}
+ Map<String,Object> shiftBody(long employee,String start,String end){return new HashMap<>(Map.of("employee_id",employee,"start",start,"end",end,"status","PUBLISHED"));}
  long shiftAs(String who,long employee,String start,String end)throws Exception{return ok(req(who,"POST",wf()+"/shifts",shiftBody(employee,start,end)),200).path("id").asLong();}
  long employee(String role)throws Exception{
   long rt=db.queryForObject("SELECT role_type_id FROM role_types WHERE role_type_name=?",Long.class,role.toUpperCase());
-  ok(req("admin","POST",access()+"/employees",Map.of("userId",users.get(role),"roleTypeId",rt,"hireDate","2026-01-01","employeeType","Full-time","payType","Hourly","rate",18,"status","Active")),200);
+  ok(req("admin","POST",access()+"/employees",Map.of("user_id",users.get(role),"role_type_id",rt,"hire_date","2026-01-01","employee_type","Full-time","pay_type","Hourly","rate",18,"status","Active")),200);
   return db.queryForObject("SELECT employee_id FROM employees WHERE user_id=?",Long.class,users.get(role));
  }
- Map<String,Object> leave(long employee,String date){return new HashMap<>(Map.of("kind","TIME_OFF","employeeId",employee,"startDate",date,"endDate",date,"leaveType","Personal Day","reason","Private reason"));}
+ Map<String,Object> leave(long employee,String date){return new HashMap<>(Map.of("kind","TIME_OFF","employee_id",employee,"start_date",date,"end_date",date,"leave_type","Personal Day","reason","Private reason"));}
  long ask(String who,Map<String,Object> body)throws Exception{return ok(req(who,"POST",wf()+"/requests",body),200).path("id").asLong();}
  String version(long id){return db.queryForObject("SELECT xmin::text FROM workforce_requests WHERE request_id=?",String.class,id);}
  Response decide(String who,long id,String action)throws Exception{return req(who,"POST",wf()+"/requests/"+id+"/decision",Map.of("action",action,"version",version(id),"note","Confirmed with employee"));}
@@ -110,27 +110,27 @@ class WorkforceIntegrationTest {
   long senior=ask("manager",leave(boss,"2027-06-20"));ok(decide("manager",senior,"APPROVE"),403);ok(decide("admin",senior,"APPROVE"),200);
  }
  @Test @Order(3) void coverageNeedsConsentThenMovesShift()throws Exception{
-  long id=ask("cashier",new HashMap<>(Map.of("kind","COVER","employeeId",staff,"shiftId",night,"targetEmployeeId",replacement,"reason","Private reason")));
+  long id=ask("cashier",new HashMap<>(Map.of("kind","COVER","employee_id",staff,"shift_id",night,"target_employee_id",replacement,"reason","Private reason")));
   ok(decide("manager",id,"APPROVE"),400);
   assertThat(ok(req("accountant","GET",wf(),null),200).toString()).doesNotContain("Private reason");
   ok(decide("accountant",id,"ACCEPT"),200);ok(decide("accountant",id,"APPROVE"),403);ok(decide("manager",id,"APPROVE"),200);
   assertThat(db.queryForObject("SELECT employee_id FROM employee_schedules WHERE schedule_id=?",Long.class,night)).isEqualTo(replacement);
  }
  @Test @Order(4) void availabilityApprovalOverridesAndExceptions()throws Exception{
-  var body=new HashMap<String,Object>(Map.of("kind","AVAILABILITY","employeeId",staff,"startDate","2027-07-01","endDate","2027-07-01","weekday",1,"startTime","09:00","endTime","17:00"));
+  var body=new HashMap<String,Object>(Map.of("kind","AVAILABILITY","employee_id",staff,"start_date","2027-07-01","end_date","2027-07-01","weekday",1,"start_time","09:00","end_time","17:00"));
   long id=ask("cashier",body);ok(decide("manager",id,"APPROVE"),200);
-  var input=shiftBody(staff,"2027-07-05T18:00","2027-07-05T22:00");ok(req("manager","POST",wf()+"/shifts",input),409);input.put("overrideReason","Employee confirmed exception");ok(req("manager","POST",wf()+"/shifts",input),200);
-  body=new HashMap<>(Map.of("kind","EXCEPTION","employeeId",staff,"startDate","2027-07-06","endDate","2027-07-06","unavailable",true));id=ask("cashier",body);ok(decide("manager",id,"APPROVE"),200);
+  var input=shiftBody(staff,"2027-07-05T18:00","2027-07-05T22:00");ok(req("manager","POST",wf()+"/shifts",input),409);input.put("override_reason","Employee confirmed exception");ok(req("manager","POST",wf()+"/shifts",input),200);
+  body=new HashMap<>(Map.of("kind","EXCEPTION","employee_id",staff,"start_date","2027-07-06","end_date","2027-07-06","unavailable",true));id=ask("cashier",body);ok(decide("manager",id,"APPROVE"),200);
   ok(req("manager","POST",wf()+"/shifts",shiftBody(staff,"2027-07-06T09:00","2027-07-06T17:00")),409);
   assertThat(ok(req("manager","GET",wf()+"?week=2027-07-05",null),200).path("shifts").size()).isEqualTo(1);
  }
  @Test @Order(5) void swapIsAtomicDeclineAndStaleRequest()throws Exception{
   long a=shiftAs("manager",staff,"2027-08-02T09:00","2027-08-02T17:00"),b=shiftAs("manager",replacement,"2027-08-03T09:00","2027-08-03T17:00");
-  var body=new HashMap<String,Object>(Map.of("kind","SWAP","employeeId",staff,"shiftId",a,"otherShiftId",b));long id=ask("cashier",body);
+  var body=new HashMap<String,Object>(Map.of("kind","SWAP","employee_id",staff,"shift_id",a,"other_shift_id",b));long id=ask("cashier",body);
   ok(decide("accountant",id,"DECLINE"),200);assertThat(db.queryForObject("SELECT employee_id FROM employee_schedules WHERE schedule_id=?",Long.class,a)).isEqualTo(staff);
   id=ask("cashier",body);ok(decide("accountant",id,"ACCEPT"),200);ok(decide("manager",id,"APPROVE"),200);
   assertThat(db.queryForObject("SELECT employee_id FROM employee_schedules WHERE schedule_id=?",Long.class,a)).isEqualTo(replacement);assertThat(db.queryForObject("SELECT employee_id FROM employee_schedules WHERE schedule_id=?",Long.class,b)).isEqualTo(staff);
-  id=ask("cashier",new HashMap<>(Map.of("kind","COVER","employeeId",staff,"shiftId",b,"targetEmployeeId",replacement)));
+  id=ask("cashier",new HashMap<>(Map.of("kind","COVER","employee_id",staff,"shift_id",b,"target_employee_id",replacement)));
   db.update("UPDATE employee_schedules SET notes='Changed' WHERE schedule_id=?",b);ok(decide("accountant",id,"ACCEPT"),409);ok(decide("cashier",id,"CANCEL"),200);
  }
  @Test @Order(6) void draftsCopyPublishAndDstValidation()throws Exception{
@@ -142,22 +142,22 @@ class WorkforceIntegrationTest {
   String version=db.queryForObject("SELECT xmin::text FROM employee_schedules WHERE schedule_id=?",String.class,id);ok(req("manager","POST",wf()+"/shifts/"+id+"/cancel",Map.of("version",version)),200);
   db.update("UPDATE stores SET timezone='America/New_York' WHERE dgt_id=?",store);
   ok(req("manager","POST",wf()+"/shifts",shiftBody(replacement,"2027-03-14T02:30","2027-03-14T05:00")),400);
-  body=shiftBody(replacement,"2027-11-07T01:30","2027-11-07T02:30");ok(req("manager","POST",wf()+"/shifts",body),400);body.put("startOffset","-04:00");body.put("endOffset","-05:00");ok(req("manager","POST",wf()+"/shifts",body),200);
+  body=shiftBody(replacement,"2027-11-07T01:30","2027-11-07T02:30");ok(req("manager","POST",wf()+"/shifts",body),400);body.put("start_offset","-04:00");body.put("end_offset","-05:00");ok(req("manager","POST",wf()+"/shifts",body),200);
   assertThat(ok(req("manager","GET",wf()+"?week=2027-11-01",null),200).path("shifts").get(0).path("hours").asDouble()).isEqualTo(2);
  }
 
  @Test @Order(7) void specificShiftLeaveDoesNotBlockSeparateShiftAndRejectsInjectedReferences()throws Exception{
   long a=shiftAs("manager",staff,"2027-12-04T09:00","2027-12-04T12:00");
-  var body=leave(staff,"2027-12-04");body.put("shiftId",a);long id=ask("cashier",body);ok(decide("manager",id,"APPROVE"),200);
+  var body=leave(staff,"2027-12-04");body.put("shift_id",a);long id=ask("cashier",body);ok(decide("manager",id,"APPROVE"),200);
   shiftAs("manager",staff,"2027-12-04T16:00","2027-12-04T20:00");
-  var malicious=new HashMap<String,Object>(Map.of("kind","EXCEPTION","employeeId",staff,"startDate","2027-12-05","endDate","2027-12-05","unavailable",true,"shiftId",a));ok(req("cashier","POST",wf()+"/requests",malicious),400);
-  body=leave(staff,"2027-12-06");body.put("targetEmployeeId",boss);ok(req("cashier","POST",wf()+"/requests",body),400);
+  var malicious=new HashMap<String,Object>(Map.of("kind","EXCEPTION","employee_id",staff,"start_date","2027-12-05","end_date","2027-12-05","unavailable",true,"shift_id",a));ok(req("cashier","POST",wf()+"/requests",malicious),400);
+  body=leave(staff,"2027-12-06");body.put("target_employee_id",boss);ok(req("cashier","POST",wf()+"/requests",body),400);
  }
 
  @Test @Order(8) void adminAutoApprovalAndEmployeeReviewButton()throws Exception{
   adminEmployee=db.queryForObject("INSERT INTO employees(user_id,hire_date,employee_type) VALUES (?,'2026-01-01','Full-time') RETURNING employee_id",Long.class,users.get("admin"));db.update("INSERT INTO employee_store_assignments(employee_id,dgt_id,is_primary,effective_from,role_type_id) VALUES (?,?,true,'2026-01-01',(SELECT role_type_id FROM role_types WHERE role_type_name='ADMIN'))",adminEmployee,store);long id=ask("admin",leave(adminEmployee,"2028-01-08"));assertThat(db.queryForObject("SELECT status FROM workforce_requests WHERE request_id=?",String.class,id)).isEqualTo("APPROVED");
   assertThat(db.queryForObject("SELECT reviewed_by FROM workforce_requests WHERE request_id=?",Long.class,id)).isEqualTo(users.get("admin"));
-  long exception=ask("admin",new HashMap<>(Map.of("kind","EXCEPTION","employeeId",adminEmployee,"startDate","2028-01-09","endDate","2028-01-09","unavailable",true)));
+  long exception=ask("admin",new HashMap<>(Map.of("kind","EXCEPTION","employee_id",adminEmployee,"start_date","2028-01-09","end_date","2028-01-09","unavailable",true)));
   assertThat(db.queryForObject("SELECT count(*) FROM workforce_availability WHERE request_id=?",Integer.class,exception)).isEqualTo(1);
   long enteredByAdmin=ask("admin",leave(staff,"2028-01-12"));assertThat(db.queryForObject("SELECT status FROM workforce_requests WHERE request_id=?",String.class,enteredByAdmin)).isEqualTo("PENDING");ok(decide("admin",enteredByAdmin,"APPROVE"),200);
   long pending=ask("cashier",leave(staff,"2028-01-10"));JsonNode row=null;for(var r:ok(req("admin","GET",wf(),null),200).path("requests"))if(r.path("request_id").asLong()==pending)row=r;assertThat(row.path("can_review").asBoolean()).isTrue();
@@ -166,7 +166,7 @@ class WorkforceIntegrationTest {
  }
  @Test @Order(9) void adminSwapWaitsForConsentThenAutoApproves()throws Exception{
   long first=shiftAs("manager",adminEmployee,"2028-02-05T09:00","2028-02-05T12:00"),secondShift=shiftAs("manager",replacement,"2028-02-06T09:00","2028-02-06T12:00");
-  long id=ask("admin",new HashMap<>(Map.of("kind","SWAP","employeeId",adminEmployee,"shiftId",first,"otherShiftId",secondShift)));
+  long id=ask("admin",new HashMap<>(Map.of("kind","SWAP","employee_id",adminEmployee,"shift_id",first,"other_shift_id",secondShift)));
   assertThat(db.queryForObject("SELECT status FROM workforce_requests WHERE request_id=?",String.class,id)).isEqualTo("PENDING");ok(decide("admin",id,"APPROVE"),400);
   ok(decide("accountant",id,"ACCEPT"),200);
   assertThat(db.queryForObject("SELECT status FROM workforce_requests WHERE request_id=?",String.class,id)).isEqualTo("APPROVED");assertThat(db.queryForObject("SELECT reviewed_by FROM workforce_requests WHERE request_id=?",Long.class,id)).isEqualTo(users.get("admin"));
@@ -175,7 +175,7 @@ class WorkforceIntegrationTest {
 
  @Autowired com.dgt.backend.workforce.WorkforceService workforce;
  @Test @Order(10) void pausedShiftChangesRejectMutationsButAllowCancellation()throws Exception{
-  long shift=shiftAs("manager",staff,"2028-03-04T09:00","2028-03-04T12:00");var body=new HashMap<String,Object>(Map.of("kind","COVER","employeeId",staff,"shiftId",shift,"targetEmployeeId",replacement));long id=ask("cashier",body);
+  long shift=shiftAs("manager",staff,"2028-03-04T09:00","2028-03-04T12:00");var body=new HashMap<String,Object>(Map.of("kind","COVER","employee_id",staff,"shift_id",shift,"target_employee_id",replacement));long id=ask("cashier",body);
   org.springframework.test.util.ReflectionTestUtils.setField(workforce,"shiftChangesEnabled",false);
   try{ok(req("cashier","POST",wf()+"/requests",body),400);ok(decide("accountant",id,"ACCEPT"),400);ok(decide("admin",id,"APPROVE"),400);ok(decide("cashier",id,"CANCEL"),200);}finally{org.springframework.test.util.ReflectionTestUtils.setField(workforce,"shiftChangesEnabled",true);}
  }

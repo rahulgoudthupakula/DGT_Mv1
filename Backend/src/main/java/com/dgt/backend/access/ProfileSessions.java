@@ -22,7 +22,7 @@ public class ProfileSessions {
     private final JwtService jwt;
     private final RefreshTokenService refreshTokens;
 
-    private static final java.util.concurrent.ConcurrentHashMap<String, long[]> RATE =
+    private final java.util.concurrent.ConcurrentHashMap<String, long[]> rate =
             new java.util.concurrent.ConcurrentHashMap<>();
     private static final long RATE_MS = 5 * 60_000L;
     private static final int RATE_MAX = 10;
@@ -45,7 +45,7 @@ public class ProfileSessions {
 
     private void checkRate(String ip) {
         long now = System.currentTimeMillis();
-        var w = RATE.compute(ip, (k, v) -> {
+        var w = rate.compute(ip, (k, v) -> {
             if (v == null || now - v[0] > RATE_MS) return new long[]{now, 1};
             v[1]++;
             return v;

@@ -163,7 +163,7 @@ class ScopedAccessIntegrationTest {
   String name=module==settingsModule?"STORE_SETTINGS":"DEPARTMENTS";
   for(String suffix:List.of("_VIEW","_EDIT")){
    String code=name+suffix;var versions=db.queryForList("SELECT xmin::text FROM store_role_permissions WHERE dgt_id=? AND role_type_id=? AND permission_code=?",String.class,store,rt,code);
-   ok(req("admin","PUT",access()+"/role-permissions",Map.of("roleTypeId",rt,"code",code,"allowed",suffix.equals("_VIEW")?view:edit,"version",versions.isEmpty()?"0":versions.getFirst())),200);
+   ok(req("admin","PUT",access()+"/role-permissions",Map.of("role_type_id",rt,"code",code,"allowed",suffix.equals("_VIEW")?view:edit,"version",versions.isEmpty()?"0":versions.getFirst())),200);
   }
  }
  @Test @Order(3) void accountantReadOnlyAndRevokedPendingChangeCannotApply() throws Exception{
@@ -176,7 +176,7 @@ class ScopedAccessIntegrationTest {
   ok(req("accountant","POST",access()+"/approvals/"+id+"/decision",Map.of("decision","CANCELLED")),200);
  }
  @Test @Order(4) void managerPolicyRequiresAdminAndRejectsOwnApproval() throws Exception{
-  ok(req("admin","PUT",access()+"/approval-policy",Map.of("moduleId",departmentModule,"required",true,"version","0")),200);
+  ok(req("admin","PUT",access()+"/approval-policy",Map.of("module_id",departmentModule,"required",true,"version","0")),200);
   long id=ok(req("manager","POST",dept(store),Map.of("name","Manager "+tag)),201).path("requestId").asLong();assertThat(id).isPositive();
   ok(req("manager","POST",access()+"/approvals/"+id+"/decision",Map.of("decision","APPROVED")),403);
   ok(req("admin","POST",access()+"/approvals/"+id+"/decision",Map.of("decision","APPROVED")),200);
@@ -195,16 +195,16 @@ class ScopedAccessIntegrationTest {
   ok(call("cashier","PATCH",settings(),Map.of("store",Map.of("company_id",otherCompany)),v,null),400);
   ok(req("cashier","POST",dept(store),Map.of("name","   ")),400);
   ok(req("admin","DELETE",dept(store)+"/"+customId,null),405);
-  ok(req("cashier","PUT",access()+"/permissions",Map.of("roleId",assignments.get("cashier"),"moduleId",departmentModule,"view",true,"edit",true,"version","0")),403);
+  ok(req("cashier","PUT",access()+"/permissions",Map.of("role_id",assignments.get("cashier"),"module_id",departmentModule,"view",true,"edit",true,"version","0")),403);
  }
  @Test @Order(7) void roleAssignmentStoreIsolationAndDeactivation() throws Exception{
   long rt=db.queryForObject("SELECT role_type_id FROM role_types WHERE role_type_name='MANAGER'",Long.class);
-  ok(req("admin","PUT","/access/stores/"+second+"/roles",Map.of("userId",users.get("manager"),"roleTypeId",rt,"active",true,"version","0")),200);
+  ok(req("admin","PUT","/access/stores/"+second+"/roles",Map.of("user_id",users.get("manager"),"role_type_id",rt,"active",true,"version","0")),200);
   assertThat(ok(req("manager","GET","/access/stores",null),200).size()).isEqualTo(2);
   ok(req("manager","GET",dept(second),null),403);
-  ok(req("admin","PUT",access()+"/roles",Map.of("userId",users.get("other"),"roleTypeId",rt,"active",true,"version","0")),403);
+  ok(req("admin","PUT",access()+"/roles",Map.of("user_id",users.get("other"),"role_type_id",rt,"active",true,"version","0")),403);
   String v=db.queryForObject("SELECT xmin::text FROM user_roles WHERE user_role_id=?",String.class,assignments.get("cashier"));long cr=db.queryForObject("SELECT role_type_id FROM role_types WHERE role_type_name='CASHIER'",Long.class);
-  ok(req("admin","PUT",access()+"/roles",Map.of("userId",users.get("cashier"),"roleTypeId",cr,"active",false,"version",v)),200);
+  ok(req("admin","PUT",access()+"/roles",Map.of("user_id",users.get("cashier"),"role_type_id",cr,"active",false,"version",v)),200);
   ok(req("cashier","GET",dept(store),null),403);assertThat(ok(req("cashier","GET","/access/stores",null),200).size()).isZero();
  }
 
@@ -224,7 +224,7 @@ class ScopedAccessIntegrationTest {
   assertThat(ok(req("admin","GET",settings(),null),200).path("contact").isNull()).isTrue();
   ok(req("manager","POST",access()+"/approvals/"+id+"/decision",Map.of("decision","APPROVED")),200);
   var after=ok(req("admin","GET",settings(),null),200);assertThat(after.path("contact").path("email").asText()).isEqualTo("test@example.com");assertThat(after.path("store").path("timezone").asText()).isEqualTo("Asia/Tokyo");
-  ok(call("admin","PATCH",settings(),Map.of("store",Map.of("timezone","Invalid/Zone"),"contact",Map.of("address","Must roll back"),"contactVersion",after.path("contact").path("_version").asText()),after.path("store").path("_version").asText(),null),400);
+  ok(call("admin","PATCH",settings(),Map.of("store",Map.of("timezone","Invalid/Zone"),"contact",Map.of("address","Must roll back"),"contact_version",after.path("contact").path("_version").asText()),after.path("store").path("_version").asText(),null),400);
   assertThat(ok(req("admin","GET",settings(),null),200).path("contact").path("address").asText()).isEqualTo("Test address");
  }
 
@@ -232,7 +232,7 @@ class ScopedAccessIntegrationTest {
   var before=ok(req("admin","GET",settings(),null),200);
   ok(call("admin","PATCH",settings(),Map.of("store",Map.of("timezone","America/New_York")),before.path("store").path("_version").asText(),null),200);
   var day=ok(req("admin","GET","/stores/"+store+"/business-day?date=2026-03-08",null),200);
-  var start=java.time.Instant.parse(day.path("startInclusive").asText());var end=java.time.Instant.parse(day.path("endExclusive").asText());assertThat(java.time.Duration.between(start,end).toHours()).isEqualTo(23);
+  var start=java.time.Instant.parse(day.path("start_inclusive").asText());var end=java.time.Instant.parse(day.path("end_exclusive").asText());assertThat(java.time.Duration.between(start,end).toHours()).isEqualTo(23);
   ok(req("other","GET","/stores/"+store+"/business-day?date=2026-03-08",null),403);
  }
  @Test @Order(11) void auditAndSchema() {
@@ -242,7 +242,7 @@ class ScopedAccessIntegrationTest {
  @Test @Order(12) void adminCreatesUserAndPermissionsAtomically() throws Exception {
   permission("manager",settingsModule,true,false);permission("manager",departmentModule,false,false);
   long rt=db.queryForObject("SELECT role_type_id FROM role_types WHERE role_type_name='MANAGER'",Long.class);
-  var body=new HashMap<String,Object>(Map.of("firstName","New","lastName","Manager","employeeId","new-"+tag,"email","new-"+tag+"@example.test","password",password,"roleTypeId",rt,"stores",List.of(store,second),"modules",List.of(Map.of("moduleId",settingsModule,"view",true,"edit",false))));
+  var body=new HashMap<String,Object>(Map.of("first_name","New","last_name","Manager","employee_id","new-"+tag,"email","new-"+tag+"@example.test","password",password,"role_type_id",rt,"stores",List.of(store,second),"modules",List.of(Map.of("module_id",settingsModule,"view",true,"edit",false))));
   body.remove("modules");
   ok(req("manager","POST",access()+"/users",body),403);
   body.put("stores",List.of(store,foreign));ok(req("admin","POST",access()+"/users",body),403);
@@ -264,35 +264,35 @@ class ScopedAccessIntegrationTest {
  }
  @Test @Order(13) void creationRejectsInvalidRolesGrantsAndPasswords() throws Exception {
   long rt=db.queryForObject("SELECT role_type_id FROM role_types WHERE role_type_name='ACCOUNTANT'",Long.class);
-  var body=new HashMap<String,Object>(Map.of("firstName","New","lastName","Accountant","employeeId","acct-new-"+tag,"email","acct-new-"+tag+"@example.test","password",password,"roleTypeId",rt,"stores",List.of(store,second),"modules",List.of(Map.of("moduleId",settingsModule,"view",true,"edit",false))));
+  var body=new HashMap<String,Object>(Map.of("first_name","New","last_name","Accountant","employee_id","acct-new-"+tag,"email","acct-new-"+tag+"@example.test","password",password,"role_type_id",rt,"stores",List.of(store,second),"modules",List.of(Map.of("module_id",settingsModule,"view",true,"edit",false))));
   ok(req("admin","POST",access()+"/users",body),400);
   body.put("stores",List.of(store));body.put("password","short");ok(req("admin","POST",access()+"/users",body),400);
-  body.put("password",password);body.put("modules",List.of(Map.of("moduleId",settingsModule,"view",false,"edit",true)));ok(req("admin","POST",access()+"/users",body),400);
+  body.put("password",password);body.put("modules",List.of(Map.of("module_id",settingsModule,"view",false,"edit",true)));ok(req("admin","POST",access()+"/users",body),400);
   assertThat(db.queryForObject("SELECT count(*) FROM users WHERE email=?",Long.class,body.get("email"))).isZero();
-  body.put("modules",List.of(Map.of("moduleId",settingsModule,"view",true,"edit",false)));
+  body.put("modules",List.of(Map.of("module_id",settingsModule,"view",true,"edit",false)));
   body.remove("modules");
-  body.put("roleTypeId",db.queryForObject("SELECT role_type_id FROM role_types WHERE role_type_name='ADMIN'",Long.class));ok(req("admin","POST",access()+"/users",body),403);
-  body.put("roleTypeId",rt);ok(req("admin","POST",access()+"/users",body),201);
+  body.put("role_type_id",db.queryForObject("SELECT role_type_id FROM role_types WHERE role_type_name='ADMIN'",Long.class));ok(req("admin","POST",access()+"/users",body),403);
+  body.put("role_type_id",rt);ok(req("admin","POST",access()+"/users",body),201);
   ok(req("acct-new","GET",settings(),null),200);
  }
 
  @Test @Order(14) void roleMatrixIsolationStaleVersionsAndLegacyEndpoint() throws Exception {
   long rt=db.queryForObject("SELECT role_type_id FROM role_types WHERE role_type_name='MANAGER'",Long.class);
-  var body=Map.of("roleTypeId",rt,"code","GROCERY_VIEW_INVENTORY","allowed",true,"version","0");
+  var body=Map.of("role_type_id",rt,"code","GROCERY_VIEW_INVENTORY","allowed",true,"version","0");
   ok(req("other","PUT",access()+"/role-permissions",body),403);ok(req("manager","PUT",access()+"/role-permissions",body),403);
   ok(req("admin","PUT",access()+"/role-permissions",body),200);ok(req("admin","PUT",access()+"/role-permissions",body),409);
   assertThat(db.queryForObject("SELECT count(*) FROM store_role_permissions WHERE dgt_id=? AND permission_code='GROCERY_VIEW_INVENTORY'",Long.class,second)).isZero();
   ok(req("manager","GET","/reports/inventory",null),403);
-  ok(req("admin","PUT",access()+"/permissions",Map.of("roleId",assignments.get("manager"),"moduleId",settingsModule,"view",true,"edit",true,"version","0")),410);
+  ok(req("admin","PUT",access()+"/permissions",Map.of("role_id",assignments.get("manager"),"module_id",settingsModule,"view",true,"edit",true,"version","0")),410);
  }
 
  @Test @Order(15) void preferencesSaveAtomicallyAndRejectStaleBatch() throws Exception {
   long rt=db.queryForObject("SELECT role_type_id FROM role_types WHERE role_type_name='MANAGER'",Long.class);
-  var first=Map.of("roleTypeId",rt,"code","GROCERY_ADJUST_STOCK","allowed",true,"version","0");
-  var invalid=Map.of("roleTypeId",rt,"code","UNKNOWN","allowed",true,"version","0");
+  var first=Map.of("role_type_id",rt,"code","GROCERY_ADJUST_STOCK","allowed",true,"version","0");
+  var invalid=Map.of("role_type_id",rt,"code","UNKNOWN","allowed",true,"version","0");
   ok(req("admin","PUT",access()+"/role-permissions/batch",Map.of("changes",List.of(first,invalid))),400);
   assertThat(db.queryForObject("SELECT count(*) FROM store_role_permissions WHERE dgt_id=? AND permission_code='GROCERY_ADJUST_STOCK'",Long.class,store)).isZero();
-  var second=Map.of("roleTypeId",rt,"code","GROCERY_REDUCE_STOCK","allowed",true,"version","0");
+  var second=Map.of("role_type_id",rt,"code","GROCERY_REDUCE_STOCK","allowed",true,"version","0");
   var batch=Map.of("changes",List.of(first,second));
   ok(req("manager","PUT",access()+"/role-permissions/batch",batch),403);
   ok(req("admin","PUT",access()+"/role-permissions/batch",batch),200);
@@ -305,20 +305,20 @@ class ScopedAccessIntegrationTest {
   var profile=ok(req("profile","GET","/access/profile",null),200);assertThat(profile.toString()).doesNotContain("password","company_id","role_type_id");
   ok(req(null,"GET","/access/profile",null),401);
   String v=profile.path("version").asText();
-  var changed=ok(call("profile","PATCH","/access/profile",Map.of("firstName","Updated","lastName","Person","email","profile-"+tag+"@example.test","user_id",users.get("admin")),v,null),200);
+  var changed=ok(call("profile","PATCH","/access/profile",Map.of("first_name","Updated","last_name","Person","email","profile-"+tag+"@example.test","user_id",users.get("admin")),v,null),200);
   assertThat(changed.path("first_name").asText()).isEqualTo("Updated");
   assertThat(db.queryForObject("SELECT first_name FROM users WHERE user_id=?",String.class,users.get("admin"))).isEqualTo("admin");
-  ok(call("profile","PATCH","/access/profile",Map.of("firstName","Stale","lastName","Person","email","profile-"+tag+"@example.test"),v,null),409);
+  ok(call("profile","PATCH","/access/profile",Map.of("first_name","Stale","last_name","Person","email","profile-"+tag+"@example.test"),v,null),409);
   v=changed.path("version").asText();
-  ok(call("profile","PATCH","/access/profile",Map.of("firstName","Updated","lastName","Person","email","admin-"+tag+"@example.test","currentPassword",password),v,null),409);
-  ok(call("profile","PATCH","/access/profile",Map.of("firstName","Updated","lastName","Person","email","profile2-"+tag+"@example.test","currentPassword","wrong"),v,null),400);
-  changed=ok(call("profile","PATCH","/access/profile",Map.of("firstName","Updated","lastName","Person","email","profile2-"+tag+"@example.test","currentPassword",password),v,null),200);
+  ok(call("profile","PATCH","/access/profile",Map.of("first_name","Updated","last_name","Person","email","admin-"+tag+"@example.test","current_password",password),v,null),409);
+  ok(call("profile","PATCH","/access/profile",Map.of("first_name","Updated","last_name","Person","email","profile2-"+tag+"@example.test","current_password","wrong"),v,null),400);
+  changed=ok(call("profile","PATCH","/access/profile",Map.of("first_name","Updated","last_name","Person","email","profile2-"+tag+"@example.test","current_password",password),v,null),200);
   ok(req("profile","GET","/access/profile",null),401);ok(req("profile2","GET","/access/profile",null),200);
   v=changed.path("version").asText();String newPassword="Changed-profile-test-password";
-  ok(call("profile2","PUT","/access/profile/password",Map.of("currentPassword","wrong","newPassword",newPassword,"confirmPassword",newPassword),v,null),400);
-  ok(call("profile2","PUT","/access/profile/password",Map.of("currentPassword",password,"newPassword",newPassword,"confirmPassword","different"),v,null),400);
-  ok(call("profile2","PUT","/access/profile/password",Map.of("currentPassword",password,"newPassword","short","confirmPassword","short"),v,null),400);
-  ok(call("profile2","PUT","/access/profile/password",Map.of("currentPassword",password,"newPassword",newPassword,"confirmPassword",newPassword),v,null),200);
+  ok(call("profile2","PUT","/access/profile/password",Map.of("current_password","wrong","new_password",newPassword,"confirm_password",newPassword),v,null),400);
+  ok(call("profile2","PUT","/access/profile/password",Map.of("current_password",password,"new_password",newPassword,"confirm_password","different"),v,null),400);
+  ok(call("profile2","PUT","/access/profile/password",Map.of("current_password",password,"new_password","short","confirm_password","short"),v,null),400);
+  ok(call("profile2","PUT","/access/profile/password",Map.of("current_password",password,"new_password",newPassword,"confirm_password",newPassword),v,null),200);
   ok(req("profile2","GET","/access/profile",null),401);
   var loginResp=http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/api/v1/access/session")).header("Authorization","Basic "+Base64.getEncoder().encodeToString(("profile2-"+tag+"@example.test:"+newPassword).getBytes(StandardCharsets.UTF_8))).POST(HttpRequest.BodyPublishers.noBody()).build(),HttpResponse.BodyHandlers.ofString());
   assertThat(loginResp.statusCode()).isEqualTo(200);
@@ -353,7 +353,7 @@ class ScopedAccessIntegrationTest {
   assertThat(db.queryForObject("SELECT count(*) FROM user_login_events WHERE user_id=? AND status='FAILED'",Long.class,id)).isEqualTo(1);
   String token=ok(req("session","POST","/access/session",null),200).path("token").asText();
   String version=ok(req("session","GET","/access/profile",null),200).path("version").asText();
-  ok(call("session","PUT","/access/profile/password",Map.of("currentPassword",password,"newPassword","Session-password-changed","confirmPassword","Session-password-changed"),version,null),200);
+  ok(call("session","PUT","/access/profile/password",Map.of("current_password",password,"new_password","Session-password-changed","confirm_password","Session-password-changed"),version,null),200);
   ok(bearer(token,"GET","/access/profile",null),401);
   assertThat(db.queryForObject("SELECT count(*) FROM user_sessions WHERE user_id=? AND revoked_at IS NOT NULL",Long.class,id)).isEqualTo(1);
  }
@@ -362,7 +362,7 @@ class ScopedAccessIntegrationTest {
  JsonNode bill(String s) throws Exception{return ok(req("admin","GET","/access/stores/"+s+"/billing",null),200);}
  JsonNode billChange(String s,String action,Long plan,String key) throws Exception{
   var data=bill(s);String version=data.path("subscription").isNull()?"0":data.path("subscription").path("version").asText();
-  Map<String,Object> body=new HashMap<>();body.put("action",action);body.put("planId",plan);body.put("version",version);
+  Map<String,Object> body=new HashMap<>();body.put("action",action);body.put("plan_id",plan);body.put("version",version);
   return ok(call("admin","POST","/access/stores/"+s+"/billing",body,null,key),200);
  }
  @Test @Order(19) void billingUpgradeDowngradeAndReplay() throws Exception {
@@ -370,7 +370,7 @@ class ScopedAccessIntegrationTest {
   assertThat(bill(store).path("subscription").isNull()).isTrue();
   var first=billChange(store,"START",plan("Basic"),UUID.randomUUID().toString());assertThat(first.path("invoices").get(0).path("total_amount").decimalValue()).isEqualByComparingTo("60");
   String version=first.path("subscription").path("version").asText(),key=UUID.randomUUID().toString();
-  var body=Map.of("action","CHANGE","planId",plan("Modern"),"version",version);
+  var body=Map.of("action","CHANGE","plan_id",plan("Modern"),"version",version);
   var up=ok(call("admin","POST",access()+"/billing",body,null,key),200);assertThat(up.path("invoices").size()).isEqualTo(2);assertThat(up.path("invoices").get(0).path("total_amount").decimalValue()).isEqualByComparingTo("30");
   assertThat(ok(call("admin","POST",access()+"/billing",body,null,key),200).path("invoices").size()).isEqualTo(2);
   ok(call("admin","POST",access()+"/billing",body,null,UUID.randomUUID().toString()),409);
@@ -393,7 +393,7 @@ class ScopedAccessIntegrationTest {
  @Test @Order(21) void addonBillingIsolationReplayAndCancellation() throws Exception {
   billing.advance(store,billing.today(store));
   var before=bill(store);long addon=before.path("addons").get(0).path("addon_id").asLong();
-  String key=UUID.randomUUID().toString();var body=Map.of("action","ADDON_ADD","planId",addon,"version",before.path("subscription").path("version").asText());
+  String key=UUID.randomUUID().toString();var body=Map.of("action","ADDON_ADD","plan_id",addon,"version",before.path("subscription").path("version").asText());
   ok(call("manager","POST",access()+"/billing",body,null,key),403);
   var added=ok(call("admin","POST",access()+"/billing",body,null,key),200);
   assertThat(added.path("addons").get(0).path("active").asBoolean()).isTrue();
@@ -412,14 +412,14 @@ class ScopedAccessIntegrationTest {
   String path=access()+"/employees";
   ok(req("manager","GET",path,null),403);ok(req("other","GET",path,null),403);
   long role=db.queryForObject("SELECT role_type_id FROM role_types WHERE role_type_name='CASHIER'",Long.class);
-  var body=new HashMap<String,Object>();body.put("userId",users.get("cashier"));body.put("roleTypeId",role);body.put("hireDate","2026-01-01");body.put("employeeType","Full-time");body.put("payType","Hourly");body.put("rate",18.50);body.put("status","Active");
+  var body=new HashMap<String,Object>();body.put("user_id",users.get("cashier"));body.put("role_type_id",role);body.put("hire_date","2026-01-01");body.put("employee_type","Full-time");body.put("pay_type","Hourly");body.put("rate",18.50);body.put("status","Active");
   var created=ok(req("admin","POST",path,body),200);var employee=created.path("employees").get(0);long id=employee.path("id").asLong();
   assertThat(employee.path("rate").decimalValue()).isEqualByComparingTo("18.50");
   assertThat(ok(req("admin","GET","/access/stores/"+second+"/employees",null),200).path("employees").size()).isZero();
   ok(req("admin","POST",path,body),409);
   body.put("version",employee.path("version").asText());body.put("rate",20);body.put("status","Inactive");var updated=ok(req("admin","PUT",path+"/"+id,body),200);assertThat(updated.path("employees").get(0).path("status").asText()).isEqualTo("Inactive");
   ok(req("admin","PUT",path+"/"+id,body),409);ok(req("other","PUT",path+"/"+id,body),403);
-  body.remove("userId");body.put("status","Active");body.put("firstName","New");body.put("lastName","Employee");body.put("employeeCode","EMP-"+tag);body.put("email","employee-"+tag+"@example.test");body.put("password",password);
+  body.remove("userId");body.put("status","Active");body.put("first_name","New");body.put("last_name","Employee");body.put("employee_code","EMP-"+tag);body.put("email","employee-"+tag+"@example.test");body.put("password",password);
   var two=ok(req("admin","POST",path,body),200);assertThat(two.path("employees").size()).isEqualTo(2);
   assertThat(db.queryForObject("SELECT count(*) FROM user_roles ur JOIN users u USING(user_id) JOIN role_types rt USING(role_type_id) WHERE u.email=? AND rt.role_type_name='CASHIER' AND ur.dgt_id=?",Integer.class,"employee-"+tag+"@example.test",store)).isEqualTo(1);
  }
@@ -429,7 +429,7 @@ class ScopedAccessIntegrationTest {
   db.update("INSERT INTO employee_store_assignments(employee_id,dgt_id,is_primary,effective_from,role_type_id) VALUES (?,?,false,'2026-01-01',?)",id,second,role);
   var employee=ok(req("admin","GET",access()+"/employees",null),200).path("employees").get(0);
   for(var row:ok(req("admin","GET",access()+"/employees",null),200).path("employees"))if(row.path("id").asLong()==id)employee=row;
-  var body=new HashMap<String,Object>();body.put("hireDate","2026-01-01");body.put("employeeType","Part-time");body.put("payType","Hourly");body.put("rate",27);body.put("status","Inactive");body.put("version",employee.path("version").asText());
+  var body=new HashMap<String,Object>();body.put("hire_date","2026-01-01");body.put("employee_type","Part-time");body.put("pay_type","Hourly");body.put("rate",27);body.put("status","Inactive");body.put("version",employee.path("version").asText());
   ok(req("admin","PUT",access()+"/employees/"+id,body),200);
   var other=ok(req("admin","GET","/access/stores/"+second+"/employees",null),200).path("employees").get(0);
   assertThat(other.path("rate").decimalValue()).isEqualByComparingTo("27");assertThat(other.path("status").asText()).isEqualTo("Active");assertThat(other.path("store_count").asInt()).isEqualTo(2);
@@ -443,7 +443,7 @@ class ScopedAccessIntegrationTest {
   for(var row:all)if(row.path("email").asText().equals("employee-"+tag+"@example.test"))employee=row;
   assertThat(employee).isNotNull();long id=employee.path("id").asLong();
   ok(req("employee","POST","/access/session",null),200);
-  var body=new HashMap<String,Object>();body.put("hireDate","2026-01-01");body.put("employeeType","Full-time");body.put("payType","Hourly");body.put("rate",20);body.put("status","Active");body.put("version",employee.path("version").asText());body.put("firstName","Updated");body.put("lastName","Employee");body.put("email","admin-"+tag+"@example.test");
+  var body=new HashMap<String,Object>();body.put("hire_date","2026-01-01");body.put("employee_type","Full-time");body.put("pay_type","Hourly");body.put("rate",20);body.put("status","Active");body.put("version",employee.path("version").asText());body.put("first_name","Updated");body.put("last_name","Employee");body.put("email","admin-"+tag+"@example.test");
   ok(req("admin","PUT",access()+"/employees/"+id,body),409);
   body.put("email","renamed-"+tag+"@example.test");ok(req("admin","PUT",access()+"/employees/"+id,body),200);
   ok(req("employee","GET","/access/profile",null),401);var profile=ok(req("renamed","GET","/access/profile",null),200);assertThat(profile.path("first_name").asText()).isEqualTo("Updated");
@@ -453,23 +453,23 @@ class ScopedAccessIntegrationTest {
  @Test @Order(25) void employeeDetailsRoundTripValidationAndStoreDepartmentScope() throws Exception {
   JsonNode employee=null;for(var row:ok(req("admin","GET",access()+"/employees",null),200).path("employees"))if(row.path("email").asText().equals("renamed-"+tag+"@example.test"))employee=row;
   assertThat(employee).isNotNull();long id=employee.path("id").asLong();
-  var body=new HashMap<String,Object>();body.put("hireDate","2026-01-01");body.put("employeeType","Full-time");body.put("payType","Hourly");body.put("rate",20);body.put("status","Active");body.put("version",employee.path("version").asText());
+  var body=new HashMap<String,Object>();body.put("hire_date","2026-01-01");body.put("employee_type","Full-time");body.put("pay_type","Hourly");body.put("rate",20);body.put("status","Active");body.put("version",employee.path("version").asText());
   String department="default-"+db.queryForObject("SELECT min(department_id) FROM departments WHERE is_default",Long.class);
-  var detail=new HashMap<String,Object>();detail.put("jobTitle","Deli Cook");detail.put("department",department);detail.put("deposit",Map.of("bankName","Sample Bank","accountHolder","Sample Employee","accountType","Checking","accountLastFour","1234","routingNumber","000000000","active",true));detail.put("deductions",List.of(Map.of("type","RETIREMENT","calculation","PERCENT","amount",3,"effectiveFrom","2026-01-01","active",true)));body.put("details",detail);
+  var detail=new HashMap<String,Object>();detail.put("job_title","Deli Cook");detail.put("department",department);detail.put("deposit",Map.of("bank_name","Sample Bank","account_holder","Sample Employee","account_type","Checking","account_last_four","1234","routing_number","000000000","active",true));detail.put("deductions",List.of(Map.of("type","RETIREMENT","calculation","PERCENT","amount",3,"effective_from","2026-01-01","active",true)));body.put("details",detail);
   var result=ok(req("admin","PUT",access()+"/employees/"+id,body),200);for(var row:result.path("employees"))if(row.path("id").asLong()==id)employee=row;
   assertThat(employee.path("job_title").asText()).isEqualTo("Deli Cook");assertThat(employee.path("department_key").asText()).isEqualTo(department);assertThat(employee.path("deposit").path("account_last_four").asText()).isEqualTo("1234");assertThat(employee.path("deductions").get(0).path("amount").decimalValue()).isEqualByComparingTo("3");
   body.put("version",employee.path("version").asText());detail.put("department","store-999999999");ok(req("admin","PUT",access()+"/employees/"+id,body),400);
-  detail.put("department",department);detail.put("deductions",List.of(Map.of("type","RETIREMENT","calculation","PERCENT","amount",101,"effectiveFrom","2026-01-01","active",true)));ok(req("admin","PUT",access()+"/employees/"+id,body),400);
-  detail.put("deductions",List.of(Map.of("type","RETIREMENT","calculation","PERCENT","amount",3,"effectiveFrom","2026-01-01","active",false)));ok(req("admin","PUT",access()+"/employees/"+id,body),200);
+  detail.put("department",department);detail.put("deductions",List.of(Map.of("type","RETIREMENT","calculation","PERCENT","amount",101,"effective_from","2026-01-01","active",true)));ok(req("admin","PUT",access()+"/employees/"+id,body),400);
+  detail.put("deductions",List.of(Map.of("type","RETIREMENT","calculation","PERCENT","amount",3,"effective_from","2026-01-01","active",false)));ok(req("admin","PUT",access()+"/employees/"+id,body),200);
  }
  @Test @Order(26) void employeeCanExistBeforeWebsiteAccess() throws Exception {
-  var body=new HashMap<String,Object>();body.put("withoutAccess",true);body.put("firstName","Standalone");body.put("lastName",tag);body.put("hireDate","2026-01-01");body.put("employeeType","Full-time");body.put("payType","Hourly");body.put("rate",18);body.put("status","Active");
+  var body=new HashMap<String,Object>();body.put("without_access",true);body.put("first_name","Standalone");body.put("last_name",tag);body.put("hire_date","2026-01-01");body.put("employee_type","Full-time");body.put("pay_type","Hourly");body.put("rate",18);body.put("status","Active");
   var created=ok(req("admin","POST",access()+"/employees",body),200);JsonNode employee=null;for(var row:created.path("employees"))if(row.path("last_name").asText().equals(tag))employee=row;
   assertThat(employee).isNotNull();assertThat(employee.path("user_id").isNull()).isTrue();long id=employee.path("id").asLong();
-  body.put("version",employee.path("version").asText());body.put("firstName","Standalone edited");ok(req("admin","PUT",access()+"/employees/"+id,body),200);
+  body.put("version",employee.path("version").asText());body.put("first_name","Standalone edited");ok(req("admin","PUT",access()+"/employees/"+id,body),200);
   JsonNode accessRow=null;for(var row:ok(req("admin","GET",access()+"/employee-access",null),200))if(row.path("employee_id").asLong()==id)accessRow=row;
   long role=db.queryForObject("SELECT role_type_id FROM role_types WHERE role_type_name='CASHIER'",Long.class);
-  var grant=new HashMap<String,Object>();grant.put("employeeCode","STAFF-"+tag);grant.put("email","standalone-"+tag+"@example.test");grant.put("password",password);grant.put("roleTypeId",role);grant.put("active",true);grant.put("version",accessRow.path("version").asText());
+  var grant=new HashMap<String,Object>();grant.put("employee_code","STAFF-"+tag);grant.put("email","standalone-"+tag+"@example.test");grant.put("password",password);grant.put("role_type_id",role);grant.put("active",true);grant.put("version",accessRow.path("version").asText());
   ok(req("other","PUT",access()+"/employee-access/"+id,grant),403);
   var granted=ok(req("admin","PUT",access()+"/employee-access/"+id,grant),200);
   assertThat(db.queryForObject("SELECT employee_id FROM users WHERE email=?",String.class,"standalone-"+tag+"@example.test")).isEqualTo(Long.toString(id));
@@ -482,19 +482,19 @@ class ScopedAccessIntegrationTest {
  Map<String,Object> bulkLinksFor(long product,Long group,List<Long> vendors,List<Long> promos) throws Exception {
   var options=ok(req("admin","GET",access()+"/items/bulk-options",null),200);var result=new LinkedHashMap<String,Object>();
   for(var row:options.path("links"))if(row.path("id").asLong()==product)result.put("version",row.path("version").asText());
-  result.put("groupId",group);result.put("groupVersion",null);for(var row:options.path("groups"))if(group!=null&&row.path("id").asLong()==group)result.put("groupVersion",row.path("version").asText());
+  result.put("group_id",group);result.put("group_version",null);for(var row:options.path("groups"))if(group!=null&&row.path("id").asLong()==group)result.put("group_version",row.path("version").asText());
   var versions=new HashMap<String,String>();for(var row:options.path("promotions"))if(promos.contains(row.path("id").asLong()))versions.put(row.path("id").asText(),row.path("version").asText());
-  result.put("vendorIds",vendors);result.put("promotionIds",promos);result.put("promotionVersions",versions);return result;
+  result.put("vendor_ids",vendors);result.put("promotion_ids",promos);result.put("promotion_versions",versions);return result;
  }
  @Test @Order(35) void bulkEditableLinksAndIndividualPrice() throws Exception {
   String path=access()+"/items";var dep=ok(req("admin","GET",path,null),200).path("departments").get(0);
-  var item=new LinkedHashMap<String,Object>();item.put("name","Editable links");item.put("sku","LINKS-"+tag);item.put("dept",dep.path("name").asText());item.put("subDept",dep.path("children").get(0).asText());item.put("retail",3);item.put("taxable",true);item.put("ebtSnap",false);item.put("allowReturns",true);item.put("active",true);item.put("unitType","item");item.put("purchaseGrossCost",1.49);item.put("purchaseDiscount",0);
+  var item=new LinkedHashMap<String,Object>();item.put("name","Editable links");item.put("sku","LINKS-"+tag);item.put("dept",dep.path("name").asText());item.put("sub_dept",dep.path("children").get(0).asText());item.put("retail",3);item.put("taxable",true);item.put("ebt_snap",false);item.put("allow_returns",true);item.put("active",true);item.put("unit_type","item");item.put("purchase_gross_cost",1.49);item.put("purchase_discount",0);
   long id=ok(req("admin","POST",path,item),200).path("id").asLong();
   long seed=db.queryForObject("SELECT product_id FROM products WHERE dgt_id=? AND product_id<>? AND is_active ORDER BY product_id DESC LIMIT 1",Long.class,store,id);
   long vendor=db.queryForObject("INSERT INTO vendors(dgt_id,vendor_name) VALUES (?,?) RETURNING vendor_id",Long.class,store,"Bulk vendor");
-  var groupInput=new LinkedHashMap<String,Object>();groupInput.put("name","Override group");groupInput.put("groupPrice",9.99);groupInput.put("products",List.of(id));
+  var groupInput=new LinkedHashMap<String,Object>();groupInput.put("name","Override group");groupInput.put("group_price",9.99);groupInput.put("products",List.of(id));
   long group=ok(req("admin","POST",access()+"/price-groups",groupInput),200).path("id").asLong();
-  var promo=Map.of("name","Bulk assign promo","type","Bundle","products",List.of(Map.of("productId",seed,"quantity",2)),"discountValue",5,"start","2030-01-01","end","2030-02-01");
+  var promo=Map.of("name","Bulk assign promo","type","Bundle","products",List.of(Map.of("product_id",seed,"quantity",2)),"discount_value",5,"start","2030-01-01","end","2030-02-01");
   long promotion=ok(req("admin","POST",access()+"/promotions",promo),200).path("id").asLong();
   item.put("name","Renamed in bulk");item.put("sku","LINKS-NEW-"+tag);item.put("barcode","BULKCODE-"+tag);item.put("retail",4.50);
   var links=bulkLinksFor(id,group,List.of(vendor),List.of(promotion));String version=db.queryForObject("SELECT xmin::text FROM products WHERE product_id=?",String.class,id);
@@ -517,10 +517,10 @@ class ScopedAccessIntegrationTest {
 
  @Test @Order(34) void bulkItemsReuseRulesAndRollbackEntireBatch() throws Exception {
   String path=access()+"/items";var dep=ok(req("admin","GET",path,null),200).path("departments").get(0);
-  var in=new LinkedHashMap<String,Object>();in.put("name","Bulk A");in.put("sku","BULK-A-"+tag);in.put("dept",dep.path("name").asText());in.put("subDept",dep.path("children").get(0).asText());in.put("retail",3);in.put("taxable",true);in.put("ebtSnap",false);in.put("allowReturns",true);in.put("active",true);in.put("unitType","item");in.put("purchaseGrossCost",1.49);in.put("purchaseDiscount",0);
+  var in=new LinkedHashMap<String,Object>();in.put("name","Bulk A");in.put("sku","BULK-A-"+tag);in.put("dept",dep.path("name").asText());in.put("sub_dept",dep.path("children").get(0).asText());in.put("retail",3);in.put("taxable",true);in.put("ebt_snap",false);in.put("allow_returns",true);in.put("active",true);in.put("unit_type","item");in.put("purchase_gross_cost",1.49);in.put("purchase_discount",0);
   long first=ok(req("admin","POST",path,in),200).path("id").asLong();var otherIn=new LinkedHashMap<String,Object>(in);otherIn.put("name","Bulk B");otherIn.put("sku","BULK-B-"+tag);long last=ok(req("admin","POST",path,otherIn),200).path("id").asLong();
   String v1=db.queryForObject("SELECT xmin::text FROM products WHERE product_id=?",String.class,first),v2=db.queryForObject("SELECT xmin::text FROM products WHERE product_id=?",String.class,last);
-  in.put("purchaseGrossCost",1.79);in.put("currentInventory",12.5);in.put("inventoryVersion","0");otherIn.put("retail",-1);
+  in.put("purchase_gross_cost",1.79);in.put("current_inventory",12.5);in.put("inventory_version","0");otherIn.put("retail",-1);
   var rows=List.of(Map.of("id",first,"version",v1,"item",in),Map.of("id",last,"version",v2,"item",otherIn));
   ok(req("admin","POST",path+"/bulk",Map.of("rows",rows)),400);
   assertThat(db.queryForObject("SELECT purchase_gross_cost FROM products WHERE product_id=?",java.math.BigDecimal.class,first)).isEqualByComparingTo("1.49");assertThat(db.queryForObject("SELECT count(*) FROM inventory WHERE product_id=?",Integer.class,first)).isZero();
@@ -551,7 +551,7 @@ class ScopedAccessIntegrationTest {
   String path=access()+"/price-groups";
   var ids=db.queryForList("SELECT product_id FROM products WHERE dgt_id=? AND is_active ORDER BY product_id LIMIT 2",Long.class,store);long p1=ids.get(0),p2=ids.get(1);
   var old1=db.queryForObject("SELECT retail_price FROM product_store_prices WHERE dgt_id=? AND product_id=?",java.math.BigDecimal.class,store,p1);var old2=db.queryForObject("SELECT retail_price FROM product_store_prices WHERE dgt_id=? AND product_id=?",java.math.BigDecimal.class,store,p2);
-  var body=new LinkedHashMap<String,Object>();body.put("name","Group test");body.put("description","Retail group");body.put("groupPrice",3.49);body.put("products",ids);
+  var body=new LinkedHashMap<String,Object>();body.put("name","Group test");body.put("description","Retail group");body.put("group_price",3.49);body.put("products",ids);
   String key=UUID.randomUUID().toString();long id=ok(call("admin","POST",path,body,null,key),200).path("id").asLong();assertThat(id).isPositive();assertThat(ok(call("admin","POST",path,body,null,key),200).path("id").asLong()).isEqualTo(id);
   assertThat(db.queryForObject("SELECT retail_price FROM product_store_prices WHERE dgt_id=? AND product_id=?",java.math.BigDecimal.class,store,p1)).isEqualByComparingTo(old1);
   assertThat(ok(req("admin","GET",access()+"/items",null),200).toString()).contains("Group test");
@@ -560,7 +560,7 @@ class ScopedAccessIntegrationTest {
   body.put("name","Duplicate membership");ok(req("admin","POST",path,body),409);
   long other=db.queryForObject("SELECT product_id FROM products WHERE dgt_id=? LIMIT 1",Long.class,second);body.put("products",List.of(other));ok(req("admin","POST",path,body),400);
   assertThatThrownBy(()->db.update("INSERT INTO product_price_groups(price_group_id,product_id,dgt_id) VALUES (?,?,?)",id,other,store)).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
-  body.put("name","Group test");body.put("products",List.of(p1));body.put("groupPrice",4.99);
+  body.put("name","Group test");body.put("products",List.of(p1));body.put("group_price",4.99);
   ok(call("admin","PUT",path+"/"+id,body,version,null),200);ok(call("admin","PUT",path+"/"+id,body,version,null),409);
   assertThat(db.queryForObject("SELECT retail_price FROM product_store_prices WHERE dgt_id=? AND product_id=?",java.math.BigDecimal.class,store,p1)).isEqualByComparingTo(old1);
   for(var item:ok(req("admin","GET",access()+"/items",null),200).path("items"))if(item.path("id").asLong()==p1)assertThat(item.path("effectiveRetail").decimalValue()).isEqualByComparingTo("4.99");
@@ -579,17 +579,17 @@ class ScopedAccessIntegrationTest {
  @Test @Order(31) void promotionsRulesIsolationAndDeactivation() throws Exception {
   String path=access()+"/promotions";
   var products=db.queryForList("SELECT product_id FROM products WHERE dgt_id=? AND is_active ORDER BY product_id LIMIT 2",Long.class,store);long p1=products.get(0),p2=products.get(1);
-  var body=new LinkedHashMap<String,Object>();body.put("name","Mix & Match");body.put("type","Buy X Get Y");body.put("products",List.of(Map.of("productId",p1,"quantity",1),Map.of("productId",p2,"quantity",1)));body.put("buyQty",2);body.put("freeQty",1);body.put("start","2030-01-01");body.put("end","2030-01-31");
-  body.put("buyQty",2.5);ok(req("admin","POST",path,body),400);body.put("buyQty",2);
+  var body=new LinkedHashMap<String,Object>();body.put("name","Mix & Match");body.put("type","Buy X Get Y");body.put("products",List.of(Map.of("product_id",p1,"quantity",1),Map.of("product_id",p2,"quantity",1)));body.put("buy_qty",2);body.put("free_qty",1);body.put("start","2030-01-01");body.put("end","2030-01-31");
+  body.put("buy_qty",2.5);ok(req("admin","POST",path,body),400);body.put("buy_qty",2);
   String key=UUID.randomUUID().toString();long id=ok(call("admin","POST",path,body,null,key),200).path("id").asLong();
   assertThat(ok(call("admin","POST",path,body,null,key),200).path("id").asLong()).isEqualTo(id);
   body.put("name","Different retry");ok(call("admin","POST",path,body,null,key),409);body.put("name","Mix & Match");
   var list=ok(req("manager","GET",path,null),200);var row=list.path("promotions").get(0);assertThat(row.path("products").size()).isEqualTo(2);assertThat(row.path("buyQty").asInt()).isEqualTo(2);assertThat(row.path("status").asText()).isEqualTo("Upcoming");
   ok(req("cashier","GET",path,null),403);ok(req("other","GET",path,null),403);
   long foreignProduct=db.queryForObject("SELECT product_id FROM products WHERE dgt_id=? LIMIT 1",Long.class,second);
-  var wrong=new LinkedHashMap<String,Object>(body);wrong.put("products",List.of(Map.of("productId",foreignProduct,"quantity",1)));ok(req("admin","POST",path,wrong),400);
+  var wrong=new LinkedHashMap<String,Object>(body);wrong.put("products",List.of(Map.of("product_id",foreignProduct,"quantity",1)));ok(req("admin","POST",path,wrong),400);
   assertThatThrownBy(()->db.update("INSERT INTO promotion_products(promotion_id,product_id,dgt_id) VALUES (?,?,?)",id,foreignProduct,store)).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
-  body.put("type","Bundle");body.remove("buyQty");body.remove("freeQty");body.put("discountValue",4.99);body.put("products",List.of(Map.of("productId",p1,"quantity",2),Map.of("productId",p2,"quantity",1)));
+  body.put("type","Bundle");body.remove("buyQty");body.remove("freeQty");body.put("discount_value",4.99);body.put("products",List.of(Map.of("product_id",p1,"quantity",2),Map.of("product_id",p2,"quantity",1)));
   ok(call("manager","PUT",path+"/"+id,body,row.path("version").asText(),null),200);
   ok(call("manager","PUT",path+"/"+id,body,row.path("version").asText(),null),409);
   assertThat(db.queryForObject("SELECT required_quantity FROM promotion_products WHERE promotion_id=? AND product_id=?",Integer.class,id,p1)).isEqualTo(2);
@@ -597,14 +597,14 @@ class ScopedAccessIntegrationTest {
   ok(call("admin","POST",path+"/"+id+"/deactivate",Map.of(),row.path("version").asText(),null),200);
   row=ok(req("admin","GET",path,null),200).path("promotions").get(0);assertThat(row.path("status").asText()).isEqualTo("Inactive");assertThat(row.path("products").size()).isEqualTo(2);
   ok(call("admin","PUT",path+"/"+id,body,row.path("version").asText(),null),409);
-  body.put("type","% Discount");body.put("products",List.of(Map.of("productId",p1,"quantity",1)));body.put("discountValue",101);ok(req("admin","POST",path,body),400);
-  body.put("discountValue",10);body.put("end","2029-01-01");ok(req("admin","POST",path,body),400);
+  body.put("type","% Discount");body.put("products",List.of(Map.of("product_id",p1,"quantity",1)));body.put("discount_value",101);ok(req("admin","POST",path,body),400);
+  body.put("discount_value",10);body.put("end","2029-01-01");ok(req("admin","POST",path,body),400);
   body.put("start",java.time.LocalDate.now().minusDays(2).toString());body.put("end",java.time.LocalDate.now().plusDays(2).toString());body.put("name","Active percent");
   long activeId=ok(req("admin","POST",path,body),200).path("id").asLong();
   assertThat(ok(req("admin","GET",path,null),200).path("promotions").get(0).path("status").asText()).isEqualTo("Active");
   // A one-day promotion over the DST transition uses 23 hours, not a fixed 24.
   db.update("UPDATE stores SET timezone='America/New_York' WHERE dgt_id=?",second);
-  var dst=new LinkedHashMap<String,Object>(body);dst.put("products",List.of(Map.of("productId",foreignProduct,"quantity",1)));dst.put("type","Fixed Price");dst.put("discountValue",1.5);dst.put("start","2027-03-14");dst.put("end","2027-03-14");
+  var dst=new LinkedHashMap<String,Object>(body);dst.put("products",List.of(Map.of("product_id",foreignProduct,"quantity",1)));dst.put("type","Fixed Price");dst.put("discount_value",1.5);dst.put("start","2027-03-14");dst.put("end","2027-03-14");
   long dstId=ok(req("admin","POST","/access/stores/"+second+"/promotions",dst),200).path("id").asLong();
   assertThat(db.queryForObject("SELECT EXTRACT(EPOCH FROM (end_date-start_date))+0.000001 FROM promotions WHERE promotion_id=?",java.math.BigDecimal.class,dstId)).isEqualByComparingTo("82800");
   assertThat(ok(req("admin","GET","/access/stores/"+second+"/promotions",null),200).path("promotions").size()).isEqualTo(1);
@@ -618,10 +618,10 @@ class ScopedAccessIntegrationTest {
 
  @Test @Order(30) void catalogCostChangesAppearInHistory() throws Exception {
   String path=access()+"/items";var dep=ok(req("admin","GET",path,null),200).path("departments").get(0);
-  var body=new LinkedHashMap<String,Object>();body.put("name","Catalog history item");body.put("sku","HISTORY-"+tag);body.put("dept",dep.path("name").asText());body.put("subDept",dep.path("children").get(0).asText());body.put("retail",2.5);body.put("taxable",false);body.put("ebtSnap",false);body.put("allowReturns",true);body.put("active",true);body.put("unitType","item");body.put("purchaseGrossCost",1.49);body.put("purchaseDiscount",0);
+  var body=new LinkedHashMap<String,Object>();body.put("name","Catalog history item");body.put("sku","HISTORY-"+tag);body.put("dept",dep.path("name").asText());body.put("sub_dept",dep.path("children").get(0).asText());body.put("retail",2.5);body.put("taxable",false);body.put("ebt_snap",false);body.put("allow_returns",true);body.put("active",true);body.put("unit_type","item");body.put("purchase_gross_cost",1.49);body.put("purchase_discount",0);
   long id=ok(req("admin","POST",path,body),200).path("id").asLong();
   String version=db.queryForObject("SELECT xmin::text FROM products WHERE product_id=?",String.class,id);
-  body.put("purchaseGrossCost",1.79);ok(call("manager","PUT",path+"/"+id,body,version,null),200);
+  body.put("purchase_gross_cost",1.79);ok(call("manager","PUT",path+"/"+id,body,version,null),200);
   var history=ok(req("admin","GET",access()+"/vendors/pricing",null),200).path("history");
   var entry=java.util.stream.StreamSupport.stream(history.spliterator(),false).filter(x->x.path("item").asText().equals("Catalog history item")).findFirst().orElseThrow();
   assertThat(entry.path("oldCost").asDouble()).isEqualTo(1.49);assertThat(entry.path("newCost").asDouble()).isEqualTo(1.79);assertThat(entry.path("change").asDouble()).isEqualTo(20.13);assertThat(entry.path("source").asText()).isEqualTo("MANUAL:CATALOG");
@@ -634,16 +634,16 @@ class ScopedAccessIntegrationTest {
  @Test @Order(29) void vendorItemTermsAndUnlink() throws Exception {
   String path=access()+"/vendors";
   long product=db.queryForObject("SELECT product_id FROM products WHERE dgt_id=? AND product_sku=?",Long.class,store,"DETAILS-"+tag);
-  long vendor=ok(req("admin","POST",path,Map.of("name","Terms vendor","active",true,"leadTime",7)),200).path("id").asLong();
+  long vendor=ok(req("admin","POST",path,Map.of("name","Terms vendor","active",true,"lead_time",7)),200).path("id").asLong();
   String links=path+"/"+vendor+"/items";
-  var input=new LinkedHashMap<String,Object>();input.put("productId",product);input.put("unitCost",24);input.put("unitType","CASE");input.put("moq",2);
+  var input=new LinkedHashMap<String,Object>();input.put("product_id",product);input.put("unit_cost",24);input.put("unit_type","CASE");input.put("moq",2);
   ok(req("admin","POST",links,input),200);
   var row=ok(req("admin","GET",links,null),200).get(0);
   var listed=java.util.stream.StreamSupport.stream(ok(req("admin","GET",access()+"/items",null),200).path("items").spliterator(),false).filter(x->x.path("id").asLong()==product).findFirst().orElseThrow();
   assertThat(listed.path("vendor").asText()).isEqualTo("Terms vendor");assertThat(listed.path("vendorNames").get(0).asText()).isEqualTo("Terms vendor");
 
   assertThat(row.path("casePackSize").asInt()).isEqualTo(24);assertThat(row.path("moq").asInt()).isEqualTo(2);assertThat(row.path("leadTime").asInt()).isEqualTo(7);assertThat(row.path("category").asText()).isNotBlank();
-  input.put("unitCost",30);input.put("casePackSize",24);input.put("moq",3);
+  input.put("unit_cost",30);input.put("case_pack_size",24);input.put("moq",3);
   ok(call("cashier","PUT",links+"/"+product,input,row.path("version").asText(),null),403);
   ok(call("manager","PUT",links+"/"+product,input,row.path("version").asText(),null),200);
   ok(call("manager","PUT",links+"/"+product,input,row.path("version").asText(),null),409);
@@ -662,15 +662,15 @@ class ScopedAccessIntegrationTest {
 
  @Test @Order(28) void itemDefaultsAndInventory() throws Exception {
   String path=access()+"/items";var dep=ok(req("admin","GET",path,null),200).path("departments").get(0);
-  var body=new LinkedHashMap<String,Object>();body.put("name","Case details");body.put("sku","DETAILS-"+tag);body.put("dept",dep.path("name").asText());body.put("subDept",dep.path("children").get(0).asText());body.put("retail",1.50);body.put("taxable",true);body.put("ebtSnap",false);body.put("allowReturns",true);body.put("active",true);
-  body.put("ageRestricted",true);body.put("unitType","case");body.put("unitsPerCase",24);body.put("purchaseGrossCost",24);body.put("purchaseDiscount",2.40);body.put("currentInventory",48);body.put("inventoryVersion","0");body.put("reorderLevel",10);
+  var body=new LinkedHashMap<String,Object>();body.put("name","Case details");body.put("sku","DETAILS-"+tag);body.put("dept",dep.path("name").asText());body.put("sub_dept",dep.path("children").get(0).asText());body.put("retail",1.50);body.put("taxable",true);body.put("ebt_snap",false);body.put("allow_returns",true);body.put("active",true);
+  body.put("age_restricted",true);body.put("unit_type","case");body.put("units_per_case",24);body.put("purchase_gross_cost",24);body.put("purchase_discount",2.40);body.put("current_inventory",48);body.put("inventory_version","0");body.put("reorder_level",10);
   long id=ok(req("admin","POST",path,body),200).path("id").asLong();
   var item=java.util.stream.StreamSupport.stream(ok(req("admin","GET",path,null),200).path("items").spliterator(),false).filter(x->x.path("id").asLong()==id).findFirst().orElseThrow();
   assertThat(item.path("cost").asDouble()).isEqualTo(0.9);assertThat(item.path("caseNetCost").asDouble()).isEqualTo(21.6);assertThat(item.path("ageRestricted").asBoolean()).isTrue();assertThat(item.path("currentInventory").asInt()).isEqualTo(48);
   assertThat(db.queryForObject("SELECT sum(qty_changed) FROM inventory_movements WHERE product_id=?",java.math.BigDecimal.class,id)).isEqualByComparingTo("48");
-  body.put("currentInventory",40);ok(call("admin","PUT",path+"/"+id,body,item.path("version").asText(),null),409);
-  body.put("inventoryVersion",item.path("inventoryVersion").asText());body.put("purchaseDiscount",25);ok(call("admin","PUT",path+"/"+id,body,item.path("version").asText(),null),400);
-  body.put("purchaseDiscount",2.4);ok(call("admin","PUT",path+"/"+id,body,item.path("version").asText(),null),200);
+  body.put("current_inventory",40);ok(call("admin","PUT",path+"/"+id,body,item.path("version").asText(),null),409);
+  body.put("inventory_version",item.path("inventoryVersion").asText());body.put("purchase_discount",25);ok(call("admin","PUT",path+"/"+id,body,item.path("version").asText(),null),400);
+  body.put("purchase_discount",2.4);ok(call("admin","PUT",path+"/"+id,body,item.path("version").asText(),null),200);
   assertThat(db.queryForObject("SELECT sum(qty_changed) FROM inventory_movements WHERE product_id=?",java.math.BigDecimal.class,id)).isEqualByComparingTo("40");
   assertThat(db.queryForObject("SELECT count(*) FROM product_vendors WHERE archived_at IS NULL AND product_id=?",Integer.class,id)).isZero();
  }
@@ -680,7 +680,7 @@ class ScopedAccessIntegrationTest {
   var initial=ok(req("admin","GET",path,null),200);
   var dep=initial.path("departments").get(0);
   assertThat(dep.path("children").size()).isGreaterThan(0);
-  var body=new LinkedHashMap<String,Object>();body.put("name","Price Book test");body.put("sku","CODE-"+tag);body.put("barcode","BAR-"+tag);body.put("dept",dep.path("name").asText());body.put("subDept",dep.path("children").get(0).asText());body.put("retail",1.99);body.put("taxable",true);body.put("ebtSnap",false);body.put("allowReturns",true);body.put("active",true);
+  var body=new LinkedHashMap<String,Object>();body.put("name","Price Book test");body.put("sku","CODE-"+tag);body.put("barcode","BAR-"+tag);body.put("dept",dep.path("name").asText());body.put("sub_dept",dep.path("children").get(0).asText());body.put("retail",1.99);body.put("taxable",true);body.put("ebt_snap",false);body.put("allow_returns",true);body.put("active",true);
   long id=ok(req("admin","POST",path,body),200).path("id").asLong();
   ok(req("admin","POST",path,body),400);
   long secondId=ok(req("admin","POST","/access/stores/"+second+"/items",body),200).path("id").asLong();assertThat(secondId).isNotEqualTo(id);
@@ -711,18 +711,18 @@ class ScopedAccessIntegrationTest {
    ok(req(who,"GET",path,null),403);ok(req(who,"POST",path,body),403);
   }
   long role=db.queryForObject("SELECT role_type_id FROM user_roles WHERE user_role_id=?",Long.class,assignments.get("manager"));
-  ok(req("admin","PUT",access()+"/role-permissions",Map.of("roleTypeId",role,"code","PRICE_BOOK_ACCESS","allowed",true,"version","0")),200);
+  ok(req("admin","PUT",access()+"/role-permissions",Map.of("role_type_id",role,"code","PRICE_BOOK_ACCESS","allowed",true,"version","0")),200);
   ok(req("manager","GET",path,null),200);
   body.put("sku","MANAGER-"+tag);body.put("barcode","MANAGER-BAR-"+tag);body.put("name","Manager item");
   assertThat(ok(req("manager","POST",path,body),200).path("saved").asBoolean()).isTrue();
-  String vp=access()+"/vendors";var vb=Map.of("name","Vendor "+tag,"contactName","Representative "+tag,"email","vendor@example.test","phone","5551234567","paymentTerms","Net 30","leadTime",2,"active",true);
+  String vp=access()+"/vendors";var vb=Map.of("name","Vendor "+tag,"contact_name","Representative "+tag,"email","vendor@example.test","phone","5551234567","payment_terms","Net 30","lead_time",2,"active",true);
   long vid=ok(req("admin","POST",vp,vb),200).path("id").asLong();assertThat(vid).isPositive();
   var vl=ok(req("admin","GET",vp,null),200);assertThat(vl.size()).isEqualTo(1);assertThat(vl.get(0).path("name").asText()).isEqualTo("Vendor "+tag);
   ok(req("other","GET",vp,null),403);ok(req("cashier","GET",vp,null),403);
-  var link=Map.of("productId",id,"unitCost",0.99,"unitType","ITEM");
+  var link=Map.of("product_id",id,"unit_cost",0.99,"unit_type","ITEM");
   ok(req("manager","POST",vp+"/"+vid+"/items",link),200);assertThat(ok(req("manager","POST",vp+"/"+vid+"/items",link),200).path("alreadyLinked").asBoolean()).isTrue();
   assertThat(ok(req("admin","GET",vp+"/"+vid+"/items",null),200).size()).isEqualTo(1);
-  ok(req("admin","POST",vp+"/"+vid+"/items",Map.of("productId",secondId,"unitCost",1,"unitType","ITEM")),400);
+  ok(req("admin","POST",vp+"/"+vid+"/items",Map.of("product_id",secondId,"unit_cost",1,"unit_type","ITEM")),400);
   ok(call("admin","PUT",vp+"/"+vid,vb,vl.get(0).path("version").asText(),null),200);
   ok(call("admin","PUT",vp+"/"+vid,vb,vl.get(0).path("version").asText(),null),409);
   ok(req("admin","POST",vp+"/"+vid+"/invoices/0/link-new-items",null),400);
@@ -739,12 +739,12 @@ class ScopedAccessIntegrationTest {
   var invalidPrefs=new LinkedHashMap<String,Object>(prefs);invalidPrefs.put("alertThreshold",-1);ok(call("admin","PUT",vp+"/pricing",invalidPrefs,priced.path("settings").path("version").asText(),null),400);
 
   assertThat(ok(req("admin","GET",vp,null),200).get(0).path("contactName").asText()).isEqualTo("Representative "+tag);
-  var contract=new LinkedHashMap<String,Object>();contract.put("vendorId",vid);contract.put("contractNumber","CON-"+tag);contract.put("startDate","2026-01-01");contract.put("endDate","2026-12-31");contract.put("status","Active");contract.put("discountValue",5);contract.put("discountType","PERCENT");contract.put("returnWindowDays",14);
+  var contract=new LinkedHashMap<String,Object>();contract.put("vendor_id",vid);contract.put("contract_number","CON-"+tag);contract.put("start_date","2026-01-01");contract.put("end_date","2026-12-31");contract.put("status","Active");contract.put("discount_value",5);contract.put("discount_type","PERCENT");contract.put("return_window_days",14);
   var types=ok(req("manager","GET",vp+"/contracts",null),200).path("types");assertThat(types.size()).isEqualTo(12);
-  for(var type:types){contract.put("contractType",type.asText());ok(req("manager","POST",vp+"/contracts",contract),200);}
+  for(var type:types){contract.put("contract_type",type.asText());ok(req("manager","POST",vp+"/contracts",contract),200);}
   var contracts=ok(req("admin","GET",vp+"/contracts",null),200).path("contracts");assertThat(contracts.size()).isEqualTo(12);assertThat(contracts.get(0).path("contractNumber").asText()).isEqualTo("CON-"+tag);assertThat(contracts.get(0).path("discountValue").asDouble()).isEqualTo(5);
   var firstContract=contracts.get(0);long cid=firstContract.path("id").asLong();String cv=firstContract.path("version").asText();
-  contract.put("returnPolicy","14 days, full refund");contract.put("status","Pending");
+  contract.put("return_policy","14 days, full refund");contract.put("status","Pending");
   contract.remove("contractNumber");
   ok(call("manager","PUT",vp+"/contracts/"+cid,contract,cv,null),200);
   ok(call("manager","PUT",vp+"/contracts/"+cid,contract,cv,null),409);
@@ -753,9 +753,9 @@ class ScopedAccessIntegrationTest {
   for(var row:changed)if(row.path("id").asLong()==cid){assertThat(row.path("returnPolicy").asText()).isEqualTo("14 days, full refund");assertThat(row.path("status").asText()).isEqualTo("Pending");assertThat(row.path("contractNumber").asText()).isEqualTo("CON-"+tag);}
   ok(req("cashier","POST",vp+"/contracts",contract),403);ok(req("other","GET",vp+"/contracts",null),403);
   ok(req("admin","POST","/access/stores/"+second+"/vendors/contracts",contract),404);
-  contract.put("contractType","Unsupported");ok(req("admin","POST",vp+"/contracts",contract),400);
-  contract.put("contractType",types.get(0).asText());contract.put("endDate","2025-01-01");ok(req("admin","POST",vp+"/contracts",contract),400);
-  contract.put("endDate","2026-12-31");contract.put("discountValue",101);ok(req("admin","POST",vp+"/contracts",contract),400);
+  contract.put("contract_type","Unsupported");ok(req("admin","POST",vp+"/contracts",contract),400);
+  contract.put("contract_type",types.get(0).asText());contract.put("end_date","2025-01-01");ok(req("admin","POST",vp+"/contracts",contract),400);
+  contract.put("end_date","2026-12-31");contract.put("discount_value",101);ok(req("admin","POST",vp+"/contracts",contract),400);
 
   body.put("sku","INVOICE-"+tag);body.put("barcode","INV-BAR-"+tag);long newProduct=ok(req("admin","POST",path,body),200).path("id").asLong();
   long oldProduct=db.queryForObject("SELECT product_id FROM products WHERE dgt_id=? AND product_sku=?",Long.class,store,"MANAGER-"+tag);
@@ -822,7 +822,7 @@ class ScopedAccessIntegrationTest {
   ok(req("manager","GET","/access/stores/"+second+"/items",null),403);
   for(String who:List.of("cashier","accountant")){
    long deniedRole=db.queryForObject("SELECT role_type_id FROM user_roles WHERE user_role_id=?",Long.class,assignments.get(who));
-   ok(req("admin","PUT",access()+"/role-permissions",Map.of("roleTypeId",deniedRole,"code","PRICE_BOOK_ACCESS","allowed",true,"version","0")),403);
+   ok(req("admin","PUT",access()+"/role-permissions",Map.of("role_type_id",deniedRole,"code","PRICE_BOOK_ACCESS","allowed",true,"version","0")),403);
    db.update("INSERT INTO store_role_permissions(dgt_id,role_type_id,permission_code,allowed) VALUES (?,?,'PRICE_BOOK_ACCESS',true)",store,deniedRole);
    ok(req(who,"GET",path,null),403);ok(req(who,"POST",path,body),403);
   }
@@ -831,8 +831,8 @@ class ScopedAccessIntegrationTest {
  @Test @Order(36) void manualInvoiceMsrpAndApproval() throws Exception {
   String entry="/access/stores/"+store+"/invoice-entry";
   String vendor=db.queryForObject("SELECT vendor_name FROM vendors WHERE dgt_id=? AND is_active ORDER BY vendor_id LIMIT 1",String.class,store);
-  var line=Map.of("sku","ARRIVAL-"+tag,"barcode","ARR-"+tag,"itemName","New invoice item","quantity",2,"unitType","case","unitsPerCase",12,"unitCost",24,"msrp",3.49);
-  var input=Map.of("vendor",vendor,"invoice","ENTRY-"+tag,"deliveryDate",java.time.LocalDate.now().toString(),"lines",List.of(line));
+  var line=Map.of("sku","ARRIVAL-"+tag,"barcode","ARR-"+tag,"item_name","New invoice item","quantity",2,"unit_type","case","units_per_case",12,"unit_cost",24,"msrp",3.49);
+  var input=Map.of("vendor",vendor,"invoice","ENTRY-"+tag,"delivery_date",java.time.LocalDate.now().toString(),"lines",List.of(line));
   ok(req("cashier","POST",entry,input),403);ok(req("other","POST",entry,input),403);
   long id=ok(req("admin","POST",entry,input),200).path("id").asLong();
   long product=db.queryForObject("SELECT product_id FROM grocery_invoice_items WHERE archived_at IS NULL AND invoice_id=?",Long.class,id);
@@ -855,7 +855,7 @@ class ScopedAccessIntegrationTest {
    long role=db.queryForObject("SELECT role_type_id FROM user_roles WHERE user_role_id=?",Long.class,assignments.get(who));
    for(String code:List.of("GROCERY_VIEW_INVENTORY","GROCERY_REDUCE_STOCK","GROCERY_ADJUST_STOCK"))db.update("INSERT INTO store_role_permissions(dgt_id,role_type_id,permission_code,allowed) VALUES (?,?,?,true) ON CONFLICT(dgt_id,role_type_id,permission_code) DO UPDATE SET allowed=true",store,role,code);
   }
-  var input=Map.of("productId",pid,"quantity",2.5,"reason","damaged-returnable");
+  var input=Map.of("product_id",pid,"quantity",2.5,"reason","damaged-returnable");
   long id=ok(req("cashier","POST",path,input),200).path("id").asLong();
   assertThat(db.queryForObject("SELECT available_quantity FROM inventory WHERE product_id=?",java.math.BigDecimal.class,pid)).isEqualByComparingTo("24");
   ok(req("cashier","POST",path,input),409);
@@ -867,16 +867,16 @@ class ScopedAccessIntegrationTest {
   assertThat(db.queryForObject("SELECT count(*) FROM inventory_movements WHERE dgt_id=? AND product_id=? AND movement_type='ADJUSTMENT' AND reference_id=?",Integer.class,store,pid,id)).isEqualTo(1);
   assertThat(db.queryForObject("SELECT qty_changed FROM inventory_movements WHERE dgt_id=? AND product_id=? AND movement_type='ADJUSTMENT' AND reference_id=?",java.math.BigDecimal.class,store,pid,id)).isEqualByComparingTo("-2.5");
   assertThat(ok(req("cashier","GET",path,null),200).path("requests").get(0).path("route").asText()).isEqualTo("returnable");
-  long reject=ok(req("cashier","POST",path,Map.of("productId",pid,"quantity",1,"reason","theft")),200).path("id").asLong();
+  long reject=ok(req("cashier","POST",path,Map.of("product_id",pid,"quantity",1,"reason","theft")),200).path("id").asLong();
   ok(req("admin","POST",path+"/"+reject+"/decision",Map.of("status","REJECTED","note","Not confirmed")),200);
   assertThat(db.queryForObject("SELECT available_quantity FROM inventory WHERE product_id=?",java.math.BigDecimal.class,pid)).isEqualByComparingTo("21.5");
-  ok(req("cashier","POST",path,Map.of("productId",pid,"quantity",99,"reason","theft")),400);
-  long stale=ok(req("cashier","POST",path,Map.of("productId",pid,"quantity",21,"reason","theft")),200).path("id").asLong();
+  ok(req("cashier","POST",path,Map.of("product_id",pid,"quantity",99,"reason","theft")),400);
+  long stale=ok(req("cashier","POST",path,Map.of("product_id",pid,"quantity",21,"reason","theft")),200).path("id").asLong();
   db.update("UPDATE inventory SET available_quantity=1 WHERE product_id=?",pid);
   ok(req("admin","POST",path+"/"+stale+"/decision",Map.of("status","APPROVED")),409);
   assertThat(db.queryForObject("SELECT status FROM inventory_reduction_requests WHERE reduction_request_id=?",String.class,stale)).isEqualTo("PENDING");
   for(long unposted:List.of(reject,stale))assertThat(db.queryForObject("SELECT count(*) FROM inventory_movements WHERE dgt_id=? AND product_id=? AND movement_type='ADJUSTMENT' AND reference_id=?",Integer.class,store,pid,unposted)).isZero();
-  var automatic=ok(req("admin","POST",path,Map.of("productId",pid,"quantity",0.5,"reason","theft")),200);
+  var automatic=ok(req("admin","POST",path,Map.of("product_id",pid,"quantity",0.5,"reason","theft")),200);
   assertThat(automatic.path("pending").asBoolean()).isFalse();
   long autoId=automatic.path("id").asLong();
   assertThat(db.queryForObject("SELECT status FROM inventory_reduction_requests WHERE reduction_request_id=?",String.class,autoId)).isEqualTo("APPROVED");
@@ -892,7 +892,7 @@ class ScopedAccessIntegrationTest {
   long id=db.queryForObject("SELECT reduction_request_id FROM inventory_reduction_requests WHERE dgt_id=? AND status='APPROVED' AND request_type='returnable' LIMIT 1",Long.class,store);
   long vendor=db.queryForObject("SELECT vendor_id FROM vendors WHERE dgt_id=? LIMIT 1",Long.class,store);
   var before=db.queryForObject("SELECT sum(available_quantity) FROM inventory WHERE dgt_id=?",java.math.BigDecimal.class,store);
-  var body=Map.of("requestId",id,"vendorId",vendor,"reason","Damaged in transit","method","Pickup","reference","RMA-TEST");
+  var body=Map.of("request_id",id,"vendor_id",vendor,"reason","Damaged in transit","method","Pickup","reference","RMA-TEST");
   ok(req("cashier","POST",base+"/return-slips",body),403);
   long rid=ok(req("admin","POST",base+"/return-slips",body),200).path("id").asLong();
   ok(req("admin","POST",base+"/return-slips",body),409);
@@ -909,7 +909,7 @@ class ScopedAccessIntegrationTest {
  @Test @Order(39) void recordedLossUsesMovementCost() throws Exception {
   String path="/access/stores/"+store+"/reductions";
   long pid=db.queryForObject("SELECT product_id FROM products WHERE dgt_id=? AND product_sku=?",Long.class,store,"ARRIVAL-"+tag);
-  long id=ok(req("admin","POST",path,Map.of("productId",pid,"quantity",0.25,"reason","damaged-non-returnable")),200).path("id").asLong();
+  long id=ok(req("admin","POST",path,Map.of("product_id",pid,"quantity",0.25,"reason","damaged-non-returnable")),200).path("id").asLong();
   var first=ok(req("admin","GET",path,null),200).path("requests").get(0);
   assertThat(first.path("reduction_request_id").asLong()).isEqualTo(id);
   assertThat(first.path("recorded_loss").asDouble()).isEqualTo(0.5);
@@ -921,18 +921,18 @@ class ScopedAccessIntegrationTest {
   String source="/access/stores/"+store+"/reductions",destination="/access/stores/"+second+"/reductions";
   long pid=db.queryForObject("SELECT product_id FROM products WHERE dgt_id=? AND product_sku=?",Long.class,store,"ARRIVAL-"+tag);
   db.update("UPDATE inventory SET available_quantity=20 WHERE product_id=?",pid);
-  long id=ok(req("admin","POST",source,Map.of("productId",pid,"quantity",10,"reason","store-to-store-transfer","destination",second)),200).path("id").asLong();
+  long id=ok(req("admin","POST",source,Map.of("product_id",pid,"quantity",10,"reason","store-to-store-transfer","destination",second)),200).path("id").asLong();
   long target=db.queryForObject("SELECT product_id FROM products WHERE dgt_id=? LIMIT 1",Long.class,second);
   var old=db.queryForObject("SELECT COALESCE(sum(available_quantity),0) FROM inventory WHERE dgt_id=? AND product_id=?",java.math.BigDecimal.class,second,target);
-  ok(req("admin","POST",source+"/transfers/"+id+"/receive",Map.of("productId",target,"totalReceived",8)),403);
-  ok(req("admin","POST",destination+"/transfers/"+id+"/receive",Map.of("productId",pid,"totalReceived",8)),400);
-  ok(req("admin","POST",destination+"/transfers/"+id+"/receive",Map.of("productId",target,"totalReceived",8)),200);
-  ok(req("admin","POST",destination+"/transfers/"+id+"/receive",Map.of("productId",target,"totalReceived",8)),409);
+  ok(req("admin","POST",source+"/transfers/"+id+"/receive",Map.of("product_id",target,"total_received",8)),403);
+  ok(req("admin","POST",destination+"/transfers/"+id+"/receive",Map.of("product_id",pid,"total_received",8)),400);
+  ok(req("admin","POST",destination+"/transfers/"+id+"/receive",Map.of("product_id",target,"total_received",8)),200);
+  ok(req("admin","POST",destination+"/transfers/"+id+"/receive",Map.of("product_id",target,"total_received",8)),409);
   assertThat(ok(req("admin","GET",destination+"/transfers",null),200).path("transfers").get(0).path("transfer_status").asText()).isEqualTo("PARTIAL");
-  ok(req("admin","POST",destination+"/transfers/"+id+"/receive",Map.of("productId",target,"totalReceived",11)),409);
-  ok(req("admin","POST",destination+"/transfers/"+id+"/receive",Map.of("productId",target,"totalReceived",10)),200);
+  ok(req("admin","POST",destination+"/transfers/"+id+"/receive",Map.of("product_id",target,"total_received",11)),409);
+  ok(req("admin","POST",destination+"/transfers/"+id+"/receive",Map.of("product_id",target,"total_received",10)),200);
   assertThat(db.queryForObject("SELECT available_quantity FROM inventory WHERE product_id=? AND dgt_id=?",java.math.BigDecimal.class,target,second)).isEqualByComparingTo(old.add(java.math.BigDecimal.TEN));
-  long loss=ok(req("admin","POST",source,Map.of("productId",pid,"quantity",2,"reason","damaged-non-returnable")),200).path("id").asLong();
+  long loss=ok(req("admin","POST",source,Map.of("product_id",pid,"quantity",2,"reason","damaged-non-returnable")),200).path("id").asLong();
   var first=ok(req("admin","GET",source,null),200).path("requests").get(0);
   assertThat(first.path("reduction_request_id").asLong()).isEqualTo(loss);
   assertThat(first.path("recorded_loss").asDouble()).isEqualTo(20.0);
@@ -941,11 +941,11 @@ class ScopedAccessIntegrationTest {
  @Test @Order(99) void editPendingInvoiceOnly() throws Exception {
   String path="/access/stores/"+store+"/invoice-entry";
   String vendor=db.queryForObject("SELECT vendor_name FROM vendors WHERE dgt_id=? AND is_active LIMIT 1",String.class,store);
-  var line=Map.of("sku","EDIT-"+tag,"itemName","Editable item","quantity",1,"unitType","item","unitCost",2,"msrp",3);
-  var input=Map.of("vendor",vendor,"invoice","EDIT-"+tag,"deliveryDate","2026-09-12","lines",List.of(line));
+  var line=Map.of("sku","EDIT-"+tag,"item_name","Editable item","quantity",1,"unit_type","item","unit_cost",2,"msrp",3);
+  var input=Map.of("vendor",vendor,"invoice","EDIT-"+tag,"delivery_date","2026-09-12","lines",List.of(line));
   long id=ok(req("admin","POST",path,input),200).path("id").asLong();
   String version=ok(req("admin","GET",path+"/"+id,null),200).path("version").asText();
-  var changed=Map.of("vendor",vendor,"invoice","EDIT-"+tag,"deliveryDate","2026-09-12","lines",List.of(Map.of("sku","EDIT-"+tag,"itemName","Editable item","quantity",4,"unitType","item","unitCost",2,"msrp",4)));
+  var changed=Map.of("vendor",vendor,"invoice","EDIT-"+tag,"delivery_date","2026-09-12","lines",List.of(Map.of("sku","EDIT-"+tag,"item_name","Editable item","quantity",4,"unit_type","item","unit_cost",2,"msrp",4)));
   ok(call("other","PUT",path+"/"+id,changed,version,null),403);
   ok(call("admin","PUT",path+"/"+id,changed,version,null),200);
   ok(call("admin","PUT",path+"/"+id,changed,version,null),409);
@@ -962,19 +962,19 @@ class ScopedAccessIntegrationTest {
  @Test @Order(100) void purchaseOrdersScopedAndDraftLifecycle() throws Exception {
   String path="/access/stores/"+store+"/purchase-orders";
   var catalog=ok(req("admin","GET",path+"/catalog",null),200);assertThat(catalog.size()).isGreaterThan(0);var item=catalog.get(0);
-  var input=Map.of("vendor",item.path("vendor").asText(),"source","Suggested Order Guide","lines",List.of(Map.of("sku",item.path("sku").asText(),"orderedQuantity",12,"unitCost",0)));
+  var input=Map.of("vendor",item.path("vendor").asText(),"source","Suggested Order Guide","lines",List.of(Map.of("sku",item.path("sku").asText(),"ordered_quantity",12,"unit_cost",0)));
   String key=UUID.randomUUID().toString();
   var first=ok(call("admin","POST",path,input,null,key),200);var repeated=ok(call("admin","POST",path,input,null,key),200);assertThat(repeated.path("po_number").asText()).isEqualTo(first.path("po_number").asText());
   ok(req("cashier","GET",path,null),403);
   ok(req("other","GET",path,null),403);
   var order=ok(req("admin","GET",path,null),200).get(0);String id=order.path("id").asText(),version=order.path("version").asText();
   assertThat(order.path("totalQuantity").asDouble()).isEqualTo(12);
-  ok(call("admin","POST",path+"/"+id+"/lines",List.of(Map.of("sku",item.path("sku").asText(),"orderedQuantity",6)),version,null),200);
-  ok(call("admin","POST",path+"/"+id+"/lines",List.of(Map.of("sku",item.path("sku").asText(),"orderedQuantity",6)),version,null),409);
+  ok(call("admin","POST",path+"/"+id+"/lines",List.of(Map.of("sku",item.path("sku").asText(),"ordered_quantity",6)),version,null),200);
+  ok(call("admin","POST",path+"/"+id+"/lines",List.of(Map.of("sku",item.path("sku").asText(),"ordered_quantity",6)),version,null),409);
   order=ok(req("admin","GET",path,null),200).get(0);assertThat(order.path("totalQuantity").asDouble()).isEqualTo(18);version=order.path("version").asText();
   ok(call("admin","POST",path+"/"+id+"/status",Map.of("status","Pending Approval"),version,null),200);
   order=ok(req("admin","GET",path,null),200).get(0);version=order.path("version").asText();
-  ok(call("admin","POST",path+"/"+id+"/lines",List.of(Map.of("sku",item.path("sku").asText(),"orderedQuantity",6)),version,null),409);
+  ok(call("admin","POST",path+"/"+id+"/lines",List.of(Map.of("sku",item.path("sku").asText(),"ordered_quantity",6)),version,null),409);
   ok(call("admin","POST",path+"/"+id+"/status",Map.of("status","Received"),version,null),409);
   ok(call("admin","POST",path+"/"+id+"/status",Map.of("status","Cancelled"),version,null),200);
   assertThat(ok(req("admin","GET","/access/stores/"+second+"/purchase-orders",null),200).size()).isZero();
@@ -985,19 +985,19 @@ class ScopedAccessIntegrationTest {
   var item=ok(req("cashier","GET",poPath+"/catalog",null),200).get(0);
   long pid=item.path("product_id").asLong();String sku=item.path("sku").asText(),vendor=item.path("vendor").asText();
   var before=db.queryForObject("SELECT COALESCE(sum(available_quantity),0) FROM inventory WHERE dgt_id=? AND product_id=?",java.math.BigDecimal.class,store,pid);
-  var create=Map.of("vendor",vendor,"source","Suggested Order Guide","lines",List.of(Map.of("sku",sku,"orderedQuantity",12)));
+  var create=Map.of("vendor",vendor,"source","Suggested Order Guide","lines",List.of(Map.of("sku",sku,"ordered_quantity",12)));
   ok(req("cashier","POST",poPath,create),200);
   var po=ok(req("cashier","GET",poPath,null),200).get(0);String poId=po.path("id").asText();
   assertThat(po.path("canEdit").asBoolean()).isTrue();assertThat(po.path("canApprove").asBoolean()).isFalse();
   ok(call("cashier","POST",poPath+"/"+poId+"/status",Map.of("status","Pending Approval"),po.path("version").asText(),null),200);
   po=ok(req("cashier","GET",poPath,null),200).get(0);
   ok(call("cashier","POST",poPath+"/"+poId+"/status",Map.of("status","Approved"),po.path("version").asText(),null),403);
-  var line=new LinkedHashMap<String,Object>();line.put("sku",sku);line.put("itemName",item.path("name").asText());line.put("quantity",2);line.put("receivedQuantity",1);line.put("unitType","case");line.put("unitsPerCase",6);line.put("unitCost",9);line.put("tax",1.2);line.put("msrp",2.5);
-  var invoice=new LinkedHashMap<String,Object>();invoice.put("vendor",vendor);invoice.put("invoice","PO-LINK-"+tag);invoice.put("deliveryDate","2026-09-13");invoice.put("purchaseOrderId",poId);invoice.put("lines",List.of(line));
+  var line=new LinkedHashMap<String,Object>();line.put("sku",sku);line.put("item_name",item.path("name").asText());line.put("quantity",2);line.put("received_quantity",1);line.put("unit_type","case");line.put("units_per_case",6);line.put("unit_cost",9);line.put("tax",1.2);line.put("msrp",2.5);
+  var invoice=new LinkedHashMap<String,Object>();invoice.put("vendor",vendor);invoice.put("invoice","PO-LINK-"+tag);invoice.put("delivery_date","2026-09-13");invoice.put("purchase_order_id",poId);invoice.put("lines",List.of(line));
   ok(req("admin","POST",invoicePath,invoice),400);
   ok(call("manager","POST",poPath+"/"+poId+"/status",Map.of("status","Approved"),po.path("version").asText(),null),200);
   po=ok(req("admin","GET",poPath,null),200).get(0);assertThat(po.path("status").asText()).isEqualTo("Approved");
-  ok(call("cashier","POST",poPath+"/"+poId+"/lines",List.of(Map.of("sku",sku,"orderedQuantity",1)),po.path("version").asText(),null),409);
+  ok(call("cashier","POST",poPath+"/"+poId+"/lines",List.of(Map.of("sku",sku,"ordered_quantity",1)),po.path("version").asText(),null),409);
   assertThat(db.queryForObject("SELECT COALESCE(sum(available_quantity),0) FROM inventory WHERE dgt_id=? AND product_id=?",java.math.BigDecimal.class,store,pid)).isEqualByComparingTo(before);
   assertThat(ok(req("admin","GET",invoicePath+"/pending-pos",null),200).get(0).path("pending").asBoolean()).isTrue();
   db.update("INSERT INTO vendors(dgt_id,vendor_name) VALUES (?,?)",store,"Wrong PO Vendor "+tag);
@@ -1006,7 +1006,7 @@ class ScopedAccessIntegrationTest {
   long id=ok(req("admin","POST",invoicePath,invoice),200).path("id").asLong();
   var detail=ok(req("admin","GET",invoicePath+"/"+id,null),200);assertThat(detail.path("purchaseOrderId").asText()).isEqualTo(poId);assertThat(detail.path("items").get(0).path("orderedQty").asDouble()).isEqualTo(2);assertThat(detail.path("items").get(0).path("receivedQty").asDouble()).isEqualTo(1);assertThat(detail.path("items").get(0).path("total").asDouble()).isEqualTo(19.2);
   line.put("tax",1.5);ok(call("admin","PUT",invoicePath+"/"+id,invoice,detail.path("version").asText(),null),200);
-  line.put("receivedQuantity",-1);ok(call("admin","PUT",invoicePath+"/"+id,invoice,ok(req("admin","GET",invoicePath+"/"+id,null),200).path("version").asText(),null),400);line.put("receivedQuantity",1);
+  line.put("received_quantity",-1);ok(call("admin","PUT",invoicePath+"/"+id,invoice,ok(req("admin","GET",invoicePath+"/"+id,null),200).path("version").asText(),null),400);line.put("received_quantity",1);
   assertThat(db.queryForObject("SELECT COALESCE(sum(available_quantity),0) FROM inventory WHERE dgt_id=? AND product_id=?",java.math.BigDecimal.class,store,pid)).isEqualByComparingTo(before);
   ok(req("admin","POST",invoicePath+"/"+id+"/approve",null),200);ok(req("admin","POST",invoicePath+"/"+id+"/approve",null),200);
   assertThat(db.queryForObject("SELECT available_quantity FROM inventory WHERE dgt_id=? AND product_id=?",java.math.BigDecimal.class,store,pid)).isEqualByComparingTo(before.add(new java.math.BigDecimal("6")));
@@ -1022,16 +1022,16 @@ class ScopedAccessIntegrationTest {
   String path=access()+"/invoice-entry";
   var item=ok(req("admin","GET",access()+"/purchase-orders/catalog",null),200).get(0);long pid=item.path("product_id").asLong();
   var before=db.queryForObject("SELECT COALESCE(sum(available_quantity),0) FROM inventory WHERE dgt_id=? AND product_id=?",java.math.BigDecimal.class,store,pid);
-  var body=new LinkedHashMap<String,Object>();body.put("vendor",item.path("vendor").asText());body.put("invoice","DELIVERY-"+tag);body.put("invoiceDate","2026-09-13");body.put("deliveryDate","2026-09-12");body.put("deliveryTime","22:15");body.put("dueDate","2026-10-13");body.put("driverName","Test Driver");body.put("driverNumber","DRV-007");body.put("routeId","ROUTE-9");body.put("terms","Net 30");body.put("notes","Leave invoice with manager");body.put("freight",5.5);body.put("fuelSurcharge",2.25);body.put("handlingFee",1.5);body.put("discount",3);
-  body.put("lines",List.of(Map.of("sku",item.path("sku").asText(),"itemName",item.path("name").asText(),"quantity",5,"receivedQuantity",2,"unitType","item","unitsPerCase",1,"unitCost",10,"tax",4)));
+  var body=new LinkedHashMap<String,Object>();body.put("vendor",item.path("vendor").asText());body.put("invoice","DELIVERY-"+tag);body.put("invoice_date","2026-09-13");body.put("delivery_date","2026-09-12");body.put("delivery_time","22:15");body.put("due_date","2026-10-13");body.put("driver_name","Test Driver");body.put("driver_number","DRV-007");body.put("route_id","ROUTE-9");body.put("terms","Net 30");body.put("notes","Leave invoice with manager");body.put("freight",5.5);body.put("fuel_surcharge",2.25);body.put("handling_fee",1.5);body.put("discount",3);
+  body.put("lines",List.of(Map.of("sku",item.path("sku").asText(),"item_name",item.path("name").asText(),"quantity",5,"received_quantity",2,"unit_type","item","units_per_case",1,"unit_cost",10,"tax",4)));
   long id=ok(req("admin","POST",path,body),200).path("id").asLong();
   var detail=ok(req("admin","GET",path+"/"+id,null),200);var invoice=detail.path("invoice");String version=detail.path("version").asText();
   assertThat(invoice.path("invoiceDate").asText()).isEqualTo("2026-09-13");assertThat(invoice.path("deliveryDate").asText()).isEqualTo("2026-09-12");assertThat(invoice.path("deliveryTime").asText()).isEqualTo("22:15:00");assertThat(invoice.path("dueDate").asText()).isEqualTo("2026-10-13");assertThat(invoice.path("driverName").asText()).isEqualTo("Test Driver");assertThat(invoice.path("driverNumber").asText()).isEqualTo("DRV-007");assertThat(invoice.path("routeId").asText()).isEqualTo("ROUTE-9");assertThat(invoice.path("termsNet").asText()).isEqualTo("Net 30");assertThat(invoice.path("notes").asText()).isEqualTo("Leave invoice with manager");assertThat(invoice.path("otherCharges").asDouble()).isEqualTo(6.25);assertThat(invoice.path("total").asDouble()).isEqualTo(60.25);
   assertThat(db.queryForObject("SELECT total_amount FROM invoice_charges WHERE invoice_id=? AND charge_type='GROCERY'",java.math.BigDecimal.class,id)).isEqualByComparingTo("60.25");
   body.put("freight",6.5);body.put("notes","Updated note");ok(call("admin","PUT",path+"/"+id,body,version,null),200);ok(call("admin","PUT",path+"/"+id,body,version,null),409);
   detail=ok(req("admin","GET",path+"/"+id,null),200);version=detail.path("version").asText();assertThat(detail.path("invoice").path("total").asDouble()).isEqualTo(61.25);
-  for(var invalid:List.of(Map.entry("discount",1000),Map.entry("fuelSurcharge",-1),Map.entry("handlingFee",1.001),Map.entry("dueDate","2026-09-01"),Map.entry("driverName","x".repeat(201)))){Object previous=body.put(invalid.getKey(),invalid.getValue());ok(call("admin","PUT",path+"/"+id,body,version,null),400);body.put(invalid.getKey(),previous);}
-  body.put("deliveryDate",null);ok(call("admin","PUT",path+"/"+id,body,version,null),400);body.put("deliveryTime",null);body.put("routeId",null);ok(call("admin","PUT",path+"/"+id,body,version,null),200);
+  for(var invalid:List.of(Map.entry("discount",1000),Map.entry("fuel_surcharge",-1),Map.entry("handling_fee",1.001),Map.entry("due_date","2026-09-01"),Map.entry("driver_name","x".repeat(201)))){Object previous=body.put(invalid.getKey(),invalid.getValue());ok(call("admin","PUT",path+"/"+id,body,version,null),400);body.put(invalid.getKey(),previous);}
+  body.put("delivery_date",null);ok(call("admin","PUT",path+"/"+id,body,version,null),400);body.put("delivery_time",null);body.put("route_id",null);ok(call("admin","PUT",path+"/"+id,body,version,null),200);
   detail=ok(req("admin","GET",path+"/"+id,null),200);assertThat(detail.path("invoice").path("deliveryDate").asText()).isEmpty();assertThat(detail.path("invoice").path("routeId").asText()).isEmpty();assertThat(detail.path("invoice").path("notes").asText()).isEqualTo("Updated note");
   assertThat(db.queryForObject("SELECT count(*) FROM invoice_charges WHERE invoice_id=?",Integer.class,id)).isEqualTo(1);
   assertThat(db.queryForObject("SELECT COALESCE(sum(available_quantity),0) FROM inventory WHERE dgt_id=? AND product_id=?",java.math.BigDecimal.class,store,pid)).isEqualByComparingTo(before);
@@ -1047,7 +1047,7 @@ class ScopedAccessIntegrationTest {
   String path=access()+"/grocery-settings";
   var initial=ok(req("admin","GET",path,null),200);assertThat(initial.path("settings").isNull()).isTrue();assertThat(initial.path("version").asText()).isEqualTo("0");
   ok(req("manager","GET",path,null),403);ok(req("other","GET",path,null),403);
-  var prefs=new LinkedHashMap<String,Object>();prefs.put("defaultTaxType","non_taxable");prefs.put("overrideCategory",true);prefs.put("overrideItem",true);prefs.put("taxRounding","standard");prefs.put("ebtExempt",true);prefs.put("wicExempt",true);prefs.put("expiryTracking",true);prefs.put("alertDays",10);prefs.put("expiredHandling","warning");prefs.put("dashboardNotif",true);prefs.put("emailNotif",false);prefs.put("inAppNotif",true);prefs.put("reorderRule","fixed");prefs.put("leadTime",3);prefs.put("safetyStock",12.5);prefs.put("itemOverride",true);
+  var prefs=new LinkedHashMap<String,Object>();prefs.put("defaultTaxType","non_taxable");prefs.put("overrideCategory",true);prefs.put("overrideItem",true);prefs.put("taxRounding","standard");prefs.put("ebtExempt",true);prefs.put("wicExempt",true);prefs.put("expiryTracking",true);prefs.put("alertDays",10);prefs.put("expiredHandling","warning");prefs.put("dashboardNotif",true);prefs.put("emailNotif",false);prefs.put("inAppNotif",true);prefs.put("reorderRule","fixed");prefs.put("lead_time",3);prefs.put("safetyStock",12.5);prefs.put("itemOverride",true);
   var margin=initial.path("margins").get(0);assertThat(margin).isNotNull();String key=margin.path("key").asText();
   var payload=new LinkedHashMap<String,Object>();payload.put("settings",prefs);payload.put("margins",List.of(Map.of("key",key,"version",margin.path("version").asText(),"margin",32.5)));
   var prices=db.queryForList("SELECT product_id,retail_price FROM product_store_prices WHERE dgt_id=? ORDER BY product_id",store);
@@ -1059,7 +1059,7 @@ class ScopedAccessIntegrationTest {
   assertThat(ok(req("admin","GET","/access/stores/"+second+"/grocery-settings",null),200).path("settings").isNull()).isTrue();
   ok(req("other","GET",path+"/defaults",null),403);
   String version=saved.path("version").asText();payload.put("margins",List.of());
-  for(var invalid:List.of(Map.entry("alertDays",-1),Map.entry("leadTime",1.5),Map.entry("safetyStock",1001),Map.entry("taxRounding","made_up"),Map.entry("overrideItem","true"))){Object old=prefs.put(invalid.getKey(),invalid.getValue());ok(call("admin","PUT",path,payload,version,null),400);prefs.put(invalid.getKey(),old);}
+  for(var invalid:List.of(Map.entry("alertDays",-1),Map.entry("lead_time",1.5),Map.entry("safetyStock",1001),Map.entry("taxRounding","made_up"),Map.entry("overrideItem","true"))){Object old=prefs.put(invalid.getKey(),invalid.getValue());ok(call("admin","PUT",path,payload,version,null),400);prefs.put(invalid.getKey(),old);}
   prefs.put("alertDays",11);payload.put("margins",List.of(Map.of("key",key,"version",margin.path("version").asText(),"margin",33)));
   ok(call("admin","PUT",path,payload,version,null),409);assertThat(ok(req("admin","GET",path,null),200).path("settings").path("alertDays").asInt()).isEqualTo(10);
   var secondMargins=ok(req("admin","GET","/access/stores/"+second+"/grocery-settings",null),200).path("margins");
@@ -1081,15 +1081,15 @@ class ScopedAccessIntegrationTest {
   ok(req("admin","POST",path+"/grades",Map.of("name","GAS TEST "+tag,"type","Gasoline","octane",89)),409);
   var prefs=new LinkedHashMap<String,Object>();for(String key:List.of("sells_diesel","two_blended_grades","auto_flag_variance","variance_approval_required","low_tank_dashboard","low_tank_email","high_variance_dashboard","high_variance_email","repeated_loss_dashboard","repeated_loss_email","missing_reading_dashboard","missing_reading_email","lock_critical_after_delivery"))prefs.put(key,false);
   prefs.put("plus_tank_type","blended");prefs.put("blend_regular_percentage",50);prefs.put("federal_multiplier",0.01);prefs.put("federal_tolerance_gallons",130);prefs.put("state_multiplier",0.01);prefs.put("state_tolerance_gallons",130);prefs.put("report_state","New York");prefs.put("supplier_payment_method","ach");prefs.put("gas_brand_type","unbranded");prefs.put("card_settlement_method","direct");prefs.put("allowed_variance_percentage",2);prefs.put("daily_loss_threshold_gallons",50);
-  var tank=new LinkedHashMap<String,Object>();tank.put("number","T-01");tank.put("name","Test tank");tank.put("gradeId",gradeId);tank.put("capacity",10000);tank.put("safeFill",11000);tank.put("lowLevel",15);tank.put("prepaidTax",0.1);tank.put("taxRate",0.2);tank.put("ustFees",0.01);tank.put("posMapping","POS-1");
+  var tank=new LinkedHashMap<String,Object>();tank.put("number","T-01");tank.put("name","Test tank");tank.put("grade_id",gradeId);tank.put("capacity",10000);tank.put("safe_fill",11000);tank.put("low_level",15);tank.put("prepaid_tax",0.1);tank.put("tax_rate",0.2);tank.put("ust_fees",0.01);tank.put("pos_mapping","POS-1");
   var body=Map.of("settings",prefs,"tanks",List.of(tank));ok(call("admin","PUT",path,body,"0",null),400);assertThat(ok(req("admin","GET",path,null),200).path("settings").isNull()).isTrue();
-  tank.put("safeFill",9000);ok(call("admin","PUT",path,body,"0",null),200);ok(call("admin","PUT",path,body,"0",null),409);
+  tank.put("safe_fill",9000);ok(call("admin","PUT",path,body,"0",null),200);ok(call("admin","PUT",path,body,"0",null),409);
   var saved=ok(req("admin","GET",path,null),200);var t=saved.path("tanks").get(0);String id=t.path("id").asText(),version=saved.path("version").asText();tank.put("id",id);tank.put("version",t.path("version").asText());assertThat(t.path("capacityLocked").asBoolean()).isTrue();assertThat(t.path("gradeLocked").asBoolean()).isTrue();assertThat(t.path("taxRate").asDouble()).isEqualTo(0.2);
   assertThat(ok(req("admin","GET",otherPath,null),200).path("tanks").isEmpty()).isTrue();ok(call("admin","PUT",otherPath,body,"0",null),400);
   tank.put("capacity",12000);ok(call("admin","PUT",path,body,version,null),409);tank.put("capacity",10000);
   prefs.put("allowed_variance_percentage",101);ok(call("admin","PUT",path,body,version,null),400);prefs.put("allowed_variance_percentage",2);
   tank.put("version","0");prefs.put("daily_loss_threshold_gallons",60);ok(call("admin","PUT",path,body,version,null),409);assertThat(ok(req("admin","GET",path,null),200).path("settings").path("daily_loss_threshold_gallons").asDouble()).isEqualTo(50);tank.put("version",t.path("version").asText());
-  db.update("INSERT INTO fuel_tank_readings(tank_id,reading_datetime,volume_gallons,created_by) VALUES (?,CURRENT_TIMESTAMP,100,?)",Long.parseLong(id),users.get("admin"));tank.put("safeFill",9500);ok(call("admin","PUT",path,body,version,null),409);tank.put("safeFill",9000);
+  db.update("INSERT INTO fuel_tank_readings(tank_id,reading_datetime,volume_gallons,created_by) VALUES (?,CURRENT_TIMESTAMP,100,?)",Long.parseLong(id),users.get("admin"));tank.put("safe_fill",9500);ok(call("admin","PUT",path,body,version,null),409);tank.put("safe_fill",9000);
   for(String role:List.of("MANAGER","CASHIER"))db.update("INSERT INTO store_role_permissions(dgt_id,role_type_id,permission_code,allowed) SELECT ?,role_type_id,'GAS_SETTINGS',true FROM role_types WHERE role_type_name=?",store,role);
   ok(call("cashier","PUT",path,body,version,null),403);tank.put("name","Updated tank");ok(call("manager","PUT",path,body,version,null),200);
   assertThat(db.queryForObject("SELECT count(*) FROM fuel_tank_grade_assignments WHERE tank_id=?",Integer.class,Long.parseLong(id))).isEqualTo(1);
@@ -1108,8 +1108,8 @@ class ScopedAccessIntegrationTest {
   long vendor=db.queryForObject("INSERT INTO vendors(dgt_id,vendor_name) VALUES (?,?) RETURNING vendor_id",Long.class,store,"Gas supplier "+tag);
   long foreignVendor=db.queryForObject("INSERT INTO vendors(dgt_id,vendor_name) VALUES (?,?) RETURNING vendor_id",Long.class,second,"Gas supplier "+tag);
   String date=db.queryForObject("SELECT (CURRENT_TIMESTAMP AT TIME ZONE timezone)::date::text FROM stores WHERE dgt_id=?",String.class,store);
-  var header=new LinkedHashMap<String,Object>();header.put("bolNumber","BOL-"+tag);header.put("folio","F-12");header.put("loadDate",date);header.put("loadTime","06:30");header.put("terminal","Test terminal");header.put("supplier",Long.toString(vendor));header.put("customer","Account 12");header.put("destination","Store address");header.put("carrier","Test carrier");header.put("driver","Test driver");header.put("tractor","T-7");header.put("trailer","R-8");header.put("notes","No pricing on BOL");
-  var line=new LinkedHashMap<String,Object>();line.put("tank",tank);line.put("gradeId",grade);line.put("productCode","REG87");line.put("description","Regular gasoline");line.put("octane",87);line.put("grossGallons",100);line.put("netGallons",99.125);line.put("temperature",61.5);line.put("gravity",57.25);line.put("meter","M1");line.put("compartment","C1");
+  var header=new LinkedHashMap<String,Object>();header.put("bol_number","BOL-"+tag);header.put("folio","F-12");header.put("load_date",date);header.put("load_time","06:30");header.put("terminal","Test terminal");header.put("supplier",Long.toString(vendor));header.put("customer","Account 12");header.put("destination","Store address");header.put("carrier","Test carrier");header.put("driver","Test driver");header.put("tractor","T-7");header.put("trailer","R-8");header.put("notes","No pricing on BOL");
+  var line=new LinkedHashMap<String,Object>();line.put("tank",tank);line.put("grade_id",grade);line.put("product_code","REG87");line.put("description","Regular gasoline");line.put("octane",87);line.put("gross_gallons",100);line.put("net_gallons",99.125);line.put("temperature",61.5);line.put("gravity",57.25);line.put("meter","M1");line.put("compartment","C1");
   var in=new LinkedHashMap<String,Object>();in.put("header",header);in.put("lines",List.of(line));in.put("receive",false);
   long productMovementCount=db.queryForObject("SELECT count(*) FROM inventory_movements WHERE dgt_id=? AND product_id IS NOT NULL",Long.class,store);
   long readingCount=db.queryForObject("SELECT count(*) FROM fuel_tank_readings WHERE tank_id=?",Long.class,Long.parseLong(tank));
@@ -1117,9 +1117,9 @@ class ScopedAccessIntegrationTest {
   String prices=db.queryForList("SELECT * FROM fuel_prices WHERE fuel_price_id=?",priceId).toString();
   line.put("tank",otherTank);ok(req("admin","POST",path,in),400);line.put("tank",tank);
   header.put("supplier",Long.toString(foreignVendor));ok(req("admin","POST",path,in),400);header.put("supplier",Long.toString(vendor));
-  line.put("gradeId","999999999");ok(req("admin","POST",path,in),409);line.put("gradeId",grade);
-  line.put("grossGallons",0);ok(req("admin","POST",path,in),400);line.put("grossGallons",100);
-  line.put("netGallons",99.12345);ok(req("admin","POST",path,in),400);line.put("netGallons",99.125);
+  line.put("grade_id","999999999");ok(req("admin","POST",path,in),409);line.put("grade_id",grade);
+  line.put("gross_gallons",0);ok(req("admin","POST",path,in),400);line.put("gross_gallons",100);
+  line.put("net_gallons",99.12345);ok(req("admin","POST",path,in),400);line.put("net_gallons",99.125);
   String key=UUID.randomUUID().toString();var draft=ok(call("admin","POST",path,in,null,key),200);String id=draft.path("id").asText(),v1=draft.path("version").asText();
   assertThat(draft.path("header").path("driver").asText()).isEqualTo("Test driver");assertThat(draft.path("lines").get(0).path("netGallons").asDouble()).isEqualTo(99.125);
   assertThat(ok(call("admin","POST",path,in,null,key),200).path("id").asText()).isEqualTo(id);
@@ -1145,10 +1145,10 @@ class ScopedAccessIntegrationTest {
   assertThat(db.queryForObject("SELECT count(*) FROM fuel_tank_readings WHERE tank_id=?",Long.class,Long.parseLong(tank))).isEqualTo(readingCount);
   assertThat(db.queryForList("SELECT * FROM fuel_prices WHERE fuel_price_id=?",priceId).toString()).isEqualTo(prices);
   assertThat(db.queryForObject("SELECT count(*) FROM access_audit_events WHERE dgt_id=? AND event_type='GAS_DELIVERY_RECEIVED' AND target_id=?",Integer.class,store,id)).isEqualTo(1);
-  header.put("bolNumber","FUTURE-"+tag);header.put("loadDate",java.time.LocalDate.parse(date).plusDays(1).toString());in.put("receive",true);ok(req("admin","POST",path,in),400);
+  header.put("bol_number","FUTURE-"+tag);header.put("load_date",java.time.LocalDate.parse(date).plusDays(1).toString());in.put("receive",true);ok(req("admin","POST",path,in),400);
   assertThat(db.queryForObject("SELECT count(*) FROM fuel_deliveries WHERE dgt_id=? AND bol_number=?",Integer.class,store,"FUTURE-"+tag)).isZero();
   // Multi-compartment delivery posts a separate movement per line, with no price update.
-  header.put("loadDate",date);header.put("loadTime",null);header.put("bolNumber","MULTI-"+tag);in.put("lines",List.of(line,line));var received=ok(req("admin","POST",path,in),200);
+  header.put("load_date",date);header.put("load_time",null);header.put("bol_number","MULTI-"+tag);in.put("lines",List.of(line,line));var received=ok(req("admin","POST",path,in),200);
   assertThat(received.path("status").asText()).isEqualTo("RECEIVED");assertThat(db.queryForObject("SELECT count(*) FROM inventory_movements WHERE dgt_id=? AND reference_id=? AND movement_type='FUEL_DELIVERY'",Integer.class,store,received.path("id").asLong())).isEqualTo(2);
   assertThat(db.queryForList("SELECT * FROM fuel_prices WHERE fuel_price_id=?",priceId).toString()).isEqualTo(prices);
  }
@@ -1158,10 +1158,10 @@ class ScopedAccessIntegrationTest {
   ok(req("other","GET",path,null),403);ok(req("cashier","GET",path,null),403);ok(req("accountant","GET",path,null),403);
   var initial=ok(req("manager","GET",path,null),200);var current=initial.path("history").get(0);String grade=current.path("gradeId").asText();
   assertThat(current.path("current").asBoolean()).isTrue();String version=current.path("id").asText()+":"+current.path("version").asText();
-  var in=new LinkedHashMap<String,Object>();in.put("gradeId",grade);in.put("cash",3.499);in.put("credit",3.599);in.put("reason","market");in.put("notes","Manual test change");in.put("effectiveTime","now");
+  var in=new LinkedHashMap<String,Object>();in.put("grade_id",grade);in.put("cash",3.499);in.put("credit",3.599);in.put("reason","market");in.put("notes","Manual test change");in.put("effective_time","now");
   long movements=db.queryForObject("SELECT count(*) FROM inventory_movements WHERE dgt_id=?",Long.class,store);
   in.put("cash",0);ok(call("admin","POST",path,in,version,null),400);in.put("cash",3.4999);ok(call("admin","POST",path,in,version,null),400);in.put("cash",3.499);
-  in.put("effectiveTime","scheduled");ok(call("admin","POST",path,in,version,null),400);in.put("effectiveTime","now");
+  in.put("effective_time","scheduled");ok(call("admin","POST",path,in,version,null),400);in.put("effective_time","now");
   ok(call("cashier","POST",path,in,version,null),403);ok(call("admin","POST",path,in,"0",null),409);
   String key=UUID.randomUUID().toString();var saved=ok(call("manager","POST",path,in,version,key),200);var latest=saved.path("history").get(0);
   assertThat(latest.path("current").asBoolean()).isTrue();assertThat(latest.path("cash").asDouble()).isEqualTo(3.499);assertThat(latest.path("credit").asDouble()).isEqualTo(3.599);assertThat(latest.path("oldCash").asDouble()).isEqualTo(3.199);assertThat(latest.path("reason").asText()).isEqualTo("market");assertThat(latest.path("notes").asText()).isEqualTo("Manual test change");assertThat(latest.path("source").asText()).isEqualTo("Manual");assertThat(latest.path("actor").asText()).contains("manager");
@@ -1187,22 +1187,22 @@ class ScopedAccessIntegrationTest {
   java.util.function.Function<JsonNode,String> version=n->n.path("id").asText()+":"+n.path("version").asText();
   var baseline=active.apply(ok(req("admin","GET",path,null),200));String grade=baseline.path("gradeId").asText();
   db.update("UPDATE stores SET timezone='America/New_York' WHERE dgt_id=?",store);
-  var in=new LinkedHashMap<String,Object>();in.put("gradeId",grade);in.put("cash",4.799);in.put("credit",4.899);in.put("reason","market");in.put("notes","Scheduled test");in.put("effectiveTime","scheduled");
-  in.put("scheduledFor","2027-03-14T02:30:00");ok(call("admin","POST",path,in,version.apply(baseline),null),400);
-  in.put("scheduledFor","2026-11-01T01:30:00");ok(call("admin","POST",path,in,version.apply(baseline),null),400);
-  in.put("overlapChoice","later");String key=UUID.randomUUID().toString();var scheduled=ok(call("admin","POST",path,in,version.apply(baseline),key),200);var future=scheduled.path("history").get(0);
+  var in=new LinkedHashMap<String,Object>();in.put("grade_id",grade);in.put("cash",4.799);in.put("credit",4.899);in.put("reason","market");in.put("notes","Scheduled test");in.put("effective_time","scheduled");
+  in.put("scheduled_for","2027-03-14T02:30:00");ok(call("admin","POST",path,in,version.apply(baseline),null),400);
+  in.put("scheduled_for","2026-11-01T01:30:00");ok(call("admin","POST",path,in,version.apply(baseline),null),400);
+  in.put("overlap_choice","later");String key=UUID.randomUUID().toString();var scheduled=ok(call("admin","POST",path,in,version.apply(baseline),key),200);var future=scheduled.path("history").get(0);
   assertThat(future.path("status").asText()).isEqualTo("SCHEDULED");assertThat(java.time.OffsetDateTime.parse(future.path("effectiveFrom").asText()).toInstant()).isEqualTo(java.time.Instant.parse("2026-11-01T06:30:00Z"));
   assertThat(active.apply(scheduled).path("cash").asDouble()).isEqualTo(baseline.path("cash").asDouble());
   assertThat(ok(call("admin","POST",path,in,version.apply(baseline),key),200).path("history").size()).isEqualTo(scheduled.path("history").size());
   ok(call("admin","POST",path,in,version.apply(active.apply(scheduled)),null),409);
-  var immediate=new LinkedHashMap<String,Object>(in);immediate.put("effectiveTime","now");immediate.put("scheduledFor",null);immediate.put("overlapChoice",null);immediate.put("cash",4.199);immediate.put("credit",4.299);
+  var immediate=new LinkedHashMap<String,Object>(in);immediate.put("effective_time","now");immediate.put("scheduled_for",null);immediate.put("overlap_choice",null);immediate.put("cash",4.199);immediate.put("credit",4.299);
   var interim=ok(call("manager","POST",path,immediate,version.apply(active.apply(scheduled)),null),200);assertThat(active.apply(interim).path("effectiveTo").asText()).isEqualTo(future.path("effectiveFrom").asText());
   String cancel=path+"/"+future.path("id").asText()+"/cancel";
   ok(call("cashier","POST",cancel,null,version.apply(future),null),403);ok(call("admin","POST","/access/stores/"+second+"/gas-prices/"+future.path("id").asText()+"/cancel",null,version.apply(future),null),404);ok(call("admin","POST",cancel,null,"stale",null),409);
   var cancelled=ok(call("admin","POST",cancel,null,version.apply(future),null),200);assertThat(cancelled.path("history").get(0).path("status").asText()).isEqualTo("CANCELLED");assertThat(active.apply(cancelled).path("cash").asDouble()).isEqualTo(4.199);assertThat(active.apply(cancelled).path("effectiveTo").isNull()).isTrue();
   ok(call("admin","POST",cancel,null,version.apply(future),null),200);
-  in.put("overlapChoice",null);in.put("scheduledFor",java.time.LocalDateTime.now(java.time.ZoneId.of("America/New_York")).minusMinutes(1).withNano(0).toString());ok(call("admin","POST",path,in,version.apply(active.apply(cancelled)),null),400);
-  var when=java.time.LocalDateTime.now(java.time.ZoneId.of("America/New_York")).plusSeconds(6).withNano(0);in.put("scheduledFor",when.toString());var soon=ok(call("admin","POST",path,in,version.apply(active.apply(cancelled)),null),200);
+  in.put("overlap_choice",null);in.put("scheduled_for",java.time.LocalDateTime.now(java.time.ZoneId.of("America/New_York")).minusMinutes(1).withNano(0).toString());ok(call("admin","POST",path,in,version.apply(active.apply(cancelled)),null),400);
+  var when=java.time.LocalDateTime.now(java.time.ZoneId.of("America/New_York")).plusSeconds(6).withNano(0);in.put("scheduled_for",when.toString());var soon=ok(call("admin","POST",path,in,version.apply(active.apply(cancelled)),null),200);
   var next=java.util.stream.StreamSupport.stream(soon.path("history").spliterator(),false).filter(r->r.path("status").asText().equals("SCHEDULED")).findFirst().orElseThrow();
   assertThat(active.apply(soon).path("cash").asDouble()).isEqualTo(4.199);
   long wait=java.time.Duration.between(java.time.Instant.now(),when.atZone(java.time.ZoneId.of("America/New_York")).toInstant()).toMillis()+300;if(wait>0)Thread.sleep(wait);
@@ -1226,7 +1226,7 @@ class ScopedAccessIntegrationTest {
   ok(req("admin","POST",path+"/tanks/"+tank+"/initial-reading",Map.of("gallons",1000)),200);
   ok(req("admin","POST",path+"/tanks/"+tank+"/initial-reading",Map.of("gallons",1000)),409);
   java.util.function.Supplier<JsonNode> current=()->{try{return java.util.stream.StreamSupport.stream(ok(req("admin","GET",path,null),200).path("tanks").spliterator(),false).filter(tankRow->tankRow.path("id").asText().equals(Long.toString(tank))).findFirst().orElseThrow();}catch(Exception e){throw new RuntimeException(e);}};
-  var t=current.get();var line=new LinkedHashMap<String,Object>();line.put("tankId",tank);line.put("gradeId",grade);line.put("systemGallons",1000);line.put("actualGallons",950);line.put("readingId",t.path("readingId").asText());line.put("movementId",null);line.put("reason","calibration");
+  var t=current.get();var line=new LinkedHashMap<String,Object>();line.put("tank_id",tank);line.put("grade_id",grade);line.put("system_gallons",1000);line.put("actual_gallons",950);line.put("reading_id",t.path("readingId").asText());line.put("movement_id",null);line.put("reason","calibration");
   var in=new LinkedHashMap<String,Object>();in.put("date",data.path("today").asText());in.put("notes","Test gallons only");in.put("lines",List.of(line));in.put("submit",false);
   long before=db.queryForObject("SELECT count(*) FROM inventory_movements WHERE dgt_id=?",Long.class,store);
   String key=UUID.randomUUID().toString();var draft=ok(call("cashier","POST",path,in,null,key),200);String id=draft.path("id").asText();assertThat(draft.path("status").asText()).isEqualTo("DRAFT");assertThat(ok(call("cashier","POST",path,in,null,key),200).path("id").asText()).isEqualTo(id);
@@ -1241,18 +1241,18 @@ class ScopedAccessIntegrationTest {
   ok(call("admin","PUT",path+"/"+id,in,approved.path("version").asText(),null),409);
   ok(call("admin","POST","/access/stores/"+second+"/gas-adjustments/"+id+"/approve",null,approved.path("version").asText(),null),404);
   ok(req("admin","POST",path,in),409); // old baseline
-  t=current.get();line.put("systemGallons",950);line.put("movementId",t.path("movementId").asText());line.put("actualGallons",0);
+  t=current.get();line.put("system_gallons",950);line.put("movement_id",t.path("movementId").asText());line.put("actual_gallons",0);
   var own=ok(req("manager","POST",path,in),200);ok(call("manager","POST",path+"/"+own.path("id").asText()+"/approve",null,own.path("version").asText(),null),403);
   ok(call("admin","POST",path+"/"+own.path("id").asText()+"/reject",Map.of("reason",""),own.path("version").asText(),null),400);
   var rejected=ok(call("admin","POST",path+"/"+own.path("id").asText()+"/reject",Map.of("reason","Verify measurement"),own.path("version").asText(),null),200);assertThat(rejected.path("status").asText()).isEqualTo("REJECTED");assertThat(current.get().path("systemGallons").asDouble()).isEqualTo(950);
   var auto=ok(req("admin","POST",path,in),200);assertThat(auto.path("status").asText()).isEqualTo("POSTED");assertThat(current.get().path("systemGallons").asDouble()).isZero();
 
-  t=current.get();line.put("systemGallons",0);line.put("movementId",t.path("movementId").asText());line.put("actualGallons",25);
+  t=current.get();line.put("system_gallons",0);line.put("movement_id",t.path("movementId").asText());line.put("actual_gallons",25);
   var stalePending=ok(req("cashier","POST",path,in),200);
-  line.put("actualGallons",10);ok(req("admin","POST",path,in),200);
+  line.put("actual_gallons",10);ok(req("admin","POST",path,in),200);
   ok(call("manager","POST",path+"/"+stalePending.path("id").asText()+"/approve",null,stalePending.path("version").asText(),null),409);
   assertThat(current.get().path("systemGallons").asDouble()).isEqualTo(10);
-  t=current.get();line.put("systemGallons",10);line.put("movementId",t.path("movementId").asText());line.put("actualGallons",20);
+  t=current.get();line.put("system_gallons",10);line.put("movement_id",t.path("movementId").asText());line.put("actual_gallons",20);
   var concurrent=ok(req("cashier","POST",path,in),200);String approvePath=path+"/"+concurrent.path("id").asText()+"/approve",v=concurrent.path("version").asText();
   var one=java.util.concurrent.CompletableFuture.supplyAsync(()->{try{return call("manager","POST",approvePath,null,v,null);}catch(Exception e){throw new RuntimeException(e);}});
   var two=java.util.concurrent.CompletableFuture.supplyAsync(()->{try{return call("admin","POST",approvePath,null,v,null);}catch(Exception e){throw new RuntimeException(e);}});
@@ -1429,40 +1429,40 @@ class ScopedAccessIntegrationTest {
   var saved=ok(req("admin","PUT",path+"/settings",Map.of("version","0","values",settings)),200);
   ok(req("admin","PUT",path+"/settings",Map.of("version","0","values",settings)),409);
   settings.put("default_fee_percent",101);ok(req("admin","PUT",path+"/settings",Map.of("version",saved.path("version").asText(),"values",settings)),400);settings.put("default_fee_percent",2.5);
-  var processor=ok(req("admin","POST",path+"/processors",Map.of("name","Test processor","active",true,"frequency","DAILY","delayDays",1,"destination","BANK","destinationLabel","Test bank")),200);long processorId=processor.path("processor_id").asLong();
-  ok(req("admin","POST",path+"/processors",Map.of("name","test processor","active",true,"frequency","DAILY","delayDays",1,"destination","BANK","destinationLabel","Test bank")),409);
-  var edit=new LinkedHashMap<String,Object>();edit.put("version",processor.path("version").asText());edit.put("name","Test processor");edit.put("active",false);edit.put("frequency","DAILY");edit.put("delayDays",2);edit.put("destination","JOBBER");edit.put("destinationLabel","Test jobber");var inactive=ok(req("admin","PUT",path+"/processors/"+processorId,edit),200);
+  var processor=ok(req("admin","POST",path+"/processors",Map.of("name","Test processor","active",true,"frequency","DAILY","delay_days",1,"destination","BANK","destination_label","Test bank")),200);long processorId=processor.path("processor_id").asLong();
+  ok(req("admin","POST",path+"/processors",Map.of("name","test processor","active",true,"frequency","DAILY","delay_days",1,"destination","BANK","destination_label","Test bank")),409);
+  var edit=new LinkedHashMap<String,Object>();edit.put("version",processor.path("version").asText());edit.put("name","Test processor");edit.put("active",false);edit.put("frequency","DAILY");edit.put("delay_days",2);edit.put("destination","JOBBER");edit.put("destination_label","Test jobber");var inactive=ok(req("admin","PUT",path+"/processors/"+processorId,edit),200);
   long sale=db.queryForObject("SELECT sale_id FROM sales WHERE store_id=? AND receipt_no='LIVE-1'",Long.class,store);long refund=db.queryForObject("SELECT sale_id FROM sales WHERE store_id=? AND receipt_no='LIVE-2'",Long.class,store);long credit=db.queryForObject("SELECT tender_type_id FROM tender_types WHERE tender_code='CREDIT_CARD'",Long.class);
   db.update("UPDATE sale_payments SET tender_type_id=?,payment_amount=100 WHERE sale_id=?",credit,sale);db.update("UPDATE sale_payments SET tender_type_id=?,payment_amount=-20 WHERE sale_id=?",credit,refund);
   var payments=ok(req("admin","GET",path+"/payments?date=2026-05-03",null),200);assertThat(payments.size()).isEqualTo(2);
   var selected=new LinkedHashMap<String,String>();payments.forEach(p->selected.put(p.path("sale_payment_id").asText(),p.path("version").asText()));
-  var create=new LinkedHashMap<String,Object>();create.put("processorId",processorId);create.put("reference","MANUAL-TEST");create.put("date","2026-05-03");create.put("requestKey",UUID.randomUUID().toString());create.put("payments",selected);
+  var create=new LinkedHashMap<String,Object>();create.put("processor_id",processorId);create.put("reference","MANUAL-TEST");create.put("date","2026-05-03");create.put("request_key",UUID.randomUUID().toString());create.put("payments",selected);
   ok(req("manager","POST",path+"/batches",create),400);
   edit.put("version",inactive.path("version").asText());edit.put("active",true);processor=ok(req("admin","PUT",path+"/processors/"+processorId,edit),200);
   var badSelection=new LinkedHashMap<>(selected);badSelection.put("999999999","0");create.put("payments",badSelection);ok(req("admin","POST",path+"/batches",create),409);create.put("payments",selected);
   long pay=payments.get(0).path("sale_payment_id").asLong();db.update("UPDATE sale_payments SET updated_at=clock_timestamp() WHERE sale_payment_id=?",pay);ok(req("admin","POST",path+"/batches",create),409);
   payments=ok(req("admin","GET",path+"/payments?date=2026-05-03",null),200);selected.clear();payments.forEach(p->selected.put(p.path("sale_payment_id").asText(),p.path("version").asText()));
   var batch=ok(req("manager","POST",path+"/batches",create),200);long id=batch.path("batch_id").asLong();assertThat(batch.path("pos_sales").asDouble()).isEqualTo(80);assertThat(batch.path("fee_base").asDouble()).isEqualTo(100);assertThat(batch.path("expected_fee").asDouble()).isEqualTo(2.6);assertThat(batch.path("actual_fee").isNull()).isTrue();assertThat(batch.path("settlement_destination").asText()).isEqualTo("JOBBER");
-  assertThat(ok(req("admin","POST",path+"/batches",create),200).path("batch_id").asLong()).isEqualTo(id);create.put("reference","Different");ok(req("admin","POST",path+"/batches",create),409);create.put("requestKey",UUID.randomUUID().toString());ok(req("admin","POST",path+"/batches",create),409);
+  assertThat(ok(req("admin","POST",path+"/batches",create),200).path("batch_id").asLong()).isEqualTo(id);create.put("reference","Different");ok(req("admin","POST",path+"/batches",create),409);create.put("request_key",UUID.randomUUID().toString());ok(req("admin","POST",path+"/batches",create),409);
   assertThat(ok(req("admin","GET",path+"/payments?date=2026-05-03",null),200).size()).isZero();
   settings.put("default_fee_percent",1);saved=ok(req("admin","PUT",path+"/settings",Map.of("version",saved.path("version").asText(),"values",settings)),200);assertThat(ok(req("admin","GET",path,null),200).path("batches").get(0).path("expected_fee").asDouble()).isEqualTo(2.6);
   String bp=path+"/batches/"+id;
   ok(req("admin","POST",bp+"/transition",Map.of("version",batch.path("version").asText(),"action","SETTLE")),409);
-  ok(req("admin","PUT",bp+"/fee",Map.of("version",batch.path("version").asText(),"actualFee",3,"reason","")),400);
-  ok(req("admin","PUT",bp+"/fee",Map.of("version",batch.path("version").asText(),"actualFee",-1)),400);
-  batch=ok(req("manager","PUT",bp+"/fee",Map.of("version",batch.path("version").asText(),"actualFee",3,"reason","Statement fee","notes","reviewed")),200);
-  ok(req("admin","POST",bp+"/transition",Map.of("version",batch.path("version").asText(),"action","SUBMIT","processorSales",80,"chargebacks",5)),400);
-  batch=ok(req("admin","POST",bp+"/transition",Map.of("version",batch.path("version").asText(),"action","SUBMIT","processorSales",80,"chargebacks",5,"chargebackReason","Dispute")),200);
-  ok(req("admin","POST",bp+"/transition",Map.of("version",batch.path("version").asText(),"action","SETTLE","receivedAmount",72,"settlementDate","2026-05-04")),400);
-  batch=ok(req("manager","POST",bp+"/transition",Map.of("version",batch.path("version").asText(),"action","SETTLE","receivedAmount",72,"settlementDate","2026-05-04","reference","SETTLEMENT-1")),200);
+  ok(req("admin","PUT",bp+"/fee",Map.of("version",batch.path("version").asText(),"actual_fee",3,"reason","")),400);
+  ok(req("admin","PUT",bp+"/fee",Map.of("version",batch.path("version").asText(),"actual_fee",-1)),400);
+  batch=ok(req("manager","PUT",bp+"/fee",Map.of("version",batch.path("version").asText(),"actual_fee",3,"reason","Statement fee","notes","reviewed")),200);
+  ok(req("admin","POST",bp+"/transition",Map.of("version",batch.path("version").asText(),"action","SUBMIT","processor_sales",80,"chargebacks",5)),400);
+  batch=ok(req("admin","POST",bp+"/transition",Map.of("version",batch.path("version").asText(),"action","SUBMIT","processor_sales",80,"chargebacks",5,"chargeback_reason","Dispute")),200);
+  ok(req("admin","POST",bp+"/transition",Map.of("version",batch.path("version").asText(),"action","SETTLE","received_amount",72,"settlement_date","2026-05-04")),400);
+  batch=ok(req("manager","POST",bp+"/transition",Map.of("version",batch.path("version").asText(),"action","SETTLE","received_amount",72,"settlement_date","2026-05-04","reference","SETTLEMENT-1")),200);
   assertThat(batch.path("status").asText()).isEqualTo("SETTLED");
   ok(req("admin","PUT",path+"/settings",Map.of("version",saved.path("version").asText(),"values",settings)),409);
   ok(req("admin","PUT",path+"/processors/"+processorId,edit),409);
-  batch=ok(req("admin","PUT",bp+"/fee",Map.of("version",batch.path("version").asText(),"actualFee",20,"reason","Additional statement fee")),200);
+  batch=ok(req("admin","PUT",bp+"/fee",Map.of("version",batch.path("version").asText(),"actual_fee",20,"reason","Additional statement fee")),200);
   ok(req("admin","POST",bp+"/transition",Map.of("version",batch.path("version").asText(),"action","RECONCILE")),400);
   batch=ok(req("manager","POST",bp+"/transition",Map.of("version",batch.path("version").asText(),"action","RECONCILE","reviewNote","Verified statement discrepancy")),200);
-  ok(req("admin","PUT",bp+"/fee",Map.of("version",batch.path("version").asText(),"actualFee",20)),409);
-  ok(req("admin","PUT","/access/stores/"+second+"/credit-card/batches/"+id+"/fee",Map.of("version",batch.path("version").asText(),"actualFee",20)),404);
+  ok(req("admin","PUT",bp+"/fee",Map.of("version",batch.path("version").asText(),"actual_fee",20)),409);
+  ok(req("admin","PUT","/access/stores/"+second+"/credit-card/batches/"+id+"/fee",Map.of("version",batch.path("version").asText(),"actual_fee",20)),404);
   var other=ok(req("admin","GET","/access/stores/"+second+"/credit-card",null),200);assertThat(other.path("processors").size()).isZero();assertThat(other.path("batches").size()).isZero();assertThat(other.path("audit").size()).isZero();
   var read=ok(req("admin","GET",path,null),200);assertThat(read.path("audit").size()).isGreaterThanOrEqualTo(9);assertThat(read.path("batches").get(0).path("status").asText()).isEqualTo("RECONCILED");
  }
@@ -1482,20 +1482,20 @@ class ScopedAccessIntegrationTest {
   var payments=ok(req("admin","GET",path+"/payments?date=2026-05-05",null),200);assertThat(payments.size()).isEqualTo(3);
   assertThat(ok(req("admin","GET",path+"/payments?date=2026-05-04",null),200).size()).isZero();
   Map<String,String> selected=new LinkedHashMap<>();payments.forEach(p->selected.put(p.path("sale_payment_id").asText(),p.path("version").asText()));
-  var create=new LinkedHashMap<String,Object>();create.put("reference","TEST-EBT");create.put("date","2026-05-05");create.put("requestKey",UUID.randomUUID().toString());create.put("payments",selected);
+  var create=new LinkedHashMap<String,Object>();create.put("reference","TEST-EBT");create.put("date","2026-05-05");create.put("request_key",UUID.randomUUID().toString());create.put("payments",selected);
   ok(req("admin","POST","/access/stores/"+second+"/ebt/batches",create),409);
   ok(req("cashier","POST",path+"/batches",create),403);
   var oldVersions=new LinkedHashMap<>(selected);selected.replaceAll((k,v)->"stale");ok(req("admin","POST",path+"/batches",create),409);selected.clear();selected.putAll(oldVersions);
   var batch=ok(req("manager","POST",path+"/batches",create),200);long id=batch.path("batch_id").asLong();String bp=path+"/batches/"+id;
   assertThat(batch.path("snap_amount").asDouble()).isEqualTo(90);assertThat(batch.path("cash_amount").asDouble()).isEqualTo(20);assertThat(batch.path("refund_amount").asDouble()).isEqualTo(10);assertThat(batch.path("transaction_count").asInt()).isEqualTo(2);assertThat(batch.path("fees").isNull()).isTrue();
   assertThat(ok(req("admin","POST",path+"/batches",create),200).path("batch_id").asLong()).isEqualTo(id);
-  create.put("reference","CHANGED");ok(req("admin","POST",path+"/batches",create),409);create.put("requestKey",UUID.randomUUID().toString());ok(req("admin","POST",path+"/batches",create),409);
+  create.put("reference","CHANGED");ok(req("admin","POST",path+"/batches",create),409);create.put("request_key",UUID.randomUUID().toString());ok(req("admin","POST",path+"/batches",create),409);
   assertThat(ok(req("admin","GET",path+"/payments?date=2026-05-05",null),200).size()).isZero();
   var list=ok(req("admin","GET",path+"?start=2026-05-05&end=2026-05-05",null),200).path("batches");assertThat(list.size()).isEqualTo(1);assertThat(list.get(0).path("business_date").asText()).isEqualTo("2026-05-05");assertThat(list.get(0).path("has_snap").asBoolean()).isTrue();assertThat(list.get(0).path("has_cash").asBoolean()).isTrue();
   ok(req("admin","GET","/access/stores/"+second+"/ebt/batches/"+id,null),404);
   ok(req("admin","POST",bp+"/reconcile",Map.of("version",batch.path("version").asText())),409);
-  var settlement=new LinkedHashMap<String,Object>();settlement.put("version",batch.path("version").asText());settlement.put("fees",1);settlement.put("adjustment",2);settlement.put("actualDeposit",110);settlement.put("date","2026-05-06");settlement.put("reference","TEST-STATEMENT");
-  ok(req("admin","PUT",bp+"/settlement",settlement),400);settlement.put("adjustmentReason","Statement correction");settlement.put("fees",-1);ok(req("admin","PUT",bp+"/settlement",settlement),400);settlement.put("fees",1.001);ok(req("admin","PUT",bp+"/settlement",settlement),400);settlement.put("fees",1);
+  var settlement=new LinkedHashMap<String,Object>();settlement.put("version",batch.path("version").asText());settlement.put("fees",1);settlement.put("adjustment",2);settlement.put("actual_deposit",110);settlement.put("date","2026-05-06");settlement.put("reference","TEST-STATEMENT");
+  ok(req("admin","PUT",bp+"/settlement",settlement),400);settlement.put("adjustment_reason","Statement correction");settlement.put("fees",-1);ok(req("admin","PUT",bp+"/settlement",settlement),400);settlement.put("fees",1.001);ok(req("admin","PUT",bp+"/settlement",settlement),400);settlement.put("fees",1);
   settlement.put("date","2026-05-04");ok(req("admin","PUT",bp+"/settlement",settlement),400);settlement.put("date","2026-05-06");settlement.put("reference","");ok(req("admin","PUT",bp+"/settlement",settlement),400);settlement.put("reference","TEST-STATEMENT");
   batch=ok(req("manager","PUT",bp+"/settlement",settlement),200);assertThat(batch.path("status").asText()).isEqualTo("SETTLED");ok(req("admin","PUT",bp+"/settlement",settlement),409);
   ok(req("admin","POST",bp+"/reconcile",Map.of("version",batch.path("version").asText(),"note","")),400);
@@ -1508,7 +1508,7 @@ class ScopedAccessIntegrationTest {
   long extra=db.queryForObject("INSERT INTO sale_payments(sale_id,tender_type_id,payment_amount,payment_status) VALUES (?,?,5,'COMPLETED') RETURNING sale_payment_id",Long.class,sale,cash);
   var p=ok(req("admin","GET",path+"/payments?date=2026-05-05",null),200).get(0);
   var requests=new ArrayList<java.util.concurrent.CompletableFuture<Response>>();
-  for(int i=0;i<2;i++){var body=Map.of("reference","RACE-"+i,"date","2026-05-05","requestKey",UUID.randomUUID().toString(),"payments",Map.of(String.valueOf(extra),p.path("version").asText()));requests.add(java.util.concurrent.CompletableFuture.supplyAsync(()->{try{return req("admin","POST",path+"/batches",body);}catch(Exception e){throw new RuntimeException(e);}}));}
+  for(int i=0;i<2;i++){var body=Map.of("reference","RACE-"+i,"date","2026-05-05","request_key",UUID.randomUUID().toString(),"payments",Map.of(String.valueOf(extra),p.path("version").asText()));requests.add(java.util.concurrent.CompletableFuture.supplyAsync(()->{try{return req("admin","POST",path+"/batches",body);}catch(Exception e){throw new RuntimeException(e);}}));}
   assertThat(requests.stream().map(f->f.join().code()).sorted().toList()).containsExactly(200,409);
  }
  @Test @Order(115) void fleetVolumesRefundsAmbiguityAndSettlement() throws Exception {
@@ -1534,13 +1534,13 @@ class ScopedAccessIntegrationTest {
   db.update("UPDATE sales SET sale_status='VOIDED',transaction_type='VOID' WHERE sale_id=?",saleIds.get(5));
   var available=ok(req("manager","GET",path+"/payments?date=2026-05-07",null),200);assertThat(available.size()).isEqualTo(6);
   Map<String,String> chosen=new LinkedHashMap<>();available.forEach(p->{if(List.of(saleIds.get(0),saleIds.get(1)).contains(p.path("sale_id").asLong()))chosen.put(p.path("sale_payment_id").asText(),p.path("version").asText());});
-  var create=new LinkedHashMap<String,Object>();create.put("provider","WEX");create.put("reference","FLEET-TEST");create.put("date","2026-05-07");create.put("requestKey",UUID.randomUUID().toString());create.put("payments",chosen);
+  var create=new LinkedHashMap<String,Object>();create.put("provider","WEX");create.put("reference","FLEET-TEST");create.put("date","2026-05-07");create.put("request_key",UUID.randomUUID().toString());create.put("payments",chosen);
   ok(req("admin","POST","/access/stores/"+second+"/fleet/batches",create),409);ok(req("cashier","POST",path+"/batches",create),403);
   var batch=ok(req("manager","POST",path+"/batches",create),200);String bp=path+"/batches/"+batch.path("batch_id").asLong();
   assertThat(batch.path("fleet_sales").asDouble()).isEqualTo(90);assertThat(batch.path("gallons_sold").asDouble()).isEqualTo(27);assertThat(batch.path("fuel_sales").asDouble()).isEqualTo(87);assertThat(batch.path("processor_fee").isNull()).isTrue();assertThat(batch.path("transaction_count").asInt()).isEqualTo(2);assertThat(batch.path("business_date").asText()).isEqualTo("2026-05-07");
-  assertThat(ok(req("admin","POST",path+"/batches",create),200).path("batch_id").asLong()).isEqualTo(batch.path("batch_id").asLong());create.put("provider","Voyager");ok(req("admin","POST",path+"/batches",create),409);create.put("requestKey",UUID.randomUUID().toString());ok(req("admin","POST",path+"/batches",create),409);
+  assertThat(ok(req("admin","POST",path+"/batches",create),200).path("batch_id").asLong()).isEqualTo(batch.path("batch_id").asLong());create.put("provider","Voyager");ok(req("admin","POST",path+"/batches",create),409);create.put("request_key",UUID.randomUUID().toString());ok(req("admin","POST",path+"/batches",create),409);
   ok(req("admin","POST",bp+"/reconcile",Map.of("version",batch.path("version").asText())),409);
-  var settlement=new LinkedHashMap<String,Object>();settlement.put("version",batch.path("version").asText());settlement.put("fees",1);settlement.put("discount",2);settlement.put("actualDeposit",86);settlement.put("date","2026-05-08");settlement.put("reference","STATEMENT");
+  var settlement=new LinkedHashMap<String,Object>();settlement.put("version",batch.path("version").asText());settlement.put("fees",1);settlement.put("discount",2);settlement.put("actual_deposit",86);settlement.put("date","2026-05-08");settlement.put("reference","STATEMENT");
   settlement.put("discount",-1);ok(req("admin","PUT",bp+"/settlement",settlement),400);settlement.put("discount",2);settlement.put("fees",1.001);ok(req("admin","PUT",bp+"/settlement",settlement),400);settlement.put("fees",1);settlement.put("date","2026-05-06");ok(req("admin","PUT",bp+"/settlement",settlement),400);settlement.put("date","2026-05-08");settlement.put("reference","");ok(req("admin","PUT",bp+"/settlement",settlement),400);settlement.put("reference","STATEMENT");
   batch=ok(req("manager","PUT",bp+"/settlement",settlement),200);ok(req("admin","PUT",bp+"/settlement",settlement),409);assertThat(batch.path("status").asText()).isEqualTo("SETTLED");
   ok(req("admin","POST",bp+"/reconcile",Map.of("version",batch.path("version").asText(),"note","")),400);
@@ -1550,7 +1550,7 @@ class ScopedAccessIntegrationTest {
   ok(req("admin","GET","/access/stores/"+second+"/fleet/batches/"+batch.path("batch_id").asLong(),null),404);
   for(int index:List.of(2,3,4)){
    var payments=ok(req("admin","GET",path+"/payments?date=2026-05-07",null),200);Map<String,String> selected=new LinkedHashMap<>();payments.forEach(p->{if(p.path("sale_id").asLong()==saleIds.get(index))selected.put(p.path("sale_payment_id").asText(),p.path("version").asText());});
-   var row=ok(req("admin","POST",path+"/batches",Map.of("provider","Voyager","reference","VOLUME-"+index,"date","2026-05-07","requestKey",UUID.randomUUID().toString(),"payments",selected)),200);
+   var row=ok(req("admin","POST",path+"/batches",Map.of("provider","Voyager","reference","VOLUME-"+index,"date","2026-05-07","request_key",UUID.randomUUID().toString(),"payments",selected)),200);
    if(index==4){assertThat(row.path("gallons_sold").asDouble()).isEqualTo(30);assertThat(row.path("transaction_count").asInt()).isEqualTo(1);}
    else{assertThat(row.path("gallons_sold").isNull()).isTrue();assertThat(row.path("fuel_sales").isNull()).isTrue();assertThat(row.path("volume_note").asText()).isNotBlank();}
   }
@@ -1561,7 +1561,7 @@ class ScopedAccessIntegrationTest {
   db.update("UPDATE store_departments SET store_department_name='Motor Oil & Additives' WHERE store_department_id=(SELECT store_department_id FROM store_sub_departments WHERE store_sub_department_id=?)",sub);
   var payment=ok(req("admin","GET",path+"/payments?date=2026-05-07",null),200).get(0);
   var futures=new ArrayList<java.util.concurrent.CompletableFuture<Response>>();
-  for(int i=0;i<2;i++){var body=Map.of("provider","Comdata","reference","RACE-"+i,"date","2026-05-07","requestKey",UUID.randomUUID().toString(),"payments",Map.of(payment.path("sale_payment_id").asText(),payment.path("version").asText()));futures.add(java.util.concurrent.CompletableFuture.supplyAsync(()->{try{return req("admin","POST",path+"/batches",body);}catch(Exception e){throw new RuntimeException(e);}}));}
+  for(int i=0;i<2;i++){var body=Map.of("provider","Comdata","reference","RACE-"+i,"date","2026-05-07","request_key",UUID.randomUUID().toString(),"payments",Map.of(payment.path("sale_payment_id").asText(),payment.path("version").asText()));futures.add(java.util.concurrent.CompletableFuture.supplyAsync(()->{try{return req("admin","POST",path+"/batches",body);}catch(Exception e){throw new RuntimeException(e);}}));}
   assertThat(futures.stream().map(f->f.join().code()).sorted().toList()).containsExactly(200,409);
   var winner=futures.stream().map(f->f.join()).filter(r->r.code()==200).findFirst().orElseThrow().body();assertThat(winner.path("gallons_sold").asDouble()).isZero();assertThat(winner.path("gallons_sold").isNull()).isFalse();
 
@@ -1582,7 +1582,7 @@ class ScopedAccessIntegrationTest {
  @Test void standaloneDiscountsPersistAndRespectStoreAndVersion() throws Exception {
   String path="/access/stores/"+store+"/discounts";
   var input=new LinkedHashMap<String,Object>();
-  input.put("name","Employee");input.put("code","EMP");input.put("valueType","PERCENT");input.put("value",10);input.put("appliesTo","Whole Ticket");input.put("dailyCap",25);input.put("active",true);input.put("managerApproval",true);input.put("combinePromotions",false);input.put("allowOnRestricted",false);input.put("allowOnFuel",false);
+  input.put("name","Employee");input.put("code","EMP");input.put("value_type","PERCENT");input.put("value",10);input.put("applies_to","Whole Ticket");input.put("daily_cap",25);input.put("active",true);input.put("manager_approval",true);input.put("combine_promotions",false);input.put("allow_on_restricted",false);input.put("allow_on_fuel",false);
   long id=ok(req("admin","POST",path,input),200).get("id").asLong();
   assertThat(req("admin","POST",path,input).code()).isEqualTo(409);
   var list=ok(req("admin","GET",path,null),200);
@@ -1611,55 +1611,55 @@ class ScopedAccessIntegrationTest {
    String ref=UUID.randomUUID().toString();long sale=db.queryForObject("INSERT INTO sales(store_id,cashier_id,terminal_id,receipt_no,transaction_id,transaction_type,sale_status,sale_datetime,subtotal,taxable_amount,tax_amount,discount_amount,total_amount,total_items) VALUES (?,?,?, ?,?,'SALE','OPEN',now(),50,50,3.5,0,53.5,1) RETURNING sale_id",Long.class,store,employee,terminal,ref,ref);
    db.update("INSERT INTO sales_items(sale_id,product_id,quantity,catalog_price,unit_price,gross_amount,discount_amount,taxable_amount,tax_amount,line_total) VALUES (?,?,1,50,50,50,0,50,3.5,53.5)",sale,product);return sale;
   };
-  long sale=ticket.get();var input=new LinkedHashMap<String,Object>();input.put("saleId",sale);input.put("discountId",discount);input.put("itemIds",List.of());input.put("eligibilityConfirmed",false);
+  long sale=ticket.get();var input=new LinkedHashMap<String,Object>();input.put("sale_id",sale);input.put("discount_id",discount);input.put("item_ids",List.of());input.put("eligibility_confirmed",false);
   assertThat(req("cashier","POST",path+"/preview",input).code()).isEqualTo(400);
-  input.put("eligibilityConfirmed",true);
+  input.put("eligibility_confirmed",true);
   assertThat(ok(req("cashier","POST",path+"/preview",input),200).get("amount").decimalValue()).isEqualByComparingTo("5");
   assertThat(db.queryForObject("SELECT total_amount FROM sales WHERE sale_id=?",java.math.BigDecimal.class,sale)).isEqualByComparingTo("53.5");
   String key=UUID.randomUUID().toString();var applied=ok(call("cashier","POST",path,input,null,key),200);assertThat(applied.get("status").asText()).isEqualTo("APPLIED");
   assertThat(ok(call("cashier","POST",path,input,null,key),200).get("id")).isEqualTo(applied.get("id"));
   assertThat(db.queryForObject("SELECT total_amount FROM sales WHERE sale_id=?",java.math.BigDecimal.class,sale)).isEqualByComparingTo("48.15");
   assertThat(req("cashier","POST",path,input).code()).isEqualTo(409);
-  input.put("saleId",ticket.get());assertThat(call("cashier","POST",path,input,null,key).code()).isEqualTo(409);
+  input.put("sale_id",ticket.get());assertThat(call("cashier","POST",path,input,null,key).code()).isEqualTo(409);
   db.update("UPDATE store_discounts SET eligibility_type='EMPLOYEE',manager_approval=false WHERE discount_id=?",discount);
-  input.put("employeeId",employee);
+  input.put("employee_id",employee);
   var pending=ok(req("cashier","POST",path,input),200);long request=pending.get("id").asLong();assertThat(pending.get("status").asText()).isEqualTo("PENDING");
   assertThat(req("cashier","POST",path+"/"+request+"/approve",Map.of()).code()).isEqualTo(403);
   assertThat(req("other","POST",path+"/"+request+"/approve",Map.of()).code()).isEqualTo(403);
   ok(req("admin","POST",path+"/"+request+"/approve",Map.of()),200);
   ok(req("admin","POST",path+"/"+request+"/approve",Map.of()),200);
-  input.put("saleId",ticket.get());assertThat(req("cashier","POST",path,input).code()).isEqualTo(409); // cap consumed
+  input.put("sale_id",ticket.get());assertThat(req("cashier","POST",path,input).code()).isEqualTo(409); // cap consumed
   db.update("UPDATE store_discounts SET daily_cap=0,manager_approval=true WHERE discount_id=?",discount);
   request=ok(req("admin","POST",path,input),200).get("id").asLong();
   assertThat(req("admin","POST",path+"/"+request+"/approve",Map.of()).code()).isEqualTo(403);
   ok(req("admin","POST",path+"/"+request+"/reject",Map.of()),200);
-  input.put("saleId",ticket.get());request=ok(req("cashier","POST",path,input),200).get("id").asLong();
+  input.put("sale_id",ticket.get());request=ok(req("cashier","POST",path,input),200).get("id").asLong();
   db.update("UPDATE store_discounts SET value=15 WHERE discount_id=?",discount);
   assertThat(req("admin","POST",path+"/"+request+"/approve",Map.of()).code()).isEqualTo(409);
   ok(req("admin","POST",path+"/"+request+"/reject",Map.of()),200);
-  long closed=ticket.get();db.update("UPDATE sales SET sale_status='COMPLETED' WHERE sale_id=?",closed);input.put("saleId",closed);assertThat(req("cashier","POST",path,input).code()).isEqualTo(409);
-  long paid=ticket.get();db.update("INSERT INTO sale_payments(sale_id,tender_type_id,payment_amount,payment_status) SELECT ?,tender_type_id,1,'COMPLETED' FROM tender_types WHERE tender_code='CASH'",paid);input.put("saleId",paid);assertThat(req("cashier","POST",path,input).code()).isEqualTo(409);
-  input.put("saleId",ticket.get());input.put("employeeId",-1);assertThat(req("cashier","POST",path,input).code()).isEqualTo(400);
+  long closed=ticket.get();db.update("UPDATE sales SET sale_status='COMPLETED' WHERE sale_id=?",closed);input.put("sale_id",closed);assertThat(req("cashier","POST",path,input).code()).isEqualTo(409);
+  long paid=ticket.get();db.update("INSERT INTO sale_payments(sale_id,tender_type_id,payment_amount,payment_status) SELECT ?,tender_type_id,1,'COMPLETED' FROM tender_types WHERE tender_code='CASH'",paid);input.put("sale_id",paid);assertThat(req("cashier","POST",path,input).code()).isEqualTo(409);
+  input.put("sale_id",ticket.get());input.put("employee_id",-1);assertThat(req("cashier","POST",path,input).code()).isEqualTo(400);
   assertThat(req("accountant","GET",path+"/options",null).code()).isEqualTo(403);
   assertThat(ok(req("cashier","GET",path+"/options",null),200).get("employees").size()).isGreaterThan(0);
   // Restrictions apply before calculating the amount.
-  input.put("employeeId",employee);db.update("UPDATE products SET is_age_restricted=true WHERE product_id=?",product);assertThat(req("cashier","POST",path+"/preview",input).code()).isEqualTo(400);
+  input.put("employee_id",employee);db.update("UPDATE products SET is_age_restricted=true WHERE product_id=?",product);assertThat(req("cashier","POST",path+"/preview",input).code()).isEqualTo(400);
   db.update("UPDATE products SET is_age_restricted=false,unit_of_measure='GAL' WHERE product_id=?",product);assertThat(req("cashier","POST",path+"/preview",input).code()).isEqualTo(400);
   db.update("UPDATE products SET unit_of_measure='ITEM' WHERE product_id=?",product);
   // Employees without website accounts are eligible through their store assignment.
   long offline=db.queryForObject("INSERT INTO employees(first_name,last_name,hire_date,employee_type) VALUES (?,'Discount fixture','2020-01-01','FULL_TIME') RETURNING employee_id",Long.class,tag);
   db.update("INSERT INTO employee_store_assignments(employee_id,dgt_id,effective_from) VALUES (?,?,'2020-01-01')",offline,store);
   db.update("UPDATE store_discounts SET manager_approval=false,value=10 WHERE discount_id=?",discount);
-  input.put("saleId",ticket.get());input.put("employeeId",offline);
+  input.put("sale_id",ticket.get());input.put("employee_id",offline);
   assertThat(ok(req("cashier","POST",path,input),200).get("status").asText()).isEqualTo("APPLIED");
-  db.update("UPDATE employees SET termination_date=CURRENT_DATE WHERE employee_id=?",offline);input.put("saleId",ticket.get());assertThat(req("cashier","POST",path,input).code()).isEqualTo(400);
+  db.update("UPDATE employees SET termination_date=CURRENT_DATE WHERE employee_id=?",offline);input.put("sale_id",ticket.get());assertThat(req("cashier","POST",path,input).code()).isEqualTo(400);
   // Fixed amount cannot exceed the eligible net amount; tax also reaches zero.
   db.update("UPDATE store_discounts SET eligibility_type='NONE',discount_type_id=(SELECT discount_type_id FROM discount_type WHERE code='AMOUNT'),value=100 WHERE discount_id=?",discount);
-  input.remove("employeeId");long free=ticket.get();input.put("saleId",free);
+  input.remove("employeeId");long free=ticket.get();input.put("sale_id",free);
   ok(req("cashier","POST",path,input),200);
   assertThat(db.queryForObject("SELECT total_amount FROM sales WHERE sale_id=?",java.math.BigDecimal.class,free)).isEqualByComparingTo("0");
   // Existing line discounts cannot be stacked unless explicitly enabled.
-  long stacked=ticket.get();input.put("saleId",stacked);
+  long stacked=ticket.get();input.put("sale_id",stacked);
   db.update("UPDATE sales_items SET discount_amount=5,taxable_amount=45,tax_amount=3.15,line_total=48.15 WHERE sale_id=?",stacked);
   db.update("UPDATE sales SET subtotal=45,discount_amount=5,taxable_amount=45,tax_amount=3.15,total_amount=48.15 WHERE sale_id=?",stacked);
   assertThat(req("cashier","POST",path+"/preview",input).code()).isEqualTo(400);
@@ -1667,7 +1667,7 @@ class ScopedAccessIntegrationTest {
   ok(req("cashier","POST",path,input),200);
   assertThat(db.queryForObject("SELECT discount_amount FROM sales WHERE sale_id=?",java.math.BigDecimal.class,stacked)).isEqualByComparingTo("6");
   // Inactive rules cannot be applied.
-  db.update("UPDATE store_discounts SET active=false WHERE discount_id=?",discount);input.put("saleId",ticket.get());assertThat(req("cashier","POST",path,input).code()).isEqualTo(400);
+  db.update("UPDATE store_discounts SET active=false WHERE discount_id=?",discount);input.put("sale_id",ticket.get());assertThat(req("cashier","POST",path,input).code()).isEqualTo(400);
 
  }
  @Test @Order(1100) void rebateProgramsAndItemLinksAreStoreScopedAndPersistent() throws Exception {
@@ -1675,7 +1675,7 @@ class ScopedAccessIntegrationTest {
   long vendor=ok(req("admin","POST","/access/stores/"+store+"/vendors",Map.of("name","Rebate provider","active",true)),200).get("id").asLong();
   long product=db.queryForObject("SELECT min(product_id) FROM products WHERE dgt_id=? AND is_active",Long.class,store);
   long secondProduct=db.queryForObject("SELECT max(product_id) FROM products WHERE dgt_id=? AND is_active",Long.class,store);
-  var form=new LinkedHashMap<String,Object>();form.put("name","Rebate test");form.put("vendorId",Long.toString(vendor));form.put("vendor","ignored client provider label");form.put("offeredByType","Vendor / Distributor");form.put("rebateType","Percentage");form.put("startDate","2026-01-01");form.put("endDate","2099-12-31");form.put("status","Active");form.put("eligibilityScope","Specific Products");form.put("scopeValue","");form.put("selectedProductIds",List.of(Long.toString(product)));form.put("qualificationType","No Minimum Requirement");form.put("target","");form.put("measurementBasis","Purchases");form.put("rewardType","Percentage");form.put("rewardValue","5");form.put("calculation","On qualifying purchases");form.put("claimFrequency","Monthly");form.put("claimRequired",true);form.put("submissionDeadlineDays","15");form.put("paymentMethod","Vendor Credit");form.put("tiers",List.of());form.put("description","Saved rules");
+  var form=new LinkedHashMap<String,Object>();form.put("name","Rebate test");form.put("vendor_id",Long.toString(vendor));form.put("vendor","ignored client provider label");form.put("offered_by_type","Vendor / Distributor");form.put("rebate_type","Percentage");form.put("start_date","2026-01-01");form.put("end_date","2099-12-31");form.put("status","Active");form.put("eligibility_scope","Specific Products");form.put("scope_value","");form.put("selected_product_ids",List.of(Long.toString(product)));form.put("qualification_type","No Minimum Requirement");form.put("target","");form.put("measurement_basis","Purchases");form.put("reward_type","Percentage");form.put("reward_value","5");form.put("calculation","On qualifying purchases");form.put("claim_frequency","Monthly");form.put("claim_required",true);form.put("submission_deadline_days","15");form.put("payment_method","Vendor Credit");form.put("tiers",List.of());form.put("description","Saved rules");
   assertThat(req("cashier","GET",path,null).code()).isEqualTo(403);
   assertThat(req("other","GET",path,null).code()).isEqualTo(403);
   assertThat(req("admin","POST",path+"/programs",form).code()).isEqualTo(400);
@@ -1684,41 +1684,41 @@ class ScopedAccessIntegrationTest {
   var result=ok(req("admin","GET",path,null),200);var program=result.get("programs").get(0);String version=program.get("version").asText();
   assertThat(program.get("vendor").asText()).isEqualTo("Rebate provider");assertThat(program.get("rewardValue").asText()).isEqualTo("5");assertThat(program.get("selectedProductIds").size()).isEqualTo(1);
   assertThat(ok(req("admin","GET",path+"/programs/"+id+"/eligible",null),200).size()).isEqualTo(1);
-  var link=result.get("items").get(0);long linkId=link.get("id").asLong();var body=new LinkedHashMap<String,Object>();body.put("programId",id);body.put("productId",product);body.put("active",true);body.put("rebateAmount","5% of qualifying purchases");body.put("startDate","2026-02-01");body.put("endDate","2099-01-01");
+  var link=result.get("items").get(0);long linkId=link.get("id").asLong();var body=new LinkedHashMap<String,Object>();body.put("program_id",id);body.put("product_id",product);body.put("active",true);body.put("rebate_amount","5% of qualifying purchases");body.put("start_date","2026-02-01");body.put("end_date","2099-01-01");
   assertThat(req("admin","POST",path+"/items",body).code()).isEqualTo(409);
   ok(call("admin","PUT",path+"/items/"+linkId,body,link.get("version").asText(),null),200);
   assertThat(call("admin","PUT",path+"/programs/"+id,form,version,null).code()).isEqualTo(409);
   assertThat(call("admin","PUT",path+"/items/"+linkId,body,link.get("version").asText(),null).code()).isEqualTo(409);
   assertThat(req("other","GET",path+"/programs/"+id+"/eligible",null).code()).isEqualTo(403);
-  body.put("programId",-1);assertThat(req("admin","POST",path+"/items",body).code()).isEqualTo(400);body.put("programId",id);
-  body.put("productId",-1);assertThat(req("admin","POST",path+"/items",body).code()).isEqualTo(400);body.put("productId",product);
+  body.put("program_id",-1);assertThat(req("admin","POST",path+"/items",body).code()).isEqualTo(400);body.put("program_id",id);
+  body.put("product_id",-1);assertThat(req("admin","POST",path+"/items",body).code()).isEqualTo(400);body.put("product_id",product);
   var updated=ok(req("admin","GET",path,null),200);assertThat(updated.get("items").get(0).get("rebateAmount").asText()).contains("5%");
   body.put("active",false);ok(call("admin","PUT",path+"/items/"+linkId,body,updated.get("items").get(0).get("version").asText(),null),200);
   assertThat(ok(req("admin","GET",path+"/programs/"+id+"/eligible",null),200).size()).isZero();
-  form.put("endDate","2025-01-01");assertThat(req("admin","POST",path+"/programs",form).code()).isEqualTo(400);form.put("endDate","2099-12-31");
-  form.put("vendorId","-1");assertThat(req("admin","POST",path+"/programs",form).code()).isEqualTo(400);form.put("vendorId",Long.toString(vendor));
-  form.put("eligibilityScope","Department");form.put("scopeValue","-1");assertThat(req("admin","POST",path+"/programs",form).code()).isEqualTo(400);
-  form.put("eligibilityScope","Specific Products");form.put("scopeValue","");form.put("rewardValue","101");assertThat(req("admin","POST",path+"/programs",form).code()).isEqualTo(400);form.put("rewardValue","5");
+  form.put("end_date","2025-01-01");assertThat(req("admin","POST",path+"/programs",form).code()).isEqualTo(400);form.put("end_date","2099-12-31");
+  form.put("vendor_id","-1");assertThat(req("admin","POST",path+"/programs",form).code()).isEqualTo(400);form.put("vendor_id",Long.toString(vendor));
+  form.put("eligibility_scope","Department");form.put("scope_value","-1");assertThat(req("admin","POST",path+"/programs",form).code()).isEqualTo(400);
+  form.put("eligibility_scope","Specific Products");form.put("scope_value","");form.put("reward_value","101");assertThat(req("admin","POST",path+"/programs",form).code()).isEqualTo(400);form.put("reward_value","5");
   // Broad scopes resolve current store classifications; provider scope uses real vendor links.
   long sub=db.queryForObject("SELECT store_sub_department_id FROM products WHERE product_id=?",Long.class,product);
-  form.put("eligibilityScope","Subdepartment");form.put("scopeValue",Long.toString(sub));
+  form.put("eligibility_scope","Subdepartment");form.put("scope_value",Long.toString(sub));
   long scoped=ok(req("admin","POST",path+"/programs",form),200).get("id").asLong();
   assertThat(ok(req("admin","GET",path+"/programs/"+scoped+"/eligible",null),200).size()).isGreaterThan(0);
-  form.put("eligibilityScope","All Products from Provider");form.put("scopeValue","");
+  form.put("eligibility_scope","All Products from Provider");form.put("scope_value","");
   db.update("DELETE FROM product_vendors WHERE product_id=? AND vendor_id=? AND dgt_id=?",product,vendor,store);
   long providerScope=ok(req("admin","POST",path+"/programs",form),200).get("id").asLong();
   assertThat(ok(req("admin","GET",path+"/programs/"+providerScope+"/eligible",null),200).size()).isZero();
   db.update("INSERT INTO product_vendors(product_id,vendor_id,dgt_id,unit_type,unit_of_measure,unit_cost,is_primary) VALUES (?,?,?,'ITEM','ITEM',1,false)",product,vendor,store);
   assertThat(ok(req("admin","GET",path+"/programs/"+providerScope+"/eligible",null),200).size()).isEqualTo(1);
-  form.put("offeredByType","Manufacturer");form.put("vendor","Manufacturer name");assertThat(req("admin","POST",path+"/programs",form).code()).isEqualTo(400);
-  form.put("eligibilityScope","Specific Products");long manufacturer=ok(req("admin","POST",path+"/programs",form),200).get("id").asLong();
+  form.put("offered_by_type","Manufacturer");form.put("vendor","Manufacturer name");assertThat(req("admin","POST",path+"/programs",form).code()).isEqualTo(400);
+  form.put("eligibility_scope","Specific Products");long manufacturer=ok(req("admin","POST",path+"/programs",form),200).get("id").asLong();
   String claimsPath=path+"/claims";
   assertThat(req("cashier","GET",claimsPath,null).code()).isEqualTo(403);
   assertThat(req("other","GET",claimsPath,null).code()).isEqualTo(403);
-  var claimForm=new LinkedHashMap<String,Object>();claimForm.put("programId",id);claimForm.put("periodStart","2026-02-01");claimForm.put("periodEnd","2026-02-28");claimForm.put("claimed","100.50");claimForm.put("action","draft");
+  var claimForm=new LinkedHashMap<String,Object>();claimForm.put("program_id",id);claimForm.put("period_start","2026-02-01");claimForm.put("period_end","2026-02-28");claimForm.put("claimed","100.50");claimForm.put("action","draft");
   long claimId=ok(req("admin","POST",claimsPath,claimForm),200).get("id").asLong();
   assertThat(req("admin","POST",claimsPath,claimForm).code()).isEqualTo(400);
-  claimForm.put("periodStart","2026-02-15");assertThat(req("admin","POST",claimsPath,claimForm).code()).isEqualTo(400);
+  claimForm.put("period_start","2026-02-15");assertThat(req("admin","POST",claimsPath,claimForm).code()).isEqualTo(400);
   var claimRow=ok(req("admin","GET",claimsPath,null),200).get(0);
   String actionPath=claimsPath+"/"+claimId+"/actions",cv=claimRow.get("version").asText();
   assertThat(claimRow.get("earned").isNull()).isTrue();
@@ -1728,10 +1728,10 @@ class ScopedAccessIntegrationTest {
   cv=ok(req("admin","GET",claimsPath,null),200).get(0).get("version").asText();
   assertThat(call("admin","POST",actionPath,Map.of("action","approve","approved","101","approvalDate","2026-03-02"),cv,null).code()).isEqualTo(400);
   assertThat(call("admin","POST",actionPath,Map.of("action","approve","approved","90","approvalDate","2026-03-02"),cv,null).code()).isEqualTo(400);
-  ok(call("admin","POST",actionPath,Map.of("action","approve","approved","90","approvalDate","2026-03-02","adjustmentReason","Provider adjustment"),cv,null),200);
+  ok(call("admin","POST",actionPath,Map.of("action","approve","approved","90","approvalDate","2026-03-02","adjustment_reason","Provider adjustment"),cv,null),200);
   claimRow=ok(req("admin","GET",claimsPath,null),200).get(0);cv=claimRow.get("version").asText();
   assertThat(claimRow.get("status").asText()).isEqualTo("Partially Approved");
-  var payment=new LinkedHashMap<String,Object>();payment.put("action","payment");payment.put("payment","40");payment.put("paymentMethod","ACH Transfer");payment.put("paymentDate","2026-03-03");payment.put("paymentRef","ACH-TEST-1");payment.put("requestKey",UUID.randomUUID().toString());
+  var payment=new LinkedHashMap<String,Object>();payment.put("action","payment");payment.put("payment","40");payment.put("payment_method","ACH Transfer");payment.put("payment_date","2026-03-03");payment.put("payment_ref","ACH-TEST-1");payment.put("request_key",UUID.randomUUID().toString());
   ok(call("admin","POST",actionPath,payment,cv,null),200);
   ok(call("admin","POST",actionPath,payment,cv,null),200); // retry is not a second receipt
   claimRow=ok(req("admin","GET",claimsPath,null),200).get(0);cv=claimRow.get("version").asText();
@@ -1739,15 +1739,15 @@ class ScopedAccessIntegrationTest {
   assertThat(claimRow.get("payments").size()).isEqualTo(1);
   assertThat(claimRow.get("status").asText()).isEqualTo("Partially Paid");
   payment.put("payment","41");assertThat(call("admin","POST",actionPath,payment,cv,null).code()).isEqualTo(409);
-  payment.put("requestKey",UUID.randomUUID().toString());payment.put("payment","51");
+  payment.put("request_key",UUID.randomUUID().toString());payment.put("payment","51");
   assertThat(call("admin","POST",actionPath,payment,cv,null).code()).isEqualTo(400);
-  payment.put("payment","50");payment.put("paymentRef","ACH-TEST-2");
+  payment.put("payment","50");payment.put("payment_ref","ACH-TEST-2");
   ok(call("admin","POST",actionPath,payment,cv,null),200);
   claimRow=ok(req("admin","GET",claimsPath,null),200).get(0);
   assertThat(claimRow.get("status").asText()).isEqualTo("Paid");
   assertThat(claimRow.get("payments").size()).isEqualTo(2);
   assertThat(claimRow.get("payment").decimalValue()).isEqualByComparingTo("90");
-  form.put("offeredByType","Vendor / Distributor");form.put("status","Inactive");
+  form.put("offered_by_type","Vendor / Distributor");form.put("status","Inactive");
   program=null;for(var row:ok(req("admin","GET",path,null),200).get("programs"))if(row.get("id").asLong()==id)program=row;
 ok(call("admin","PUT",path+"/programs/"+id,form,program.get("version").asText(),null),200);
   for(var row:ok(req("admin","GET",path,null),200).get("programs"))if(row.get("id").asLong()==id)assertThat(row.get("status").asText()).isEqualTo("Inactive");
@@ -1891,8 +1891,8 @@ ok(call("admin","PUT",path+"/programs/"+id,form,program.get("version").asText(),
   long vendor=db.queryForObject("INSERT INTO vendors(dgt_id,vendor_name) VALUES (?,?) RETURNING vendor_id",Long.class,store,"Lottery vendor "+tag);
   long wrongVendor=db.queryForObject("INSERT INTO vendors(dgt_id,vendor_name) VALUES (?,?) RETURNING vendor_id",Long.class,second,"Lottery other "+tag);
   long game=db.queryForObject("INSERT INTO lottery_games(dgt_id,game_code,game_name,ticket_price,tickets_per_pack,pack_value,commission_percent,status) VALUES (?,'LTEST','Lottery test',5,50,250,7,'ACTIVE') RETURNING lottery_game_id",Long.class,store);
-  var item=Map.of("gameId",Long.toString(game),"packNumber","000123","quantity",2,"key","ui-line-key");
-  var receipt=new HashMap<String,Object>(Map.of("distributorId",Long.toString(vendor),"deliveryDate","2026-06-01","referenceNumber","LOT-TEST-"+tag,"items",List.of(item)));
+  var item=Map.of("game_id",Long.toString(game),"pack_number","000123","quantity",2,"key","ui-line-key");
+  var receipt=new HashMap<String,Object>(Map.of("distributor_id",Long.toString(vendor),"delivery_date","2026-06-01","reference_number","LOT-TEST-"+tag,"items",List.of(item)));
   ok(req("other","GET",path,null),403);ok(req("cashier","GET",path,null),403);ok(req("cashier","POST",path,receipt),403);
   long managerRole=db.queryForObject("SELECT role_type_id FROM role_types WHERE role_type_name='MANAGER'",Long.class);
   db.update("INSERT INTO store_role_permissions(dgt_id,role_type_id,permission_code,allowed) VALUES (?,?,'LOTTERY_RECEIVE_DELIVERY',true)",store,managerRole);
@@ -1904,11 +1904,11 @@ ok(call("admin","PUT",path+"/programs/"+id,form,program.get("version").asText(),
   assertThat(data.path("packs").get(0).path("startTicket").asText()).isEqualTo("0");
   assertThat(data.path("packs").get(0).path("endTicket").asInt()).isEqualTo(data.path("packs").get(0).path("ticketsCount").asInt()-1);
   assertThat(ok(req("admin","GET","/access/stores/"+second+"/lottery-deliveries",null),200).path("packs").isEmpty()).isTrue();
-  receipt.put("referenceNumber","Changed");ok(call("manager","POST",path,receipt,null,key),409);
+  receipt.put("reference_number","Changed");ok(call("manager","POST",path,receipt,null,key),409);
   long invoiceCount=db.queryForObject("SELECT count(*) FROM invoices WHERE dgt_id=?",Long.class,store);
   ok(req("admin","POST",path,receipt),409);
-  receipt.put("distributorId",Long.toString(wrongVendor));ok(req("admin","POST",path,receipt),400);
-  receipt.put("distributorId",Long.toString(vendor));receipt.put("items",List.of(Map.of("gameId",Long.toString(game),"packNumber","000125","quantity",1),Map.of("gameId",Long.toString(game),"packNumber","bad","quantity",1)));
+  receipt.put("distributor_id",Long.toString(wrongVendor));ok(req("admin","POST",path,receipt),400);
+  receipt.put("distributor_id",Long.toString(vendor));receipt.put("items",List.of(Map.of("game_id",Long.toString(game),"pack_number","000125","quantity",1),Map.of("game_id",Long.toString(game),"pack_number","bad","quantity",1)));
   ok(req("admin","POST",path,receipt),400);assertThat(db.queryForObject("SELECT count(*) FROM invoices WHERE dgt_id=?",Long.class,store)).isEqualTo(invoiceCount);
   assertThat(db.queryForObject("SELECT count(*) FROM lottery_packs WHERE dgt_id=?",Long.class,store)).isEqualTo(2);
   var first=data.path("packs").get(0);var next=data.path("packs").get(1);
@@ -1929,7 +1929,7 @@ ok(call("admin","PUT",path+"/programs/"+id,form,program.get("version").asText(),
   String delivery=access()+"/lottery-deliveries",path=access()+"/lottery-verification";
   long vendor=db.queryForObject("INSERT INTO vendors(dgt_id,vendor_name) VALUES (?,?) RETURNING vendor_id",Long.class,store,"Verify supplier "+tag);
   long game=db.queryForObject("INSERT INTO lottery_games(dgt_id,game_code,game_name,ticket_price,tickets_per_pack,pack_value,commission_percent,status) VALUES (?,'VERIFY','Verify game',10,30,300,7,'ACTIVE') RETURNING lottery_game_id",Long.class,store);
-  ok(req("admin","POST",delivery,Map.of("distributorId",Long.toString(vendor),"deliveryDate","2026-06-01","referenceNumber","VERIFY-"+tag,"items",List.of(Map.of("gameId",Long.toString(game),"packNumber","000900","quantity",2)))),200);
+  ok(req("admin","POST",delivery,Map.of("distributor_id",Long.toString(vendor),"delivery_date","2026-06-01","reference_number","VERIFY-"+tag,"items",List.of(Map.of("game_id",Long.toString(game),"pack_number","000900","quantity",2)))),200);
   var pending=ok(req("admin","GET",delivery,null),200).path("packs");var ids=new ArrayList<String>();var selection=new ArrayList<Map<String,String>>();
   for(var p:pending)if(p.path("gameId").asText().equals(Long.toString(game))){ids.add(p.path("id").asText());selection.add(Map.of("id",p.path("id").asText(),"version",p.path("version").asText()));}
   ok(req("cashier","GET",path,null),403);ok(req("other","GET",path,null),403);
@@ -1968,33 +1968,33 @@ ok(call("admin","PUT",path+"/programs/"+id,form,program.get("version").asText(),
   String path=access()+"/lottery-closing";ok(req("cashier","GET",path,null),403);ok(req("other","GET",path,null),403);ok(req("cashier","GET",path+"/settings",null),403);
   var setting=ok(req("admin","GET",path+"/settings",null),200);
   ok(req("admin","POST",path+"/open",Map.of("type","DAY")),400);
-  ok(req("admin","PUT",path+"/settings",Map.of("version",setting.path("version").asText(),"separateCounter",false)),200);
-  ok(req("admin","PUT",path+"/settings",Map.of("version",setting.path("version").asText(),"separateCounter",true)),409);
+  ok(req("admin","PUT",path+"/settings",Map.of("version",setting.path("version").asText(),"separate_counter",false)),200);
+  ok(req("admin","PUT",path+"/settings",Map.of("version",setting.path("version").asText(),"separate_counter",true)),409);
   var opened=ok(req("admin","POST",path+"/open",Map.of("type","DAY")),200);long cid=opened.path("closing").path("lottery_pack_inventory_id").asLong();
   assertThat(opened.path("closing").path("counter_separate").asBoolean()).isFalse();assertThat(opened.path("packs").isEmpty()).isFalse();
   ok(req("admin","POST",path+"/open",Map.of("type","DAY")),409);
-  var lines=new ArrayList<Map<String,Object>>();for(var p:opened.path("packs"))lines.add(Map.of("id",p.path("id").asLong(),"recordedTickets",0,"lastSold",p.path("opening").asInt()-1));
-  long first=opened.path("packs").get(0).path("id").asLong();int opening=opened.path("packs").get(0).path("opening").asInt();lines.set(0,Map.of("id",first,"recordedTickets",3,"lastSold",opening+1));
+  var lines=new ArrayList<Map<String,Object>>();for(var p:opened.path("packs"))lines.add(Map.of("id",p.path("id").asLong(),"recorded_tickets",0,"last_sold",p.path("opening").asInt()-1));
+  long first=opened.path("packs").get(0).path("id").asLong();int opening=opened.path("packs").get(0).path("opening").asInt();lines.set(0,Map.of("id",first,"recorded_tickets",3,"last_sold",opening+1));
   long sale=db.queryForObject("INSERT INTO sales(store_id,cashier_id,terminal_id,receipt_no,transaction_id,transaction_type,sale_status,sale_datetime,total_amount) SELECT store_id,cashier_id,terminal_id,'LOTTERY-TEST',?,'SALE','COMPLETED',CURRENT_TIMESTAMP,6 FROM sales WHERE store_id=? AND receipt_no='LIVE-1' RETURNING sale_id",Long.class,"LOTTERY-"+tag,store);
   long product=db.queryForObject("SELECT min(product_id) FROM products WHERE dgt_id=?",Long.class,store);
   long item=db.queryForObject("INSERT INTO sales_items(sale_id,product_id,quantity,unit_price,line_total) VALUES (?,?,3,2,6) RETURNING sales_item_id",Long.class,sale,product);
   String linkPath=path+"/"+cid+"/sales";
-  ok(req("cashier","PUT",linkPath,Map.of("salesItemId",item,"packId",first)),403);
-  ok(req("admin","PUT","/access/stores/"+second+"/lottery-closing/"+cid+"/sales",Map.of("salesItemId",item,"packId",first)),409);
+  ok(req("cashier","PUT",linkPath,Map.of("sales_item_id",item,"pack_id",first)),403);
+  ok(req("admin","PUT","/access/stores/"+second+"/lottery-closing/"+cid+"/sales",Map.of("sales_item_id",item,"pack_id",first)),409);
   assertThat(ok(req("admin","GET",linkPath+"?receipt=LOTTERY-TEST",null),200).size()).isEqualTo(1);
-  opened=ok(req("admin","PUT",linkPath,Map.of("salesItemId",item,"packId",first)),200);
+  opened=ok(req("admin","PUT",linkPath,Map.of("sales_item_id",item,"pack_id",first)),200);
   assertThat(opened.path("packs").get(0).path("recordedTickets").asInt()).isEqualTo(3);
   opened=ok(req("admin","POST",linkPath+"/"+item+"/unlink",null),200);
   assertThat(opened.path("packs").get(0).path("recordedTickets").asInt()).isZero();
-  opened=ok(req("admin","PUT",linkPath,Map.of("salesItemId",item,"packId",first)),200);
+  opened=ok(req("admin","PUT",linkPath,Map.of("sales_item_id",item,"pack_id",first)),200);
   var body=new HashMap<String,Object>(Map.of("version",opened.path("closing").path("version").asText(),"close",false,"packs",lines));
   var draft=ok(req("admin","PUT",path+"/"+cid,body),200);ok(req("admin","PUT",path+"/"+cid,body),409);
   var reload=ok(req("admin","GET",path,null),200);assertThat(reload.path("packs").get(0).path("lastSold").asInt()).isEqualTo(opening+1);
-  setting=ok(req("admin","GET",path+"/settings",null),200);ok(req("admin","PUT",path+"/settings",Map.of("version",setting.path("version").asText(),"separateCounter",true)),200);
-  body.put("version",draft.path("closing").path("version").asText());body.put("close",true);body.put("cashCounted",999);body.put("varianceNote","One more ticket recorded in POS than the last-ticket count");
-  ok(req("admin","PUT",path+"/"+cid,body),400);body.put("salesReviewed",true);
+  setting=ok(req("admin","GET",path+"/settings",null),200);ok(req("admin","PUT",path+"/settings",Map.of("version",setting.path("version").asText(),"separate_counter",true)),200);
+  body.put("version",draft.path("closing").path("version").asText());body.put("close",true);body.put("cash_counted",999);body.put("variance_note","One more ticket recorded in POS than the last-ticket count");
+  ok(req("admin","PUT",path+"/"+cid,body),400);body.put("sales_reviewed",true);
   body.remove("varianceNote");ok(req("admin","PUT",path+"/"+cid,body),400);
-  body.put("varianceNote","One more ticket recorded in POS than the last-ticket count");
+  body.put("variance_note","One more ticket recorded in POS than the last-ticket count");
   db.update("UPDATE sales_items SET quantity=4 WHERE sales_item_id=?",item);
   ok(req("admin","PUT",path+"/"+cid,body),409);
   db.update("UPDATE sales_items SET quantity=3 WHERE sales_item_id=?",item);
@@ -2006,9 +2006,9 @@ ok(call("admin","PUT",path+"/programs/"+id,form,program.get("version").asText(),
   assertThat(closed.path("closing").path("counter_separate").asBoolean()).isFalse();ok(req("admin","PUT",path+"/"+cid,body),409);
   ok(req("admin","GET","/access/stores/"+second+"/lottery-closing?closingId="+cid,null),404);
   var next=ok(req("admin","POST",path+"/open",Map.of("type","SHIFT")),200);long nextId=next.path("closing").path("lottery_pack_inventory_id").asLong();assertThat(next.path("closing").path("counter_separate").asBoolean()).isTrue();assertThat(next.path("packs").get(0).path("opening").asInt()).isEqualTo(opening+2);
-  lines.clear();for(var p:next.path("packs"))lines.add(Map.of("id",p.path("id").asLong(),"recordedTickets",0,"lastSold",p.path("opening").asInt()-1));
+  lines.clear();for(var p:next.path("packs"))lines.add(Map.of("id",p.path("id").asLong(),"recorded_tickets",0,"last_sold",p.path("opening").asInt()-1));
   body=new HashMap<>(Map.of("version",next.path("closing").path("version").asText(),"close",true,"packs",lines));ok(req("admin","PUT",path+"/"+nextId,body),400);
-  body.put("salesReviewed",true);body.put("cashCounted",1);ok(req("admin","PUT",path+"/"+nextId,body),400);body.put("varianceNote","Count difference");
+  body.put("sales_reviewed",true);body.put("cash_counted",1);ok(req("admin","PUT",path+"/"+nextId,body),400);body.put("variance_note","Count difference");
   var finish=ok(req("admin","PUT",path+"/"+nextId,body),200);assertThat(finish.path("packs").get(0).path("sales").decimalValue()).isEqualByComparingTo("0");assertThat(finish.path("closing").path("cash_counted").decimalValue()).isEqualByComparingTo("1");
   assertThat(ok(req("admin","GET",path+"?closingId="+cid,null),200).path("closing").path("shift_closed_at").isNull()).isFalse();
  }
@@ -2022,10 +2022,10 @@ ok(call("admin","PUT",path+"/programs/"+id,form,program.get("version").asText(),
   assertThat(pack.path("status").asText()).isEqualTo("blocked");
   var selected=List.of(Map.of("id",Long.toString(id),"version",pack.path("version").asText()));
   ok(req("admin","POST",path,Map.of("action","SETTLE","packs",selected)),409);
-  ok(req("cashier","POST",path,Map.of("action","REQUEST_RETURN","packs",selected,"returnType","partial","reason","Low sales","reference","RET-TEST")),403);
-  ok(req("admin","POST","/access/stores/"+second+"/lottery-dispositions",Map.of("action","REQUEST_RETURN","packs",selected,"returnType","partial","reason","Low sales","reference","RET-TEST")),409);
-  ok(req("admin","POST",path,Map.of("action","REQUEST_RETURN","packs",selected,"returnType","full","reason","Low sales","reference","RET-TEST")),409);
-  data=ok(req("admin","POST",path,Map.of("action","REQUEST_RETURN","packs",selected,"returnType","partial","reason","Low sales","reference","RET-TEST")),200);
+  ok(req("cashier","POST",path,Map.of("action","REQUEST_RETURN","packs",selected,"return_type","partial","reason","Low sales","reference","RET-TEST")),403);
+  ok(req("admin","POST","/access/stores/"+second+"/lottery-dispositions",Map.of("action","REQUEST_RETURN","packs",selected,"return_type","partial","reason","Low sales","reference","RET-TEST")),409);
+  ok(req("admin","POST",path,Map.of("action","REQUEST_RETURN","packs",selected,"return_type","full","reason","Low sales","reference","RET-TEST")),409);
+  data=ok(req("admin","POST",path,Map.of("action","REQUEST_RETURN","packs",selected,"return_type","partial","reason","Low sales","reference","RET-TEST")),200);
   pack=dispositionPack(data,id);assertThat(pack.path("return_status").asText()).isEqualTo("PENDING");
   ok(req("admin","POST",path,Map.of("action","CONFIRM_RETURN","packs",selected)),409);
   selected=List.of(Map.of("id",Long.toString(id),"version",pack.path("version").asText()));
@@ -2041,7 +2041,7 @@ ok(call("admin","PUT",path+"/programs/"+id,form,program.get("version").asText(),
   var closing=ok(req("admin","GET",access()+"/lottery-closing",null),200);for(var row:closing.path("packs"))assertThat(row.path("id").asLong()).isNotEqualTo(id);
   long full=db.queryForObject("SELECT min(lottery_pack_id) FROM lottery_packs WHERE dgt_id=? AND delivery_decided_at IS NOT NULL AND pack_settlement_reference IS NULL AND status_id=(SELECT status_type_id FROM status_types WHERE status_name='APPROVED') AND lottery_pack_id NOT IN (SELECT pack_id FROM lottery_pack_inventory_items)",Long.class,store);
   pack=dispositionPack(ok(req("admin","GET",path,null),200),full);
-  data=ok(req("admin","POST",path,Map.of("action","REQUEST_RETURN","packs",List.of(Map.of("id",Long.toString(full),"version",pack.path("version").asText())),"returnType","full","reason","Damaged","reference","FULL-RET")),200);
+  data=ok(req("admin","POST",path,Map.of("action","REQUEST_RETURN","packs",List.of(Map.of("id",Long.toString(full),"version",pack.path("version").asText())),"return_type","full","reason","Damaged","reference","FULL-RET")),200);
   pack=dispositionPack(data,full);
   data=ok(req("admin","POST",path,Map.of("action","CONFIRM_RETURN","packs",List.of(Map.of("id",Long.toString(full),"version",pack.path("version").asText())))),200);
   assertThat(dispositionPack(data,full).path("netAmountDue").decimalValue()).isEqualByComparingTo("0");
@@ -2050,14 +2050,14 @@ ok(call("admin","PUT",path+"/programs/"+id,form,program.get("version").asText(),
  @Test @Order(9974) void lotteryGamesAndHistoryAreScopedAndPersistent() throws Exception {
   String path=access()+"/lottery-games";ok(req("cashier","GET",path,null),403);ok(req("other","GET",path,null),403);
   var listed=ok(req("admin","GET",path,null),200);String today=listed.path("today").asText();
-  var form=new HashMap<String,Object>();form.put("gameName","Catalog Test");form.put("gameCode","CAT-"+tag);form.put("ticketPrice",2);form.put("ticketsPerPack",50);form.put("commissionPercent",5);form.put("startDate",today);form.put("status",true);
-  ok(req("cashier","POST",path,form),403);form.put("ticketsPerPack",1.5);ok(req("admin","POST",path,form),400);form.put("ticketsPerPack",50);var data=ok(req("admin","POST",path,form),200);
+  var form=new HashMap<String,Object>();form.put("game_name","Catalog Test");form.put("game_code","CAT-"+tag);form.put("ticket_price",2);form.put("tickets_per_pack",50);form.put("commission_percent",5);form.put("start_date",today);form.put("status",true);
+  ok(req("cashier","POST",path,form),403);form.put("tickets_per_pack",1.5);ok(req("admin","POST",path,form),400);form.put("tickets_per_pack",50);var data=ok(req("admin","POST",path,form),200);
   long id=db.queryForObject("SELECT lottery_game_id FROM lottery_games WHERE dgt_id=? AND game_code=?",Long.class,store,"CAT-"+tag);
   JsonNode game=null;for(var g:data.path("games"))if(g.path("id").asLong()==id)game=g;
   assertThat(game.path("packValue").decimalValue()).isEqualByComparingTo("100");
-  ok(req("admin","POST",path,form),400);form.put("version",game.path("version").asText());form.put("commissionPercent",7);
+  ok(req("admin","POST",path,form),400);form.put("version",game.path("version").asText());form.put("commission_percent",7);
   ok(req("admin","PUT",path+"/"+id,form),400);
-  String tomorrow=java.time.LocalDate.parse(today).plusDays(1).toString();form.put("commissionEffectiveDate",tomorrow);
+  String tomorrow=java.time.LocalDate.parse(today).plusDays(1).toString();form.put("commission_effective_date",tomorrow);
   data=ok(req("admin","PUT",path+"/"+id,form),200);
   for(var g:data.path("games"))if(g.path("id").asLong()==id)game=g;
   assertThat(game.path("commissionPercent").asDouble()).isEqualTo(5);assertThat(game.path("scheduledCommission").asDouble()).isEqualTo(7);
@@ -2068,7 +2068,7 @@ ok(call("admin","PUT",path+"/programs/"+id,form,program.get("version").asText(),
   assertThat(game.path("commissionPercent").asDouble()).isEqualTo(7);
   long existing=db.queryForObject("SELECT min(lottery_game_id) FROM lottery_packs WHERE dgt_id=?",Long.class,store);
   for(var g:data.path("games"))if(g.path("id").asLong()==existing)game=g;
-  form.put("version",game.path("version").asText());form.put("gameCode",game.path("gameCode").asText());form.put("ticketPrice",999);form.put("commissionPercent",game.path("commissionPercent").asDouble());
+  form.put("version",game.path("version").asText());form.put("game_code",game.path("gameCode").asText());form.put("ticket_price",999);form.put("commission_percent",game.path("commissionPercent").asDouble());
   ok(req("admin","PUT",path+"/"+existing,form),400);
   String history=access()+"/lottery-pack-history";ok(req("cashier","GET",history,null),403);ok(req("other","GET",history,null),403);
   var report=ok(req("admin","GET",history,null),200);assertThat(report.path("packs").size()).isGreaterThan(0);
@@ -2089,7 +2089,7 @@ ok(call("admin","PUT",path+"/programs/"+id,form,program.get("version").asText(),
   assertThat(visible).contains("GROCERY_PAGE_INVOICES","GAS_PAGE_DELIVERY","LOTTERY_PAGE_ACTIVATE").doesNotContain("STORE_SETTINGS_VIEW","STORE_SETTINGS_EDIT","LOTTERY_RECEIVE_DELIVERY","GROCERY_CREATE_PO","GAS_RECORD_DELIVERY");
   db.update("INSERT INTO store_role_permissions(dgt_id,role_type_id,permission_code,allowed) VALUES (?,?,'GAS_VIEW_DELIVERIES',true) ON CONFLICT(dgt_id,role_type_id,permission_code) DO UPDATE SET allowed=true",store,role);
   ok(req("manager","GET",access()+"/gas-deliveries",null),200);
-  var change=Map.of("roleTypeId",role,"code","GAS_PAGE_DELIVERY","allowed",false,"version","0");
+  var change=Map.of("role_type_id",role,"code","GAS_PAGE_DELIVERY","allowed",false,"version","0");
   ok(req("manager","PUT",base,change),403);ok(req("other","PUT",base,change),403);
   ok(req("admin","PUT",base,change),200);
   assertThat(ok(req("manager","GET",access()+"/context",null),200).path("pages").path("GAS_PAGE_DELIVERY").asBoolean()).isFalse();
@@ -2098,19 +2098,19 @@ ok(call("admin","PUT",path+"/programs/"+id,form,program.get("version").asText(),
   ok(req("admin","GET",access()+"/gas-deliveries",null),200);
   ok(req("admin","PUT",base,change),409);
   String version=db.queryForObject("SELECT xmin::text FROM store_role_permissions WHERE dgt_id=? AND role_type_id=? AND permission_code='GAS_PAGE_DELIVERY'",String.class,store,role);
-  var enable=Map.of("roleTypeId",role,"code","GAS_PAGE_DELIVERY","allowed",true,"version",version);
-  var stale=Map.of("roleTypeId",role,"code","GAS_PAGE_TANK_REPORT","allowed",false,"version","invalid");
+  var enable=Map.of("role_type_id",role,"code","GAS_PAGE_DELIVERY","allowed",true,"version",version);
+  var stale=Map.of("role_type_id",role,"code","GAS_PAGE_TANK_REPORT","allowed",false,"version","invalid");
   ok(req("admin","PUT",base+"/batch",Map.of("changes",List.of(enable,stale))),409);
   ok(req("manager","GET",access()+"/gas-deliveries",null),403);
   ok(req("admin","PUT",base+"/batch",Map.of("changes",List.of(enable))),200);
   ok(req("manager","GET",access()+"/gas-deliveries",null),200);
   // Enabling a page must not grant manager-only actions to a cashier.
   long cashier=db.queryForObject("SELECT role_type_id FROM role_types WHERE role_type_name='CASHIER'",Long.class);
-  ok(req("admin","PUT",base,Map.of("roleTypeId",cashier,"code","GAS_PAGE_TANK_REPORT","allowed",true,"version","0")),200);
+  ok(req("admin","PUT",base,Map.of("role_type_id",cashier,"code","GAS_PAGE_TANK_REPORT","allowed",true,"version","0")),200);
   ok(req("cashier","GET",access()+"/gas-prices",null),403);
   ok(req("other","GET",access()+"/context",null),403);
   // A hidden entry form cannot be opened by calling its write endpoint directly.
-  ok(req("admin","PUT",base,Map.of("roleTypeId",role,"code","GAS_PAGE_DELIVERY_ADD","allowed",false,"version","0")),200);
+  ok(req("admin","PUT",base,Map.of("role_type_id",role,"code","GAS_PAGE_DELIVERY_ADD","allowed",false,"version","0")),200);
   ok(req("manager","GET",access()+"/gas-deliveries",null),200);
   ok(req("manager","POST",access()+"/gas-deliveries",Map.of()),403);
   var rights=ok(req("manager","GET",access()+"/context",null),200).path("pages");
@@ -2118,7 +2118,7 @@ ok(call("admin","PUT",path+"/programs/"+id,form,program.get("version").asText(),
   assertThat(rights.path("GAS_PAGE_DELIVERY_ADD").asBoolean()).isFalse();
   // Hide a tabbed parent when all of its children are disabled.
   for(String code:List.of("GROCERY_PAGE_INVOICES_EDIT","GROCERY_PAGE_INVOICES_APPROVALS","GROCERY_PAGE_INVOICES_VIEW"))
-   ok(req("admin","PUT",base,Map.of("roleTypeId",role,"code",code,"allowed",false,"version","0")),200);
+   ok(req("admin","PUT",base,Map.of("role_type_id",role,"code",code,"allowed",false,"version","0")),200);
   assertThat(ok(req("manager","GET",access()+"/context",null),200).path("pages").path("GROCERY_PAGE_INVOICES").asBoolean()).isFalse();
   ok(req("manager","GET",access()+"/invoice-entry",null),403);
 
@@ -2129,7 +2129,7 @@ ok(call("admin","PUT",path+"/programs/"+id,form,program.get("version").asText(),
   String base=access()+"/role-permissions";
   for(String module:List.of("GROCERY","GAS","LOTTERY")){
    String code="MODULE_"+module;
-   var disable=Map.of("roleTypeId",role,"code",code,"allowed",false,"version","0");
+   var disable=Map.of("role_type_id",role,"code",code,"allowed",false,"version","0");
    ok(req("manager","PUT",base,disable),403);
    ok(req("admin","PUT",base,disable),200);
    var rights=ok(req("manager","GET",access()+"/context",null),200).path("pages");
@@ -2141,7 +2141,7 @@ ok(call("admin","PUT",path+"/programs/"+id,form,program.get("version").asText(),
    assertThat(ok(req("cashier","GET",access()+"/context",null),200).path("pages").path(code).asBoolean()).isTrue();
    ok(req("admin","PUT",base,disable),409);
    String version=db.queryForObject("SELECT xmin::text FROM store_role_permissions WHERE dgt_id=? AND role_type_id=? AND permission_code=?",String.class,store,role,code);
-   ok(req("admin","PUT",base,Map.of("roleTypeId",role,"code",code,"allowed",true,"version",version)),200);
+   ok(req("admin","PUT",base,Map.of("role_type_id",role,"code",code,"allowed",true,"version",version)),200);
   }
   var restored=ok(req("manager","GET",access()+"/context",null),200).path("pages");
   assertThat(restored.path("GAS_PAGE_DELIVERY").asBoolean()).isTrue();
@@ -2190,13 +2190,13 @@ ok(call("admin","PUT",path+"/programs/"+id,form,program.get("version").asText(),
   Set<String> groups=new HashSet<>();catalogue.path("pages").forEach(p->groups.add(p.path("group").asText()));
   assertThat(groups).hasSize(12).contains("Payroll Permissions","Banking Management Permissions","Workweek Permissions","Financial and Payment Services Permissions");
   for(String code:List.of("TENDERS_PAGE_CREDIT_CARD_SETTINGS","PRICE_BOOK_PAGE_DISCOUNTS_REASONS","WORKWEEK_PAGE_WEEK_SCHEDULE_AVAILABILITY"))
-   ok(req("admin","PUT",matrix,Map.of("roleTypeId",role,"code",code,"allowed",false,"version","0")),200);
+   ok(req("admin","PUT",matrix,Map.of("role_type_id",role,"code",code,"allowed",false,"version","0")),200);
   var rights=ok(req("manager","GET",access()+"/context",null),200).path("pages");
   assertThat(rights.path("TENDERS_PAGE_CREDIT_CARD").asBoolean()).isTrue();
   assertThat(rights.path("TENDERS_PAGE_CREDIT_CARD_SETTINGS").asBoolean()).isFalse();
   ok(req("manager","PUT",access()+"/credit-card/settings",Map.of()),403);
   ok(req("manager","POST",access()+"/discounts",Map.of()),403);
-  ok(req("admin","PUT",matrix,Map.of("roleTypeId",role,"code","TENDERS_PAGE_CREDIT_CARD","allowed",false,"version","0")),200);
+  ok(req("admin","PUT",matrix,Map.of("role_type_id",role,"code","TENDERS_PAGE_CREDIT_CARD","allowed",false,"version","0")),200);
   ok(req("manager","GET",access()+"/credit-card",null),403);
   rights=ok(req("manager","GET",access()+"/context",null),200).path("pages");
   assertThat(rights.path("TENDERS_PAGE_CREDIT_CARD_SETTLEMENT").asBoolean()).isFalse();
@@ -2207,14 +2207,14 @@ ok(call("admin","PUT",path+"/programs/"+id,form,program.get("version").asText(),
  @Test @Order(1003) void adminCreatesChildStoreWithoutSignup() throws Exception {
   String endpoint=access()+"/manage-stores",key=UUID.randomUUID().toString();
   var original=db.queryForMap("SELECT legal_business_name,tax_id FROM stores WHERE dgt_id=?",store);
-  var body=new LinkedHashMap<String,Object>();body.put("parentStoreId",store);body.put("storeId","child-"+tag);body.put("storeName","Child "+tag);body.put("legalBusinessName",original.get("legal_business_name"));body.put("taxId",original.get("tax_id"));body.put("licenseNumber","child-license-"+tag);body.put("timezone","America/New_York");body.put("address","123 Local Test Street");body.put("phone","");body.put("email","child@example.test");
+  var body=new LinkedHashMap<String,Object>();body.put("parent_store_id",store);body.put("store_id","child-"+tag);body.put("store_name","Child "+tag);body.put("legal_business_name",original.get("legal_business_name"));body.put("tax_id",original.get("tax_id"));body.put("license_number","child-license-"+tag);body.put("timezone","America/New_York");body.put("address","123 Local Test Street");body.put("phone","");body.put("email","child@example.test");
   ok(req("manager","GET",endpoint,null),403);ok(req("cashier","POST",endpoint,body),403);ok(req("other","POST",endpoint,body),403);
-  var foreignParent=new LinkedHashMap<>(body);foreignParent.put("parentStoreId",foreign);ok(req("admin","POST",endpoint,foreignParent),403);
+  var foreignParent=new LinkedHashMap<>(body);foreignParent.put("parent_store_id",foreign);ok(req("admin","POST",endpoint,foreignParent),403);
   var invalid=new LinkedHashMap<>(body);invalid.put("timezone","Invalid/Zone");ok(req("admin","POST",endpoint,invalid),400);
   var created=ok(call("admin","POST",endpoint,body,null,key),201);String child=created.path("dgtId").asText();
   assertThat(child).startsWith("DGT-");
   assertThat(ok(call("admin","POST",endpoint,body,null,key),201).path("dgtId").asText()).isEqualTo(child);
-  var changed=new LinkedHashMap<>(body);changed.put("storeName","Different");ok(call("admin","POST",endpoint,changed,null,key),409);
+  var changed=new LinkedHashMap<>(body);changed.put("store_name","Different");ok(call("admin","POST",endpoint,changed,null,key),409);
   ok(req("admin","POST",endpoint,body),409);
   assertThat(db.queryForObject("SELECT parent_store_dgt_id FROM stores WHERE dgt_id=?",String.class,child)).isEqualTo(store);
   assertThat(db.queryForObject("SELECT company_id FROM stores WHERE dgt_id=?",Long.class,child)).isEqualTo(company);
