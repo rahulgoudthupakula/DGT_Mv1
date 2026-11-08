@@ -11,7 +11,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import tools.jackson.databind.*;
 import static org.assertj.core.api.Assertions.*;
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={
- "app.workforce.enabled=true","app.workforce.shift-changes.enabled=true","app.workweek.enabled=true","app.billing.enabled=true","app.profile.enabled=true","spring.datasource.url=jdbc:postgresql://127.0.0.1:55439/dgt_test","spring.datasource.username=dgt_test","spring.datasource.password=only-test-password","logging.level.root=WARN","debug=false"})
+ "app.workforce.enabled=true","app.workforce.shift-changes.enabled=true","app.workweek.enabled=true","app.billing.enabled=true","app.profile.enabled=true","spring.datasource.url=jdbc:postgresql://127.0.0.1:55439/dgt_test","spring.datasource.username=dgt_test","spring.datasource.password=only-test-password","spring.flyway.enabled=true","logging.level.root=WARN","debug=false"})
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class WorkforceIntegrationTest {
@@ -22,9 +22,14 @@ class WorkforceIntegrationTest {
  long company,otherCompany;Map<String,Long> users=new HashMap<>();Map<String,Long> assignments=new HashMap<>();
  String password="Only-local-integration-tests";long departmentModule,settingsModule;String customId;
  record Response(int code,JsonNode body){}
+ String getToken(String who) throws Exception {
+  var r=http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/api/v1/access/session")).header("Authorization","Basic "+Base64.getEncoder().encodeToString((who+"-"+tag+"@example.test:"+password).getBytes(StandardCharsets.UTF_8))).POST(HttpRequest.BodyPublishers.noBody()).build(),HttpResponse.BodyHandlers.ofString());
+  if(r.statusCode()!=200)return null;
+  return json.readTree(r.body()).path("token").asText();
+ }
  Response call(String who,String method,String path,Object body,String version,String key) throws Exception {
   var b=HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/api/v1"+path));
-  if(who!=null)b.header("Authorization","Basic "+Base64.getEncoder().encodeToString((who+"-"+tag+"@example.test:"+password).getBytes(StandardCharsets.UTF_8)));
+  if(who!=null){String token=getToken(who);if(token!=null)b.header("Authorization","Bearer "+token);}
   if(version!=null)b.header("If-Match",version);
   b.header("Idempotency-Key",key==null?UUID.randomUUID().toString():key);
   if(body!=null)b.header("Content-Type","application/json").method(method,HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body)));else b.method(method,HttpRequest.BodyPublishers.noBody());

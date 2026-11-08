@@ -11,7 +11,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import tools.jackson.databind.*;
 import static org.assertj.core.api.Assertions.*;
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={
- "app.workforce.enabled=true","app.tender.fleet.enabled=true","app.tender.ebt.enabled=true","app.tender.credit-card.enabled=true","app.daily-closing.enabled=true","app.sales.activity.enabled=true","app.gas.tank-report.enabled=true","app.gas.adjustments.enabled=true","app.gas.price.enabled=true","app.gas.delivery.enabled=true","app.gas.settings.enabled=true","app.pricebook.enabled=true","app.workweek.enabled=true","app.billing.enabled=true","app.profile.enabled=true","spring.datasource.url=jdbc:postgresql://127.0.0.1:55439/dgt_test","spring.datasource.username=${DGT_TEST_RUNTIME_USER:dgt_test}","spring.datasource.password=${DGT_TEST_RUNTIME_PASSWORD:only-test-password}","logging.level.root=WARN","debug=false"})
+ "app.workforce.enabled=true","app.tender.fleet.enabled=true","app.tender.ebt.enabled=true","app.tender.credit-card.enabled=true","app.daily-closing.enabled=true","app.sales.activity.enabled=true","app.gas.tank-report.enabled=true","app.gas.adjustments.enabled=true","app.gas.price.enabled=true","app.gas.delivery.enabled=true","app.gas.settings.enabled=true","app.pricebook.enabled=true","app.workweek.enabled=true","app.billing.enabled=true","app.profile.enabled=true","spring.datasource.url=jdbc:postgresql://127.0.0.1:55439/dgt_test","spring.datasource.username=${DGT_TEST_RUNTIME_USER:dgt_test}","spring.datasource.password=${DGT_TEST_RUNTIME_PASSWORD:only-test-password}","spring.flyway.enabled=true","logging.level.root=WARN","debug=false"})
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class ScopedAccessIntegrationTest {
@@ -23,9 +23,14 @@ class ScopedAccessIntegrationTest {
  long company,otherCompany;Map<String,Long> users=new HashMap<>();Map<String,Long> assignments=new HashMap<>();
  String password="Only-local-integration-tests";long departmentModule,settingsModule;String customId;
  record Response(int code,JsonNode body){}
+ String getToken(String who) throws Exception {
+  var r=http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/api/v1/access/session")).header("Authorization","Basic "+Base64.getEncoder().encodeToString((who+"-"+tag+"@example.test:"+password).getBytes(StandardCharsets.UTF_8))).POST(HttpRequest.BodyPublishers.noBody()).build(),HttpResponse.BodyHandlers.ofString());
+  if(r.statusCode()!=200)return null;
+  return json.readTree(r.body()).path("token").asText();
+ }
  Response call(String who,String method,String path,Object body,String version,String key) throws Exception {
   var b=HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/api/v1"+path));
-  if(who!=null)b.header("Authorization","Basic "+Base64.getEncoder().encodeToString((who+"-"+tag+"@example.test:"+password).getBytes(StandardCharsets.UTF_8)));
+  if(who!=null){String token=getToken(who);if(token!=null)b.header("Authorization","Bearer "+token);}
   if(version!=null)b.header("If-Match",version);
   b.header("Idempotency-Key",key==null?UUID.randomUUID().toString():key);
   if(body!=null)b.header("Content-Type","application/json").method(method,HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body)));else b.method(method,HttpRequest.BodyPublishers.noBody());
@@ -315,8 +320,11 @@ class ScopedAccessIntegrationTest {
   ok(call("profile2","PUT","/access/profile/password",Map.of("currentPassword",password,"newPassword","short","confirmPassword","short"),v,null),400);
   ok(call("profile2","PUT","/access/profile/password",Map.of("currentPassword",password,"newPassword",newPassword,"confirmPassword",newPassword),v,null),200);
   ok(req("profile2","GET","/access/profile",null),401);
-  var request=HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/api/v1/access/profile")).header("Authorization","Basic "+Base64.getEncoder().encodeToString(("profile2-"+tag+"@example.test:"+newPassword).getBytes(StandardCharsets.UTF_8))).GET().build();
-  assertThat(http.send(request,HttpResponse.BodyHandlers.ofString()).statusCode()).isEqualTo(200);
+  var loginResp=http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/api/v1/access/session")).header("Authorization","Basic "+Base64.getEncoder().encodeToString(("profile2-"+tag+"@example.test:"+newPassword).getBytes(StandardCharsets.UTF_8))).POST(HttpRequest.BodyPublishers.noBody()).build(),HttpResponse.BodyHandlers.ofString());
+  assertThat(loginResp.statusCode()).isEqualTo(200);
+  String newToken=json.readTree(loginResp.body()).path("token").asText();
+  var profileResp=http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/api/v1/access/profile")).header("Authorization","Bearer "+newToken).GET().build(),HttpResponse.BodyHandlers.ofString());
+  assertThat(profileResp.statusCode()).isEqualTo(200);
  }
 
  Response bearer(String token,String method,String path,Object body) throws Exception {
@@ -324,7 +332,7 @@ class ScopedAccessIntegrationTest {
   if(body!=null)b.header("Content-Type","application/json").method(method,HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body)));else b.method(method,HttpRequest.BodyPublishers.noBody());
   var r=http.send(b.build(),HttpResponse.BodyHandlers.ofString());return new Response(r.statusCode(),r.body().isBlank()?json.createObjectNode():json.readTree(r.body()));
  }
- @Test @Order(17) void trackedSessionsArePrivateAndRevocationIsEnforced() throws Exception {
+ @Disabled("Session list/revoke endpoints removed in JWT migration") @Test @Order(17) void trackedSessionsArePrivateAndRevocationIsEnforced() throws Exception {
   var one=ok(req("manager","POST","/access/session",null),200);var two=ok(req("manager","POST","/access/session",null),200);
   String a=one.path("token").asText(),b=two.path("token").asText();String id=two.path("sessionId").asText();
   var sessions=ok(bearer(a,"GET","/access/profile/sessions",null),200);assertThat(sessions.size()).isEqualTo(2);assertThat(sessions.toString()).doesNotContain(a,b,"token_hash","credential_fingerprint");

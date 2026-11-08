@@ -71,19 +71,27 @@ public class ProfileSessions {
 
     public Map<String, Object> create(HttpServletRequest request) {
         checkRate(request.getRemoteAddr());
-        long uid = access.user();
-        var u = access.db.queryForMap("SELECT email,password_hash FROM users WHERE user_id=? FOR UPDATE", uid);
-
         String raw = new String(Base64.getDecoder().decode(
                 request.getHeader("Authorization").substring(6)), StandardCharsets.UTF_8);
         int colon = raw.indexOf(':');
-        if (colon < 0 || !encoder.matches(raw.substring(colon + 1), (String) u.get("password_hash"))) {
+        if (colon < 0) throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.UNAUTHORIZED, "Sign in again");
+        String email = raw.substring(0, colon);
+        String password = raw.substring(colon + 1);
+
+        var rows = access.db.queryForList(
+                "SELECT user_id,email,password_hash FROM users WHERE email=? AND account_status='ACTIVE' AND two_factor_authentication=false FOR UPDATE",
+                email);
+        boolean valid = rows.size() == 1 && encoder.matches(password, (String) rows.getFirst().get("password_hash"));
+        if (!valid) {
+            if (rows.size() == 1) event((Long) rows.getFirst().get("user_id"), request, "FAILED");
             throw new org.springframework.web.server.ResponseStatusException(
                     org.springframework.http.HttpStatus.UNAUTHORIZED, "Sign in again");
         }
 
-        String email = (String) u.get("email");
-        String token = jwt.issue(email);
+        long uid = (Long) rows.getFirst().get("user_id");
+        String resolvedEmail = (String) rows.getFirst().get("email");
+        String token = jwt.issue(resolvedEmail);
         String refreshToken = refreshTokens.issue(uid);
         event(uid, request, "SUCCESS");
         log.info("JWT issued for user_id={}", uid);
