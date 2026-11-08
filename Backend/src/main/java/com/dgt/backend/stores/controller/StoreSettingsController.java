@@ -52,7 +52,8 @@ public class StoreSettingsController {
     }
     public Map<String,Object> apply(String dgtId,String version,Update body) {
         if(body.store()!=null && !Set.of("store_id","store_name","legal_business_name","tax_id","license_number","timezone").containsAll(body.store().keySet())) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Unsupported store field");
-        db.queryForList("SELECT dgt_id FROM stores WHERE dgt_id=? FOR UPDATE",dgtId);
+        var lock=db.queryForList("SELECT xmin::text AS v FROM stores WHERE dgt_id=? FOR UPDATE",dgtId);
+        if(version!=null&&!version.isBlank()&&!lock.isEmpty()&&!version.equals(lock.get(0).get("v")))throw new ResponseStatusException(HttpStatus.CONFLICT,"Store changed since this was submitted; submit again");
         var existing=contact(dgtId);
         if(body.contact()!=null) {
             if(!Set.of("address","phone_number","email").containsAll(body.contact().keySet())) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Unsupported contact field");
