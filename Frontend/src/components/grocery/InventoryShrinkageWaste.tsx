@@ -44,6 +44,7 @@ export const InventoryShrinkageWaste = ({storeId}:{storeId:string}) => {
   const [reason, setReason] = useState<"all" | keyof typeof REASON_META>("all");
 
   const fetchRecords = async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     try{const data=await request<{requests:any[];items:any[]}>(`/access/stores/${encodeURIComponent(storeId)}/reductions`);setRecords(data.requests.filter(r=>r.status==='APPROVED'&&r.route==='shrinkage').map(r=>({id:String(r.reduction_request_id),item_name:r.product_name,scan_code:r.barcode??'',quantity:Number(r.quantity),current_stock:data.items.find(i=>Number(i.id)===Number(r.product_id))?.inventoryCount??null,net_cost:r.recorded_unit_cost==null?null:Number(r.recorded_unit_cost),recorded_loss:r.recorded_loss==null?null:Number(r.recorded_loss),reason:r.reason,notes:r.notes,recorded_at:r.updated_at,})));}catch(e){toast({title:'Could not load records',description:String(e),variant:'destructive'});}finally{setLoading(false);}
   };
   useEffect(()=>{fetchRecords();},[storeId]);

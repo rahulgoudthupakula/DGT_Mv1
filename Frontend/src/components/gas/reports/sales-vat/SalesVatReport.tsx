@@ -11,6 +11,7 @@ export const SalesVatReport = () => {
   const [vatRate, setVatRate] = useState("all");
   const [fuelType, setFuelType] = useState("all");
   const [viewType, setViewType] = useState("by-day");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [selectedRow, setSelectedRow] = useState<any | null>(null);
 
   return (
