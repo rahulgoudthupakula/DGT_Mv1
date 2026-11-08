@@ -50,6 +50,8 @@ class WorkforceIntegrationTest {
    if(role.equals("admin")||role.equals("other"))db.update("INSERT INTO company_admins(company_id,user_id) VALUES (?,?)",role.equals("admin")?company:otherCompany,id);
    else{long roleType=db.queryForObject("SELECT role_type_id FROM role_types WHERE role_type_name=?",Long.class,role.toUpperCase());long ar=db.queryForObject("INSERT INTO user_roles(user_id,role_type_id,dgt_id) VALUES (?,?,?) RETURNING user_role_id",Long.class,id,roleType,store);assignments.put(role,ar);for(String code:List.of("STORE_SETTINGS_VIEW","STORE_SETTINGS_EDIT","DEPARTMENTS_VIEW","DEPARTMENTS_EDIT"))db.update("INSERT INTO store_role_permissions(dgt_id,role_type_id,permission_code,allowed) VALUES (?,?,?,?)",store,roleType,code,!role.equals("accountant")||code.endsWith("_VIEW"));for(long module:List.of(settingsModule,departmentModule))db.update("INSERT INTO permissions(user_role_id,module_id,can_view,can_edit) VALUES (?,?,true,?)",ar,module,!role.equals("accountant"));}
   }
+  for(var section:com.dgt.backend.access.PagePermissions.SECTIONS)if(!section.defaultAllowed())
+   db.update("INSERT INTO store_role_permissions(dgt_id,role_type_id,permission_code,allowed) SELECT ?,role_type_id,?,true FROM role_types WHERE role_type_name IN ('MANAGER','CASHIER','ACCOUNTANT')",store,section.code());
  }
  @AfterAll void cleanup(){
   if(company==0)return;
