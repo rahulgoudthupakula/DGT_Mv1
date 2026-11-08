@@ -134,12 +134,12 @@ export const BulkUpdatePage = ({storeId}:{storeId:string}) => {
   const allSelected = paginated.length > 0 && paginated.every((i) => selected.has(String(i.id)));
   const toggleAll = () => {
     const next = new Set(selected);
-    allSelected ? paginated.forEach((i) => next.delete(String(i.id))) : paginated.forEach((i) => next.add(String(i.id)));
+    if(allSelected){paginated.forEach((i)=>next.delete(String(i.id)));}else{paginated.forEach((i)=>next.add(String(i.id)));}
     setSelected(next);
   };
   const toggleOne = (barcode: string) => {
     const next = new Set(selected);
-    next.has(barcode) ? next.delete(barcode) : next.add(barcode);
+    if(next.has(barcode)){next.delete(barcode);}else{next.add(barcode);}
     setSelected(next);
   };
 
@@ -149,6 +149,7 @@ export const BulkUpdatePage = ({storeId}:{storeId:string}) => {
   };
 
   const updateDraft=(id:number,key:keyof BulkItem,value:string|number|boolean)=>setDraft(prev=>prev.map(i=>{
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if(i.id!==id)return i;let patch:any={[key]:value};
     if(key==='dept')patch.subDept='';
     try{if(['cost','margin','itemGrossCost','itemDiscount','itemNetCost','caseGrossCost','caseDiscount','caseNetCost'].includes(key))patch=costEdit(i,key,value as number);if(key==='unitsPerCase'&&value!=null&&(!Number.isInteger(value)||Number(value)<=0))throw Error('Units per case must be a positive whole number.');setMessage('');}catch(e){setMessage(e instanceof Error?e.message:'Invalid value');return i;}

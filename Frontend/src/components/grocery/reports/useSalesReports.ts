@@ -7,6 +7,7 @@ export function useSalesReports(store:string,start?:Date,end?:Date){
  return useQuery({queryKey:['grocery-sales',store,params.toString()],queryFn:()=>request<{rows:SalesSource[];start:string;end:string;days:number}>('/access/stores/'+encodeURIComponent(store)+'/grocery-reports/sales?'+params),enabled:!!store});
 }
 export function salesGroups(rows:SalesSource[],start:string,days:number,byCategory=false){
+ // eslint-disable-next-line @typescript-eslint/no-explicit-any
  const groups=new Map<string,any>();
  for(const row of rows){
   const key=byCategory?row.category:row.id;
