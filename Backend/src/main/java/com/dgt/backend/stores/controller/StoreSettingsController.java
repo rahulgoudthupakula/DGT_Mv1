@@ -41,7 +41,14 @@ public class StoreSettingsController {
     @PreAuthorize("@scopedAccess.can(authentication,#dgtId,'STORE_SETTINGS',false)")
     public Map<String,Object> get(@PathVariable String dgtId) {
         var result=new LinkedHashMap<String,Object>();
-        result.put("store",stores.get(dgtId)); result.put("contact",contact(dgtId)); result.put("hours",hours.get(dgtId)); return result;
+        var sr=stores.get(dgtId);
+        var storeMap=new LinkedHashMap<String,Object>();
+        storeMap.put("dgt_id",sr.dgtId());storeMap.put("store_id",sr.storeId());storeMap.put("store_name",sr.storeName());
+        storeMap.put("legal_business_name",sr.legalBusinessName());storeMap.put("tax_id",sr.taxId());storeMap.put("license_number",sr.licenseNumber());
+        storeMap.put("timezone",sr.timezone());storeMap.put("company_id",sr.companyId());storeMap.put("created_at",sr.createdAt());storeMap.put("updated_at",sr.updatedAt());
+        var xv=db.queryForList("SELECT xmin::text AS v FROM stores WHERE dgt_id=?",dgtId);
+        if(!xv.isEmpty())storeMap.put("_version",xv.getFirst().get("v"));
+        result.put("store",storeMap);result.put("contact",contact(dgtId));result.put("hours",hours.get(dgtId));return result;
     }
     public record Update(Map<String,Object> store, Map<String,Object> contact, String contactVersion, List<StoreHoursService.Day> hours, Map<String,String> hoursVersions) {}
     @PatchMapping
@@ -52,7 +59,8 @@ public class StoreSettingsController {
     }
     public Map<String,Object> apply(String dgtId,String version,Update body) {
         if(body.store()!=null && !Set.of("store_id","store_name","legal_business_name","tax_id","license_number","timezone").containsAll(body.store().keySet())) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Unsupported store field");
-        db.queryForList("SELECT dgt_id FROM stores WHERE dgt_id=? FOR UPDATE",dgtId);
+        var lock=db.queryForList("SELECT xmin::text AS v FROM stores WHERE dgt_id=? FOR UPDATE",dgtId);
+        if(version!=null&&!version.isBlank()&&!lock.isEmpty()&&!version.equals(lock.get(0).get("v")))throw new ResponseStatusException(HttpStatus.CONFLICT,"Store changed since this was submitted; submit again");
         var existing=contact(dgtId);
         if(body.contact()!=null) {
             if(!Set.of("address","phone_number","email").containsAll(body.contact().keySet())) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Unsupported contact field");
@@ -78,6 +86,7 @@ public class StoreSettingsController {
         }
         if(body.hours()!=null) hours.save(dgtId,body.hours(),body.hoursVersions());
         if(body.store()!=null && !body.store().isEmpty()) {
+            if(body.store().containsKey("timezone")){try{java.time.ZoneId.of((String)body.store().get("timezone"));}catch(java.time.DateTimeException e){throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid timezone: use a valid IANA timezone identifier");}}
             StoreResponse existingStore=stores.get(dgtId);
             var sv=body.store();
             stores.update(dgtId, new UpdateStoreRequest(

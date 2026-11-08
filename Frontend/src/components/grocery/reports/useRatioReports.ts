@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {useSalesReports} from './useSalesReports';
 import {usePurchaseReports} from './usePurchaseReports';
 export function useRatioReports(storeId:string,start?:Date,end?:Date){

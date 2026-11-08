@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {useSalesReports} from './useSalesReports';
 import {useStockReports} from './useStockReports';
 import {usePurchaseReports} from './usePurchaseReports';

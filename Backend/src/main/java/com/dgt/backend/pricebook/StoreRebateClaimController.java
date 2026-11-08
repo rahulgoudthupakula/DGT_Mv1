@@ -30,6 +30,8 @@ public class StoreRebateClaimController {
  private Map<String,Object> one(String sql,Object... args){var rows=a.db.queryForList(sql,args);if(rows.size()!=1)throw bad("Record not found in this store");return rows.getFirst();}
  private LocalDate today(String store){return a.db.queryForObject("SELECT (CURRENT_TIMESTAMP AT TIME ZONE timezone)::date FROM stores WHERE dgt_id=?",LocalDate.class,store);}
  private void past(String store,LocalDate value){if(value.isAfter(today(store)))throw bad("Date cannot be in the future");}
+ private static String toCamel(String s){var sb=new StringBuilder();boolean up=false;for(char c:s.toCharArray()){if(c=='_'){up=true;}else if(up){sb.append(Character.toUpperCase(c));up=false;}else{sb.append(c);}}return sb.toString();}
+ private static Map<String,Object> snakeToCamel(Map<String,Object> m){var out=new LinkedHashMap<String,Object>();for(var e:m.entrySet())out.put(toCamel(e.getKey()),e.getValue());return out;}
  private void submit(String store,long claim,Map<String,Object> c,Map<String,Object> in){
   var p=one("SELECT * FROM rebate_programs WHERE program_id=? AND dgt_id=?",c.get("program_id"),store);
   if(!"Active".equals(p.get("status")))throw bad("Only active programs can receive submissions");
@@ -52,7 +54,7 @@ public class StoreRebateClaimController {
   }).toList();
  }
  @PostMapping @Transactional public Object create(@PathVariable String store,@RequestBody Map<String,Object> in){
-  lock(store);long program=id(in.get("programId"));var p=one("SELECT * FROM rebate_programs WHERE program_id=? AND dgt_id=?",program,store);
+  in=snakeToCamel(in);lock(store);long program=id(in.get("programId"));var p=one("SELECT * FROM rebate_programs WHERE program_id=? AND dgt_id=?",program,store);
   if(!"Active".equals(p.get("status")))throw bad("Choose an active program");
   LocalDate start=date(in.get("periodStart")),end=date(in.get("periodEnd"));
   if(end.isBefore(start)||start.isBefore(date(p.get("start_date")))||end.isAfter(date(p.get("end_date"))))throw bad("Claim period must be inside program dates");
@@ -64,7 +66,7 @@ public class StoreRebateClaimController {
   a.audit(store,"REBATE_CLAIM_CREATED",Long.toString(claim),"{}");return Map.of("id",claim);
  }
  @PostMapping("/{claim}/actions") @Transactional public Object action(@PathVariable String store,@PathVariable long claim,@RequestHeader("If-Match") String version,@RequestBody Map<String,Object> in){
-  lock(store);var c=one("SELECT *,xmin::text AS version FROM rebate_claims WHERE claim_id=? AND dgt_id=? FOR UPDATE",claim,store);
+  in=snakeToCamel(in);lock(store);var c=one("SELECT *,xmin::text AS version FROM rebate_claims WHERE claim_id=? AND dgt_id=? FOR UPDATE",claim,store);
   String action=text(in,"action",20),status=c.get("status").toString();
   UUID key=null;
   if(action.equals("payment")){

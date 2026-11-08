@@ -29,6 +29,8 @@ public class StoreRebateController {
  @SuppressWarnings("unchecked") private Map<String,Object> settings(Object x){return json.readValue(x.toString(),Map.class);}
  private void choice(Map<String,Object> m,String key,String... values){if(!Set.of(values).contains(text(m,key,100)))throw bad("Choose a valid "+key);}
  private void decimal(Map<String,Object> m,String key,boolean required){String s=text(m,key,40);if(s.isEmpty()){if(required)throw bad("Enter "+key);return;}try{BigDecimal n=new BigDecimal(s);if(n.signum()<0||n.scale()>4||n.compareTo(new BigDecimal("9999999999"))>0)throw bad("Invalid "+key);}catch(NumberFormatException e){throw bad("Enter a numeric "+key);}}
+ private static String toCamel(String s){var sb=new StringBuilder();boolean up=false;for(char c:s.toCharArray()){if(c=='_'){up=true;}else if(up){sb.append(Character.toUpperCase(c));up=false;}else{sb.append(c);}}return sb.toString();}
+ private static Map<String,Object> snakeToCamel(Map<String,Object> m){var out=new LinkedHashMap<String,Object>();for(var e:m.entrySet())out.put(toCamel(e.getKey()),e.getValue());return out;}
  private Map<String,Object> program(String store,long id){return one("SELECT *,xmin::text AS version FROM rebate_programs WHERE program_id=? AND dgt_id=?",id,store);}
  private String status(Map<String,Object> p){String s=p.get("status").toString();if(!s.equals("Active"))return s;LocalDate now=a.db.queryForObject("SELECT (CURRENT_TIMESTAMP AT TIME ZONE timezone)::date FROM stores WHERE dgt_id=?",LocalDate.class,p.get("dgt_id"));return date(p.get("end_date")).isBefore(now)?"Expired":date(p.get("start_date")).isAfter(now)?"Upcoming":"Active";}
  private boolean eligible(String store,Map<String,Object> p,long product){var config=settings(p.get("settings"));String scope=Objects.toString(config.get("eligibilityScope"),"");
@@ -52,7 +54,7 @@ public class StoreRebateController {
  }
  @PostMapping("/programs") @Transactional public Object create(@PathVariable String store,@RequestBody Map<String,Object> in){return save(store,null,null,in);}
  @PutMapping("/programs/{id}") @Transactional public Object update(@PathVariable String store,@PathVariable long id,@RequestHeader("If-Match") String version,@RequestBody Map<String,Object> in){return save(store,id,version,in);}
- private Object save(String store,Long id,String version,Map<String,Object> in){lock(store);if(id!=null&&!Objects.equals(program(store,id).get("version"),version))throw conflict();
+ private Object save(String store,Long id,String version,Map<String,Object> in){in=snakeToCamel(in);lock(store);if(id!=null&&!Objects.equals(program(store,id).get("version"),version))throw conflict();
  if(id!=null&&"Inactive".equals(in.get("status"))){a.db.update("UPDATE rebate_programs SET status='Inactive',updated_at=now() WHERE program_id=?",id);a.audit(store,"REBATE_PROGRAM_DEACTIVATED",id.toString(),"{}");return Map.of("id",id,"saved",true);}
  String name=text(in,"name",150);if(name.isEmpty())throw bad("Enter a program name");String provider=text(in,"vendor",200);Long vendor=null;
  choice(in,"offeredByType","Vendor / Distributor","Manufacturer","Other");

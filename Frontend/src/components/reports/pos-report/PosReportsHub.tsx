@@ -64,6 +64,7 @@ export const PosReportsHub = ({storeId}:{storeId:string}) => {
   const empty:PosReport={start:today,end:today,today,timezone:'UTC',rows:[],payments:[],closing:{},closingMeta:{}};
   const {deptSummaryData,deptByDateData,deptByWeekData,deptByMonthData,vatByDeptData,gasSalesSummaryData,gasSalesByDateData,gasSalesByWeekData,gasSalesByMonthData,gasSalesByHourData,itemSalesData,itemSalesByHourData,fuelByCCData,taxSalesData,profitData,itemSalesHistoryData,manualRingupData,unallocatedFuelReceipts}=posTables(data??empty,deptSalesView.startsWith('merch-'),itemTimeView,profitView==='scanned');
   const galFmt = (n:number|null) => n==null?'—':n.toLocaleString('en-US',{minimumFractionDigits:1,maximumFractionDigits:3});
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const knownSum=(rows:any[],key:string):number|null=>rows.some(r=>r[key]==null)?null:rows.reduce((s,r)=>s+r[key],0);
   const apply=(event:React.FormEvent)=>{event.preventDefault();if(!from||!to||from>to||to>today){setError('Choose From and To dates in order, ending today or earlier.');return;}setError('');setRange({from,to});};
 

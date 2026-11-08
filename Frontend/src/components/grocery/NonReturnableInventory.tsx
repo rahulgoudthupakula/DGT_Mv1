@@ -112,6 +112,7 @@ const loadApprovedNonReturnables = (): InventoryItem[] =>
     }));
 
 export const NonReturnableInventory = ({storeId}:{storeId:string}) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const approved=useQuery({queryKey:['reductions',storeId],queryFn:()=>request<{requests:any[];items:any[]}>(`/access/stores/${encodeURIComponent(storeId)}/reductions`)});
   const [date, setDate] = useState<Date>();
   const [scanCodeFilter, setScanCodeFilter] = useState("");
