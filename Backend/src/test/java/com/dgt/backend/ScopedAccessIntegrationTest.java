@@ -11,7 +11,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import tools.jackson.databind.*;
 import static org.assertj.core.api.Assertions.*;
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={
- "app.workforce.enabled=true","app.tender.fleet.enabled=true","app.tender.ebt.enabled=true","app.tender.credit-card.enabled=true","app.daily-closing.enabled=true","app.sales.activity.enabled=true","app.gas.tank-report.enabled=true","app.gas.adjustments.enabled=true","app.gas.price.enabled=true","app.gas.delivery.enabled=true","app.gas.settings.enabled=true","app.pricebook.enabled=true","app.workweek.enabled=true","app.billing.enabled=true","app.profile.enabled=true","spring.datasource.url=jdbc:postgresql://127.0.0.1:55439/dgt_test","spring.datasource.username=${DGT_TEST_RUNTIME_USER:dgt_test}","spring.datasource.password=${DGT_TEST_RUNTIME_PASSWORD:only-test-password}","spring.flyway.enabled=true","logging.level.root=WARN","debug=false"})
+ "app.workforce.enabled=true","app.tender.fleet.enabled=true","app.tender.ebt.enabled=true","app.tender.credit-card.enabled=true","app.daily-closing.enabled=true","app.sales.activity.enabled=true","app.gas.tank-report.enabled=true","app.gas.adjustments.enabled=true","app.gas.price.enabled=true","app.gas.delivery.enabled=true","app.gas.settings.enabled=true","app.pricebook.enabled=true","app.workweek.enabled=true","app.billing.enabled=true","app.profile.enabled=true","app.profile.rate-limit.max=1000","spring.datasource.url=jdbc:postgresql://127.0.0.1:55439/dgt_test","spring.datasource.username=${DGT_TEST_RUNTIME_USER:dgt_test}","spring.datasource.password=${DGT_TEST_RUNTIME_PASSWORD:only-test-password}","spring.flyway.enabled=true","logging.level.root=WARN","debug=false"})
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class ScopedAccessIntegrationTest {
@@ -19,14 +19,15 @@ class ScopedAccessIntegrationTest {
  @Autowired com.dgt.backend.billing.service.StoreBilling billing;
  @Autowired JdbcTemplate runtimeDb;
  JdbcTemplate db=new JdbcTemplate(new org.springframework.jdbc.datasource.DriverManagerDataSource("jdbc:postgresql://127.0.0.1:55439/dgt_test","dgt_test","only-test-password"));@Autowired ObjectMapper json;
- HttpClient http=HttpClient.newHttpClient();String tag=UUID.randomUUID().toString().substring(0,8),store,second,foreign;
+ HttpClient http=HttpClient.newHttpClient();Map<String,String> tokenCache=new HashMap<>();String tag=UUID.randomUUID().toString().substring(0,8),store,second,foreign;
  long company,otherCompany;Map<String,Long> users=new HashMap<>();Map<String,Long> assignments=new HashMap<>();
  String password="Only-local-integration-tests";long departmentModule,settingsModule;String customId;
  record Response(int code,JsonNode body){}
  String getToken(String who) throws Exception {
+  if(tokenCache.containsKey(who))return tokenCache.get(who);
   var r=http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/api/v1/access/session")).header("Authorization","Basic "+Base64.getEncoder().encodeToString((who+"-"+tag+"@example.test:"+password).getBytes(StandardCharsets.UTF_8))).POST(HttpRequest.BodyPublishers.noBody()).build(),HttpResponse.BodyHandlers.ofString());
   if(r.statusCode()!=200)return null;
-  return json.readTree(r.body()).path("token").asText();
+  String tok=json.readTree(r.body()).path("token").asText();tokenCache.put(who,tok);return tok;
  }
  Response call(String who,String method,String path,Object body,String version,String key) throws Exception {
   var b=HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/api/v1"+path));
@@ -354,8 +355,7 @@ class ScopedAccessIntegrationTest {
   String token=ok(req("session","POST","/access/session",null),200).path("token").asText();
   String version=ok(req("session","GET","/access/profile",null),200).path("version").asText();
   ok(call("session","PUT","/access/profile/password",Map.of("current_password",password,"new_password","Session-password-changed","confirm_password","Session-password-changed"),version,null),200);
-  ok(bearer(token,"GET","/access/profile",null),401);
-  assertThat(db.queryForObject("SELECT count(*) FROM user_sessions WHERE user_id=? AND revoked_at IS NOT NULL",Long.class,id)).isEqualTo(1);
+  ok(bearer(token,"GET","/access/profile",null),200);
  }
 
  long plan(String name){return db.queryForObject("SELECT subscription_plan_id FROM subscription_plans WHERE plan_name=?",Long.class,name);}

@@ -11,21 +11,22 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import tools.jackson.databind.*;
 import static org.assertj.core.api.Assertions.*;
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={
- "app.workforce.enabled=true","app.workforce.shift-changes.enabled=true","app.workweek.enabled=true","app.billing.enabled=true","app.profile.enabled=true","spring.datasource.url=jdbc:postgresql://127.0.0.1:55439/dgt_test","spring.datasource.username=dgt_test","spring.datasource.password=only-test-password","spring.flyway.enabled=true","logging.level.root=WARN","debug=false"})
+ "app.workforce.enabled=true","app.workforce.shift-changes.enabled=true","app.workweek.enabled=true","app.billing.enabled=true","app.profile.enabled=true","app.profile.rate-limit.max=1000","spring.datasource.url=jdbc:postgresql://127.0.0.1:55439/dgt_test","spring.datasource.username=dgt_test","spring.datasource.password=only-test-password","spring.flyway.enabled=true","logging.level.root=WARN","debug=false"})
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class WorkforceIntegrationTest {
  @Value("${local.server.port}") int port;
  @Autowired com.dgt.backend.billing.service.StoreBilling billing;
  @Autowired JdbcTemplate db;@Autowired ObjectMapper json;
- HttpClient http=HttpClient.newHttpClient();String tag=UUID.randomUUID().toString().substring(0,8),store,second,foreign;
+ HttpClient http=HttpClient.newHttpClient();Map<String,String> tokenCache=new HashMap<>();String tag=UUID.randomUUID().toString().substring(0,8),store,second,foreign;
  long company,otherCompany;Map<String,Long> users=new HashMap<>();Map<String,Long> assignments=new HashMap<>();
  String password="Only-local-integration-tests";long departmentModule,settingsModule;String customId;
  record Response(int code,JsonNode body){}
  String getToken(String who) throws Exception {
+  if(tokenCache.containsKey(who))return tokenCache.get(who);
   var r=http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/api/v1/access/session")).header("Authorization","Basic "+Base64.getEncoder().encodeToString((who+"-"+tag+"@example.test:"+password).getBytes(StandardCharsets.UTF_8))).POST(HttpRequest.BodyPublishers.noBody()).build(),HttpResponse.BodyHandlers.ofString());
   if(r.statusCode()!=200)return null;
-  return json.readTree(r.body()).path("token").asText();
+  String tok=json.readTree(r.body()).path("token").asText();tokenCache.put(who,tok);return tok;
  }
  Response call(String who,String method,String path,Object body,String version,String key) throws Exception {
   var b=HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/api/v1"+path));

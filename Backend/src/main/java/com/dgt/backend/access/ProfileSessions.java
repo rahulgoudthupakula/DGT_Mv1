@@ -25,7 +25,8 @@ public class ProfileSessions {
     private final java.util.concurrent.ConcurrentHashMap<String, long[]> rate =
             new java.util.concurrent.ConcurrentHashMap<>();
     private static final long RATE_MS = 5 * 60_000L;
-    private static final int RATE_MAX = 10;
+    @org.springframework.beans.factory.annotation.Value("${app.profile.rate-limit.max:10}")
+    private int rateMax;
 
     public ProfileSessions(ScopedAccess access, PasswordEncoder encoder, JwtService jwt, RefreshTokenService refreshTokens) {
         this.access = access;
@@ -50,7 +51,7 @@ public class ProfileSessions {
             v[1]++;
             return v;
         });
-        if (w[1] > RATE_MAX) throw new org.springframework.web.server.ResponseStatusException(
+        if (w[1] > rateMax) throw new org.springframework.web.server.ResponseStatusException(
                 org.springframework.http.HttpStatus.TOO_MANY_REQUESTS, "Too many sign-in attempts; try again later");
     }
 
