@@ -9,12 +9,21 @@ import org.springframework.orm.jpa.JpaTransactionManager;
 
 @Configuration
 public class TransactionConfig {
+
     @Bean
     @Primary
     public JpaTransactionManager transactionManager(EntityManagerFactory emf, DataSource dataSource) {
-        JpaTransactionManager tm = new JpaTransactionManager(emf);
+        // Anonymous subclass so afterPropertiesSet() can install the custom dialect last,
+        // overriding the HibernateJpaDialect that Spring Boot auto-detects from the EMF.
+        JpaTransactionManager tm = new JpaTransactionManager(emf) {
+            @Override
+            public void afterPropertiesSet() {
+                super.afterPropertiesSet();
+                setJpaDialect(new HibernateNestedJpaDialect());
+                setNestedTransactionAllowed(true);
+            }
+        };
         tm.setDataSource(dataSource);
-        tm.setNestedTransactionAllowed(true);
         return tm;
     }
 }
