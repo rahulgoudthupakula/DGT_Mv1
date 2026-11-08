@@ -19,6 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 public class VendorPricingController {
  private final ScopedAccess a;private final ObjectMapper json;
  public VendorPricingController(ScopedAccess a,ObjectMapper json){this.a=a;this.json=json;}
+ @tools.jackson.databind.annotation.JsonNaming(tools.jackson.databind.PropertyNamingStrategies.LowerCamelCaseStrategy.class)
  public record Preferences(boolean priceChangeAlerts,BigDecimal alertThreshold,boolean approvalRequired,BigDecimal approvalThreshold,boolean autoPick,boolean fallback,boolean considerLeadTime){}
  private void access(String store){a.grant(a.user(),store,"PRICE_BOOK",true);}
  private ResponseStatusException conflict(){return new ResponseStatusException(HttpStatus.CONFLICT,"Pricing preferences changed or have duplicate records; reload and retry");}

@@ -1047,7 +1047,7 @@ class ScopedAccessIntegrationTest {
   String path=access()+"/grocery-settings";
   var initial=ok(req("admin","GET",path,null),200);assertThat(initial.path("settings").isNull()).isTrue();assertThat(initial.path("version").asText()).isEqualTo("0");
   ok(req("manager","GET",path,null),403);ok(req("other","GET",path,null),403);
-  var prefs=new LinkedHashMap<String,Object>();prefs.put("defaultTaxType","non_taxable");prefs.put("overrideCategory",true);prefs.put("overrideItem",true);prefs.put("taxRounding","standard");prefs.put("ebtExempt",true);prefs.put("wicExempt",true);prefs.put("expiryTracking",true);prefs.put("alertDays",10);prefs.put("expiredHandling","warning");prefs.put("dashboardNotif",true);prefs.put("emailNotif",false);prefs.put("inAppNotif",true);prefs.put("reorderRule","fixed");prefs.put("lead_time",3);prefs.put("safetyStock",12.5);prefs.put("itemOverride",true);
+  var prefs=new LinkedHashMap<String,Object>();prefs.put("defaultTaxType","non_taxable");prefs.put("overrideCategory",true);prefs.put("overrideItem",true);prefs.put("taxRounding","standard");prefs.put("ebtExempt",true);prefs.put("wicExempt",true);prefs.put("expiryTracking",true);prefs.put("alertDays",10);prefs.put("expiredHandling","warning");prefs.put("dashboardNotif",true);prefs.put("emailNotif",false);prefs.put("inAppNotif",true);prefs.put("reorderRule","fixed");prefs.put("leadTime",3);prefs.put("safetyStock",12.5);prefs.put("itemOverride",true);
   var margin=initial.path("margins").get(0);assertThat(margin).isNotNull();String key=margin.path("key").asText();
   var payload=new LinkedHashMap<String,Object>();payload.put("settings",prefs);payload.put("margins",List.of(Map.of("key",key,"version",margin.path("version").asText(),"margin",32.5)));
   var prices=db.queryForList("SELECT product_id,retail_price FROM product_store_prices WHERE dgt_id=? ORDER BY product_id",store);
@@ -1059,7 +1059,7 @@ class ScopedAccessIntegrationTest {
   assertThat(ok(req("admin","GET","/access/stores/"+second+"/grocery-settings",null),200).path("settings").isNull()).isTrue();
   ok(req("other","GET",path+"/defaults",null),403);
   String version=saved.path("version").asText();payload.put("margins",List.of());
-  for(var invalid:List.of(Map.entry("alertDays",-1),Map.entry("lead_time",1.5),Map.entry("safetyStock",1001),Map.entry("taxRounding","made_up"),Map.entry("overrideItem","true"))){Object old=prefs.put(invalid.getKey(),invalid.getValue());ok(call("admin","PUT",path,payload,version,null),400);prefs.put(invalid.getKey(),old);}
+  for(var invalid:List.of(Map.entry("alertDays",-1),Map.entry("leadTime",1.5),Map.entry("safetyStock",1001),Map.entry("taxRounding","made_up"),Map.entry("overrideItem","true"))){Object old=prefs.put(invalid.getKey(),invalid.getValue());ok(call("admin","PUT",path,payload,version,null),400);prefs.put(invalid.getKey(),old);}
   prefs.put("alertDays",11);payload.put("margins",List.of(Map.of("key",key,"version",margin.path("version").asText(),"margin",33)));
   ok(call("admin","PUT",path,payload,version,null),409);assertThat(ok(req("admin","GET",path,null),200).path("settings").path("alertDays").asInt()).isEqualTo(10);
   var secondMargins=ok(req("admin","GET","/access/stores/"+second+"/grocery-settings",null),200).path("margins");
@@ -1189,9 +1189,9 @@ class ScopedAccessIntegrationTest {
   db.update("UPDATE stores SET timezone='America/New_York' WHERE dgt_id=?",store);
   var in=new LinkedHashMap<String,Object>();in.put("grade_id",grade);in.put("cash",4.799);in.put("credit",4.899);in.put("reason","market");in.put("notes","Scheduled test");in.put("effective_time","scheduled");
   in.put("scheduled_for","2027-03-14T02:30:00");ok(call("admin","POST",path,in,version.apply(baseline),null),400);
-  in.put("scheduled_for","2026-11-01T01:30:00");ok(call("admin","POST",path,in,version.apply(baseline),null),400);
+  in.put("scheduled_for","2027-11-07T01:30:00");ok(call("admin","POST",path,in,version.apply(baseline),null),400);
   in.put("overlap_choice","later");String key=UUID.randomUUID().toString();var scheduled=ok(call("admin","POST",path,in,version.apply(baseline),key),200);var future=scheduled.path("history").get(0);
-  assertThat(future.path("status").asText()).isEqualTo("SCHEDULED");assertThat(java.time.OffsetDateTime.parse(future.path("effectiveFrom").asText()).toInstant()).isEqualTo(java.time.Instant.parse("2026-11-01T06:30:00Z"));
+  assertThat(future.path("status").asText()).isEqualTo("SCHEDULED");assertThat(java.time.OffsetDateTime.parse(future.path("effectiveFrom").asText()).toInstant()).isEqualTo(java.time.Instant.parse("2027-11-07T06:30:00Z"));
   assertThat(active.apply(scheduled).path("cash").asDouble()).isEqualTo(baseline.path("cash").asDouble());
   assertThat(ok(call("admin","POST",path,in,version.apply(baseline),key),200).path("history").size()).isEqualTo(scheduled.path("history").size());
   ok(call("admin","POST",path,in,version.apply(active.apply(scheduled)),null),409);
