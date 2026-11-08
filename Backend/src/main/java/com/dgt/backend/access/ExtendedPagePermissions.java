@@ -106,7 +106,7 @@ final class ExtendedPagePermissions {
  new PagePermissions.Child("WORKWEEK_PAGE_EMPLOYEES_DOCS","Documents","WORKWEEK_PAGE_EMPLOYEES","docs",true),
  new PagePermissions.Child("WORKWEEK_PAGE_WEEK_SCHEDULE_SCHEDULE","Schedule","WORKWEEK_PAGE_WEEK_SCHEDULE","schedule",true),
  new PagePermissions.Child("WORKWEEK_PAGE_WEEK_SCHEDULE_AVAILABILITY","Availability","WORKWEEK_PAGE_WEEK_SCHEDULE","availability",true),
- new PagePermissions.Child("WORKWEEK_PAGE_WEEK_SCHEDULE_COVERAGE","Shift Swaps & Coverage","WORKWEEK_PAGE_WEEK_SCHEDULE","coverage",false),
+ new PagePermissions.Child("WORKWEEK_PAGE_WEEK_SCHEDULE_COVERAGE","Shift Swaps & Coverage","WORKWEEK_PAGE_WEEK_SCHEDULE","coverage",true),
  new PagePermissions.Child("WORKWEEK_PAGE_TIME_OFF_APPROVALS_PENDING","Pending","WORKWEEK_PAGE_TIME_OFF_APPROVALS","pending",true),
  new PagePermissions.Child("WORKWEEK_PAGE_TIME_OFF_APPROVALS_ALL","All Requests","WORKWEEK_PAGE_TIME_OFF_APPROVALS","all",true));
 }
