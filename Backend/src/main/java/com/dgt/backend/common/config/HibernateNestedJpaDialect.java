@@ -41,6 +41,7 @@ public class HibernateNestedJpaDialect extends HibernateJpaDialect {
         public void rollbackToSavepoint(Object savepoint) throws TransactionException {
             try {
                 session.doWork(con -> con.rollback((Savepoint) savepoint));
+                session.clear();
             } catch (Exception e) {
                 throw new TransactionSystemException("Cannot rollback to JDBC savepoint", e);
             }
