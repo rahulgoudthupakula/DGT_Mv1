@@ -41,7 +41,14 @@ public class StoreSettingsController {
     @PreAuthorize("@scopedAccess.can(authentication,#dgtId,'STORE_SETTINGS',false)")
     public Map<String,Object> get(@PathVariable String dgtId) {
         var result=new LinkedHashMap<String,Object>();
-        result.put("store",stores.get(dgtId)); result.put("contact",contact(dgtId)); result.put("hours",hours.get(dgtId)); return result;
+        var sr=stores.get(dgtId);
+        var storeMap=new LinkedHashMap<String,Object>();
+        storeMap.put("dgt_id",sr.dgtId());storeMap.put("store_id",sr.storeId());storeMap.put("store_name",sr.storeName());
+        storeMap.put("legal_business_name",sr.legalBusinessName());storeMap.put("tax_id",sr.taxId());storeMap.put("license_number",sr.licenseNumber());
+        storeMap.put("timezone",sr.timezone());storeMap.put("company_id",sr.companyId());storeMap.put("created_at",sr.createdAt());storeMap.put("updated_at",sr.updatedAt());
+        var xv=db.queryForList("SELECT xmin::text AS v FROM stores WHERE dgt_id=?",dgtId);
+        if(!xv.isEmpty())storeMap.put("_version",xv.getFirst().get("v"));
+        result.put("store",storeMap);result.put("contact",contact(dgtId));result.put("hours",hours.get(dgtId));return result;
     }
     public record Update(Map<String,Object> store, Map<String,Object> contact, String contactVersion, List<StoreHoursService.Day> hours, Map<String,String> hoursVersions) {}
     @PatchMapping
