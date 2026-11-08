@@ -23,10 +23,10 @@ class WorkforceIntegrationTest {
  String password="Only-local-integration-tests";long departmentModule,settingsModule;String customId;
  record Response(int code,JsonNode body){}
  String getToken(String who) throws Exception {
-  if(tokenCache.containsKey(who))return tokenCache.get(who);
+  if(users.containsKey(who)&&tokenCache.containsKey(who))return tokenCache.get(who);
   var r=http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/api/v1/access/session")).header("Authorization","Basic "+Base64.getEncoder().encodeToString((who+"-"+tag+"@example.test:"+password).getBytes(StandardCharsets.UTF_8))).POST(HttpRequest.BodyPublishers.noBody()).build(),HttpResponse.BodyHandlers.ofString());
   if(r.statusCode()!=200)return null;
-  String tok=json.readTree(r.body()).path("token").asText();tokenCache.put(who,tok);return tok;
+  String tok=json.readTree(r.body()).path("token").asText();if(users.containsKey(who))tokenCache.put(who,tok);return tok;
  }
  Response call(String who,String method,String path,Object body,String version,String key) throws Exception {
   var b=HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/api/v1"+path));
