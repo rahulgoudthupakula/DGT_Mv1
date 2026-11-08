@@ -1461,7 +1461,7 @@ class ScopedAccessIntegrationTest {
   ok(req("admin","PUT",path+"/processors/"+processorId,edit),409);
   batch=ok(req("admin","PUT",bp+"/fee",Map.of("version",batch.path("version").asText(),"actual_fee",20,"reason","Additional statement fee")),200);
   ok(req("admin","POST",bp+"/transition",Map.of("version",batch.path("version").asText(),"action","RECONCILE")),400);
-  batch=ok(req("manager","POST",bp+"/transition",Map.of("version",batch.path("version").asText(),"action","RECONCILE","reviewNote","Verified statement discrepancy")),200);
+  batch=ok(req("manager","POST",bp+"/transition",Map.of("version",batch.path("version").asText(),"action","RECONCILE","review_note","Verified statement discrepancy")),200);
   ok(req("admin","PUT",bp+"/fee",Map.of("version",batch.path("version").asText(),"actual_fee",20)),409);
   ok(req("admin","PUT","/access/stores/"+second+"/credit-card/batches/"+id+"/fee",Map.of("version",batch.path("version").asText(),"actual_fee",20)),404);
   var other=ok(req("admin","GET","/access/stores/"+second+"/credit-card",null),200);assertThat(other.path("processors").size()).isZero();assertThat(other.path("batches").size()).isZero();assertThat(other.path("audit").size()).isZero();
@@ -1656,7 +1656,7 @@ class ScopedAccessIntegrationTest {
   db.update("UPDATE employees SET termination_date=CURRENT_DATE WHERE employee_id=?",offline);input.put("sale_id",ticket.get());assertThat(req("cashier","POST",path,input).code()).isEqualTo(400);
   // Fixed amount cannot exceed the eligible net amount; tax also reaches zero.
   db.update("UPDATE store_discounts SET eligibility_type='NONE',discount_type_id=(SELECT discount_type_id FROM discount_type WHERE code='AMOUNT'),value=100 WHERE discount_id=?",discount);
-  input.remove("employeeId");long free=ticket.get();input.put("sale_id",free);
+  input.remove("employee_id");long free=ticket.get();input.put("sale_id",free);
   ok(req("cashier","POST",path,input),200);
   assertThat(db.queryForObject("SELECT total_amount FROM sales WHERE sale_id=?",java.math.BigDecimal.class,free)).isEqualByComparingTo("0");
   // Existing line discounts cannot be stacked unless explicitly enabled.
@@ -1994,7 +1994,7 @@ ok(call("admin","PUT",path+"/programs/"+id,form,program.get("version").asText(),
   setting=ok(req("admin","GET",path+"/settings",null),200);ok(req("admin","PUT",path+"/settings",Map.of("version",setting.path("version").asText(),"separate_counter",true)),200);
   body.put("version",draft.path("closing").path("version").asText());body.put("close",true);body.put("cash_counted",999);body.put("variance_note","One more ticket recorded in POS than the last-ticket count");
   ok(req("admin","PUT",path+"/"+cid,body),400);body.put("sales_reviewed",true);
-  body.remove("varianceNote");ok(req("admin","PUT",path+"/"+cid,body),400);
+  body.remove("variance_note");ok(req("admin","PUT",path+"/"+cid,body),400);
   body.put("variance_note","One more ticket recorded in POS than the last-ticket count");
   db.update("UPDATE sales_items SET quantity=4 WHERE sales_item_id=?",item);
   ok(req("admin","PUT",path+"/"+cid,body),409);
