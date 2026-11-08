@@ -107,7 +107,7 @@ jobs:
           username: ec2-user
           key: ${{ secrets.EC2_SSH_KEY }}
           source: release/
-          target: /root/dgt-release
+          target: /home/ec2-user/dgt-release
           strip_components: 1
           rm: true
 
@@ -117,4 +117,4 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ec2-user
           key: ${{ secrets.EC2_SSH_KEY }}
-          script: sudo bash /root/dgt-release/update.sh
+          script: sudo bash /home/ec2-user/dgt-release/update.sh
