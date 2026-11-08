@@ -55,6 +55,7 @@ class ScopedAccessIntegrationTest {
   // Legacy workflow tests explicitly enable their parent modules.
   for(var section:com.dgt.backend.access.PagePermissions.SECTIONS)if(!section.defaultAllowed())
    db.update("INSERT INTO store_role_permissions(dgt_id,role_type_id,permission_code,allowed) SELECT ?,role_type_id,?,true FROM role_types WHERE role_type_name IN ('MANAGER','CASHIER','ACCOUNTANT')",store,section.code());
+  db.update("INSERT INTO tender_types(tender_code,tender_name) VALUES ('CASH','Cash'),('CREDIT_CARD','Credit Card') ON CONFLICT(tender_code) DO NOTHING");
  }
  @AfterAll void cleanup(){
   if(company==0)return;
