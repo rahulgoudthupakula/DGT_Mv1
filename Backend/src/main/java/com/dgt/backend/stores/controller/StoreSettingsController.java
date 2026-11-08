@@ -78,6 +78,7 @@ public class StoreSettingsController {
         }
         if(body.hours()!=null) hours.save(dgtId,body.hours(),body.hoursVersions());
         if(body.store()!=null && !body.store().isEmpty()) {
+            if(body.store().containsKey("timezone")){try{java.time.ZoneId.of((String)body.store().get("timezone"));}catch(java.time.DateTimeException e){throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid timezone: use a valid IANA timezone identifier");}}
             StoreResponse existingStore=stores.get(dgtId);
             var sv=body.store();
             stores.update(dgtId, new UpdateStoreRequest(
