@@ -29,7 +29,7 @@ class WorkforceIntegrationTest {
  }
  Response call(String who,String method,String path,Object body,String version,String key) throws Exception {
   var b=HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/api/v1"+path));
-  if(who!=null){String token=getToken(who);if(token!=null)b.header("Authorization","Bearer "+token);}
+  if(who!=null){if(path.equals("/access/session"))b.header("Authorization","Basic "+Base64.getEncoder().encodeToString((who+"-"+tag+"@example.test:"+password).getBytes(StandardCharsets.UTF_8)));else{String token=getToken(who);if(token!=null)b.header("Authorization","Bearer "+token);}}
   if(version!=null)b.header("If-Match",version);
   b.header("Idempotency-Key",key==null?UUID.randomUUID().toString():key);
   if(body!=null)b.header("Content-Type","application/json").method(method,HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body)));else b.method(method,HttpRequest.BodyPublishers.noBody());
