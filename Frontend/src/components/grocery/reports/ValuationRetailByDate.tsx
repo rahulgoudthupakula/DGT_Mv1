@@ -1,3 +1,7 @@
+/**
+ * Standalone ValuationRetailByDate UI contains local/sample state rather than a connected report
+ * query. Do not treat the displayed values or local actions as persisted business records.
+ */
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow,

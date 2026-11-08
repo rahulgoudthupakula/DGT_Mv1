@@ -7,11 +7,17 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.math.BigDecimal;
 import java.time.*;
 
+/**
+ * JPA mapping of fuel_grades.
+ * Stores record fields and scalar relationship identifiers; workflow rules live outside this entity.
+ */
+
 @Entity
 @Table(name = "fuel_grades")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class FuelGrade {
 
+    // Database-generated primary key.
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "fuel_grade_id")
@@ -30,10 +36,12 @@ public class FuelGrade {
     private Boolean isActive;
 
     @Column(name = "created_at", updatable = false)
+    // Hibernate supplies this timestamp when inserting the record.
     @CreationTimestamp
     private OffsetDateTime createdAt;
 
     @Column(name = "updated_at")
+    // Hibernate maintains this timestamp on entity updates.
     @UpdateTimestamp
     private OffsetDateTime updatedAt;
 }

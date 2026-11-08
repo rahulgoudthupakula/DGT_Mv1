@@ -3,6 +3,7 @@ package com.dgt.backend.products.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
+// Creation payload for the generic product API; declared constraints run when validated by the controller.
 public record CreateProductRequest(
         Long storeSubDepartmentId,
         @NotBlank @Size(max = 200) String productName,

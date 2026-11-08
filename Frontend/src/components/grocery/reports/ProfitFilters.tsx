@@ -1,3 +1,7 @@
+/**
+ * Controlled profit-report filters. Change handlers update the parent; this component does not
+ * issue report requests.
+ */
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

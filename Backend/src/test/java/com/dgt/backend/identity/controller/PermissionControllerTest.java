@@ -1,6 +1,6 @@
 package com.dgt.backend.identity.controller;
 
-import com.dgt.backend.access.PagePermissions;
+import com.dgt.backend.access.security.PagePermissions;
 import com.dgt.backend.identity.dto.*;
 import com.dgt.backend.identity.service.PermissionService;
 import com.dgt.backend.common.dto.PageResponse;

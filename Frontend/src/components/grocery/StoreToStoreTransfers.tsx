@@ -1,3 +1,7 @@
+/**
+ * Shows incoming and outgoing transfers for the selected store. Receiving sends the destination
+ * product and cumulative totalReceived to the backend, then reloads transfer state.
+ */
 import {request} from '@/lib/backend';
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -66,6 +70,7 @@ export const StoreToStoreTransfers = ({storeId}:{storeId:string}) => {
 
 
   const toggleSelect = (id:string) => setSelectedIds(prev=>{const next=new Set(prev);if(next.has(id))next.delete(id);else next.add(id);return next;});
+  // Send the cumulative received quantity, not a new quantity to add on every retry.
   const handleConfirmReceipt = async () => {if(!confirmTarget||confirming)return;setConfirming(true);try{await request(`${path}/${confirmTarget.id}/receive`,{method:'POST',body:JSON.stringify({productId:Number(targetProduct),totalReceived:Number(totalReceived)})});await fetchRecords();setConfirmTarget(null);toast({title:'Receipt recorded'});}catch(e){toast({title:'Could not receive',description:String(e),variant:'destructive'});}finally{setConfirming(false);}};
   const handleBulkConfirm = () => {};
 

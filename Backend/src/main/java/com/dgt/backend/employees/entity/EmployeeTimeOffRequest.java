@@ -9,11 +9,17 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.math.BigDecimal;
 import java.time.*;
 
+/**
+ * JPA mapping of employee_time_off_requests.
+ * Stores record fields and scalar relationship identifiers; workflow rules live outside this entity.
+ */
+
 @Entity
 @Table(name = "employee_time_off_requests")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class EmployeeTimeOffRequest {
 
+    // Database-generated primary key.
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "time_off_request_id")
@@ -54,10 +60,12 @@ public class EmployeeTimeOffRequest {
     private String rejectedReason;
 
     @Column(name = "created_at", updatable = false)
+    // Hibernate supplies this timestamp when inserting the record.
     @CreationTimestamp
     private OffsetDateTime createdAt;
 
     @Column(name = "updated_at")
+    // Hibernate maintains this timestamp on entity updates.
     @UpdateTimestamp
     private OffsetDateTime updatedAt;
 }

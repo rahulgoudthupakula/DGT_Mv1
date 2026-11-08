@@ -4,6 +4,11 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.OffsetDateTime;
 
+/**
+ * Creation payload for EmployeeDocument.
+ * Bean Validation annotations declare field requirements for the generic API.
+ */
+
 public record CreateEmployeeDocumentRequest(
         @NotNull Long employeeId,
         @Size(max = 100) String documentType,

@@ -1,6 +1,6 @@
 package com.dgt.backend.fuel.controller;
 
-import com.dgt.backend.access.PagePermissions;
+import com.dgt.backend.access.security.PagePermissions;
 import com.dgt.backend.fuel.dto.*;
 import com.dgt.backend.fuel.service.FuelPriceService;
 import com.dgt.backend.common.dto.PageResponse;

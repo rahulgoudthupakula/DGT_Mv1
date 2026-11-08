@@ -16,10 +16,12 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
+// Coordinate price group persistence and response mapping; caller authorization is handled at the controller.
 public class PriceGroupService {
     private final PriceGroupRepository repository;
     public PriceGroupService(PriceGroupRepository repository) { this.repository = repository; }
 
+    // Read a page sorted by primary key and include the total record count.
     public PageResponse<PriceGroupResponse> list(int page, int size) {
         log.debug("Listing price group page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("priceGroupId")));
@@ -27,6 +29,7 @@ public class PriceGroupService {
         return new PageResponse<>(p.getContent().stream().map(PriceGroupResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    // Map the stored record to the API response, or return HTTP 404 when absent.
     public PriceGroupResponse get(Long id) {
         log.debug("Fetching price group id={}", id);
         return PriceGroupResponse.from(repository.findById(id)
@@ -38,6 +41,7 @@ public class PriceGroupService {
     }
 
     @Transactional
+    // Build and save a record from the submitted create fields inside the transaction.
     public PriceGroupResponse create(CreatePriceGroupRequest req) {
         log.info("Creating price group");
         var entity = PriceGroup.builder()
@@ -53,6 +57,7 @@ public class PriceGroupService {
     }
 
     @Transactional
+    // Load the existing record and apply only non-null fields; null does not clear a stored value.
     public PriceGroupResponse update(Long id, UpdatePriceGroupRequest req) {
         log.info("Updating price group id={}", id);
         var entity = repository.findById(id)

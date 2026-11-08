@@ -14,12 +14,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * JPA CRUD operations for EmployeeCompensation.
+ * The caller is responsible for authorization and workflow validation; these queries add no store predicate.
+ */
+
 @Slf4j
 @Service
 public class EmployeeCompensationService {
     private final EmployeeCompensationRepository repository;
     public EmployeeCompensationService(EmployeeCompensationRepository repository) { this.repository = repository; }
 
+    /** Load a page sorted by primary key and map its records to response DTOs. */
     public PageResponse<EmployeeCompensationResponse> list(int page, int size) {
         log.debug("Listing employee compensation page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("compensationId")));
@@ -27,6 +33,7 @@ public class EmployeeCompensationService {
         return new PageResponse<>(p.getContent().stream().map(EmployeeCompensationResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    /** Load a record by ID or return HTTP 404. */
     public EmployeeCompensationResponse get(Long id) {
         log.debug("Fetching employee compensation id={}", id);
         return EmployeeCompensationResponse.from(repository.findById(id)
@@ -37,6 +44,7 @@ public class EmployeeCompensationService {
     
     }
 
+    /** Persist the supplied fields in one transaction and return the saved values. */
     @Transactional
     public EmployeeCompensationResponse create(CreateEmployeeCompensationRequest req) {
         log.info("Creating employee compensation");
@@ -53,6 +61,7 @@ public class EmployeeCompensationService {
         return EmployeeCompensationResponse.from(saved);
     }
 
+    /** Apply only non-null fields in one transaction, leaving omitted fields unchanged. */
     @Transactional
     public EmployeeCompensationResponse update(Long id, UpdateEmployeeCompensationRequest req) {
         log.info("Updating employee compensation id={}", id);

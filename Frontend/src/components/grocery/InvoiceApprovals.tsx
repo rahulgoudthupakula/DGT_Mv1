@@ -1,3 +1,7 @@
+/**
+ * Shows invoice-entry records eligible for review. Approval POST is the stock-posting workflow;
+ * successful approval invalidates cached views to reload the resulting stock and invoice state.
+ */
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { request } from "@/lib/backend";
 import { useMemo, useState } from "react";

@@ -1,6 +1,6 @@
 package com.dgt.backend.stores.controller;
 
-import com.dgt.backend.access.PagePermissions;
+import com.dgt.backend.access.security.PagePermissions;
 import com.dgt.backend.stores.dto.*;
 import com.dgt.backend.stores.service.StoreContactInfoService;
 import com.dgt.backend.common.dto.PageResponse;

@@ -14,12 +14,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * JPA CRUD operations for EmployeeDocument.
+ * The caller is responsible for authorization and workflow validation; these queries add no store predicate.
+ */
+
 @Slf4j
 @Service
 public class EmployeeDocumentService {
     private final EmployeeDocumentRepository repository;
     public EmployeeDocumentService(EmployeeDocumentRepository repository) { this.repository = repository; }
 
+    /** Load a page sorted by primary key and map its records to response DTOs. */
     public PageResponse<EmployeeDocumentResponse> list(int page, int size) {
         log.debug("Listing employee document page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("employeeDocumentId")));
@@ -27,6 +33,7 @@ public class EmployeeDocumentService {
         return new PageResponse<>(p.getContent().stream().map(EmployeeDocumentResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    /** Load a record by ID or return HTTP 404. */
     public EmployeeDocumentResponse get(Long id) {
         log.debug("Fetching employee document id={}", id);
         return EmployeeDocumentResponse.from(repository.findById(id)
@@ -37,6 +44,7 @@ public class EmployeeDocumentService {
     
     }
 
+    /** Persist the supplied fields in one transaction and return the saved values. */
     @Transactional
     public EmployeeDocumentResponse create(CreateEmployeeDocumentRequest req) {
         log.info("Creating employee document");
@@ -52,6 +60,7 @@ public class EmployeeDocumentService {
         return EmployeeDocumentResponse.from(saved);
     }
 
+    /** Apply only non-null fields in one transaction, leaving omitted fields unchanged. */
     @Transactional
     public EmployeeDocumentResponse update(Long id, UpdateEmployeeDocumentRequest req) {
         log.info("Updating employee document id={}", id);

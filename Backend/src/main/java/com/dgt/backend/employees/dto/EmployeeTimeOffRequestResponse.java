@@ -6,6 +6,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
+/**
+ * Response DTO for stored EmployeeTimeOffRequest fields.
+ */
+
 public record EmployeeTimeOffRequestResponse(
         Long timeOffRequestId,
         Long employeeId,
@@ -22,6 +26,7 @@ public record EmployeeTimeOffRequestResponse(
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
 ) {
+    /** Copy entity fields to the response without changing the stored record. */
     public static EmployeeTimeOffRequestResponse from(EmployeeTimeOffRequest e) {
         return new EmployeeTimeOffRequestResponse(
                 e.getTimeOffRequestId(), e.getEmployeeId(), e.getRequestType(),

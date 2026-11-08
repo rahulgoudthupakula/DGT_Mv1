@@ -6,6 +6,11 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
+/**
+ * Creation payload for FuelPrice.
+ * Bean Validation annotations declare field requirements for the generic API.
+ */
+
 public record CreateFuelPriceRequest(
         @NotBlank @Size(max = 50) String dgtId,
         @NotNull Long fuelGradeId,

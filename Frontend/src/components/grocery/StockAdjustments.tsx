@@ -1,3 +1,8 @@
+/**
+ * Builds reasoned inventory reduction requests from current versus requested counts. Batch
+ * submission sends the difference, with a destination only for store transfers; backend rules
+ * decide approval.
+ */
 import { useQuery,useQueryClient } from "@tanstack/react-query";
 import { request } from "@/lib/backend";
 import { useState } from "react";
@@ -359,6 +364,7 @@ export const StockAdjustments = ({storeId}:{storeId:string}) => {
     }
   };
 
+  // Submit a reduction request instead of directly overwriting inventory; the backend applies approval rules.
   const handleSubmitReduceRequest = async () => {
     if(saving)return;setSaving(true);
     try{const results=await request<{pending:boolean}[]>(`${path}/batch`,{method:'POST',body:JSON.stringify(reduceRows.map(r=>({productId:r.id,quantity:r.currentCount-r.updatedCount,reason:r.reason,destination:r.reason==='store-to-store-transfer'?r.transferStore:null})))});

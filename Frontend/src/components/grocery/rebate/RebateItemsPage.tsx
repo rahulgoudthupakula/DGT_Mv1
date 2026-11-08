@@ -1,3 +1,7 @@
+/**
+ * Manages product-to-program eligibility links through useRebates. Deleting a link marks it
+ * inactive, preserving its history.
+ */
 import {useRebates, type RebateLink} from './useRebates';
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

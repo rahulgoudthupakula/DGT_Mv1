@@ -1,6 +1,6 @@
 package com.dgt.backend.invoices.controller;
 
-import com.dgt.backend.access.PagePermissions;
+import com.dgt.backend.access.security.PagePermissions;
 import com.dgt.backend.invoices.dto.*;
 import com.dgt.backend.invoices.service.InvoiceChargeService;
 import com.dgt.backend.common.dto.PageResponse;

@@ -4,6 +4,11 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+/**
+ * Partial update payload for EmployeeCompensation.
+ * The service ignores null fields, so omitted values are preserved rather than cleared.
+ */
+
 public record UpdateEmployeeCompensationRequest(
         Long employeeId,
         @Size(max = 50) String payType,

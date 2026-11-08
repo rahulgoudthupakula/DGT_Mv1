@@ -1,3 +1,7 @@
+/**
+ * Store-aware rebate tabs connect programs, item eligibility and claims/payments. Earnings reports
+ * remain explicitly unavailable in this workspace.
+ */
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Gift, Tag, BarChart2, FileText } from "lucide-react";

@@ -1,3 +1,7 @@
+/**
+ * Hosts the invoice entry, viewing and approval screens for one store. Child pages own their API
+ * calls and invoice state.
+ */
 import { useState } from "react";
 import { useAppNavigation } from "@/contexts/NavigationContext";
 import { TabsList } from "@/components/ui/tabs";

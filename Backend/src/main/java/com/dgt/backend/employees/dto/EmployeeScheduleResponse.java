@@ -4,6 +4,10 @@ import com.dgt.backend.employees.entity.EmployeeSchedule;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
+/**
+ * Response DTO for stored EmployeeSchedule fields.
+ */
+
 public record EmployeeScheduleResponse(
         Long scheduleId,
         Long employeeId,
@@ -17,6 +21,7 @@ public record EmployeeScheduleResponse(
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
 ) {
+    /** Copy entity fields to the response without changing the stored record. */
     public static EmployeeScheduleResponse from(EmployeeSchedule e) {
         return new EmployeeScheduleResponse(
                 e.getScheduleId(), e.getEmployeeId(), e.getDgtId(),

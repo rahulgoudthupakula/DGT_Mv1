@@ -1,4 +1,8 @@
-import {useSalesReports,salesGroups} from './useSalesReports';
+/**
+ * Groups detailed report rows by item or category and opens item details. Legacy mock-prefixed
+ * variables below are populated from backend grocery report summaries.
+ */
+import {useReportSummary} from './useReportSummary';
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { usePagination } from "@/hooks/use-pagination";
@@ -24,6 +28,7 @@ type HighlightType = "zero" | "drop" | "consistent" | null;
 
 /* ── Item-level data ── */
 interface SalesItemRow {
+  highlight?: HighlightType;
   name: string;
   scanCode: string;
   category: string;
@@ -85,12 +90,7 @@ interface SalesDayRow {
 
 
 /* ── Smart highlight logic ── */
-const getItemHighlight = (item: SalesItemRow): HighlightType => {
-  if (item.unitsSold === 0) return "zero";
-  if (item.prevVelocity > 0 && item.velocity / item.prevVelocity < 0.7) return "drop";
-  if (item.prevVelocity > 0 && Math.abs(item.velocity - item.prevVelocity) / item.prevVelocity < 0.05 && item.velocity > 10) return "consistent";
-  return null;
-};
+const getItemHighlight = (item: SalesItemRow): HighlightType => item.highlight??null;
 
 const getHighlightStyles = (highlight: HighlightType) => {
   switch (highlight) {
@@ -169,9 +169,9 @@ interface SalesTableProps {
 }
 
 export const SalesTable = ({ storeId,departmentScope,startDate,endDate,groupBy, itemSearch = "" }: SalesTableProps) => {
- const query=useSalesReports(storeId,startDate,endDate);
- const mockItemData=salesGroups((query.data?.rows??[]).filter(r=>!departmentScope||r.department.toLowerCase()===departmentScope),query.data?.start??"",query.data?.days??1);
- const mockCategoryData=salesGroups((query.data?.rows??[]).filter(r=>!departmentScope||r.department.toLowerCase()===departmentScope),query.data?.start??"",query.data?.days??1,true);
+ const query=useReportSummary(storeId,'sales-summary',startDate,endDate,{department:departmentScope??''});
+ const mockItemData:SalesItemRow[]=query.data?.items??[];
+ const mockCategoryData:SalesCategoryRow[]=query.data?.categories??[];
   const [viewTab, setViewTab] = useState<ViewTab>("all");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<ReturnType<typeof mockItemDetail> | null>(null);

@@ -14,12 +14,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * JPA CRUD operations for InventoryReturnItem.
+ * The caller is responsible for authorization and workflow validation; these queries add no store predicate.
+ */
+
 @Slf4j
 @Service
 public class InventoryReturnItemService {
     private final InventoryReturnItemRepository repository;
     public InventoryReturnItemService(InventoryReturnItemRepository repository) { this.repository = repository; }
 
+    /** Load a page sorted by primary key and map its records to response DTOs. */
     public PageResponse<InventoryReturnItemResponse> list(int page, int size) {
         log.debug("Listing inventory return item page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("returnItemId")));
@@ -27,6 +33,7 @@ public class InventoryReturnItemService {
         return new PageResponse<>(p.getContent().stream().map(InventoryReturnItemResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    /** Load a record by ID or return HTTP 404. */
     public InventoryReturnItemResponse get(Long id) {
         log.debug("Fetching inventory return item id={}", id);
         return InventoryReturnItemResponse.from(repository.findById(id)
@@ -37,9 +44,11 @@ public class InventoryReturnItemService {
     
     }
 
+    /** Persist the supplied fields in one transaction and return the saved values. */
     @Transactional
     public InventoryReturnItemResponse create(CreateInventoryReturnItemRequest req) {
         log.info("Creating inventory return item");
+        // Save the return line values without calculating a stock adjustment in this service.
         var entity = InventoryReturnItem.builder()
                 .returnId(req.returnId())
                 .productId(req.productId())
@@ -52,6 +61,7 @@ public class InventoryReturnItemService {
         return InventoryReturnItemResponse.from(saved);
     }
 
+    /** Apply only non-null fields in one transaction, leaving omitted fields unchanged. */
     @Transactional
     public InventoryReturnItemResponse update(Long id, UpdateInventoryReturnItemRequest req) {
         log.info("Updating inventory return item id={}", id);

@@ -7,6 +7,12 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
+/**
+ * Request fields for creating a BillingInvoice record through the generic API.
+ * Bean Validation annotations declare required fields and string-length limits.
+ * Amounts are supplied by the caller; this DTO does not check their arithmetic.
+ */
+
 public record CreateBillingInvoiceRequest(
         @NotBlank @Size(max = 50) String storeId,
         @NotNull Long subscriptionPlanId,

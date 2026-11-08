@@ -16,10 +16,12 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
+// Coordinate store contact information persistence and response mapping; caller authorization is handled at the controller.
 public class StoreContactInfoService {
     private final StoreContactInfoRepository repository;
     public StoreContactInfoService(StoreContactInfoRepository repository) { this.repository = repository; }
 
+    // Read a page sorted by primary key and include the total record count.
     public PageResponse<StoreContactInfoResponse> list(int page, int size) {
         log.debug("Listing store contact info page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("contactInfoId")));
@@ -27,6 +29,7 @@ public class StoreContactInfoService {
         return new PageResponse<>(p.getContent().stream().map(StoreContactInfoResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    // Map the stored record to the API response, or return HTTP 404 when absent.
     public StoreContactInfoResponse get(Long id) {
         log.debug("Fetching store contact info id={}", id);
         return StoreContactInfoResponse.from(repository.findById(id)
@@ -38,6 +41,7 @@ public class StoreContactInfoService {
     }
 
     @Transactional
+    // Build and save a record from the submitted create fields inside the transaction.
     public StoreContactInfoResponse create(CreateStoreContactInfoRequest req) {
         log.info("Creating store contact info");
         var entity = StoreContactInfo.builder()
@@ -53,6 +57,7 @@ public class StoreContactInfoService {
     }
 
     @Transactional
+    // Load the existing record and apply only non-null fields; null does not clear a stored value.
     public StoreContactInfoResponse update(Long id, UpdateStoreContactInfoRequest req) {
         log.info("Updating store contact info id={}", id);
         var entity = repository.findById(id)

@@ -1,3 +1,7 @@
+/**
+ * Loads reduction requests for review. Approval decisions are sent to the backend, which owns
+ * authorization and stock changes.
+ */
 import { useQuery,useQueryClient } from "@tanstack/react-query";
 import { request as apiRequest } from "@/lib/backend";
 import { useMemo, useState } from "react";

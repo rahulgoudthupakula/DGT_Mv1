@@ -6,6 +6,11 @@ import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
+/**
+ * Request fields for creating a StoreSubscription record through the generic API.
+ * Bean Validation annotations declare required fields and string-length limits.
+ */
+
 public record CreateStoreSubscriptionRequest(
         @NotBlank @Size(max = 50) String storeId,
         @NotNull Long subscriptionPlanId,

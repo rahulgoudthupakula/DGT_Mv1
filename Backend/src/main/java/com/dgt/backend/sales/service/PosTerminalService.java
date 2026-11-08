@@ -16,10 +16,12 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
+// Coordinate POS terminal persistence and response mapping; caller authorization is handled at the controller.
 public class PosTerminalService {
     private final PosTerminalRepository repository;
     public PosTerminalService(PosTerminalRepository repository) { this.repository = repository; }
 
+    // Read a page sorted by primary key and include the total record count.
     public PageResponse<PosTerminalResponse> list(int page, int size) {
         log.debug("Listing pos terminal page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("terminalId")));
@@ -27,6 +29,7 @@ public class PosTerminalService {
         return new PageResponse<>(p.getContent().stream().map(PosTerminalResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    // Map the stored record to the API response, or return HTTP 404 when absent.
     public PosTerminalResponse get(Long id) {
         log.debug("Fetching pos terminal id={}", id);
         return PosTerminalResponse.from(repository.findById(id)
@@ -38,6 +41,7 @@ public class PosTerminalService {
     }
 
     @Transactional
+    // Build and save a record from the submitted create fields inside the transaction.
     public PosTerminalResponse create(CreatePosTerminalRequest req) {
         log.info("Creating pos terminal");
         var entity = PosTerminal.builder()
@@ -52,6 +56,7 @@ public class PosTerminalService {
     }
 
     @Transactional
+    // Load the existing record and apply only non-null fields; null does not clear a stored value.
     public PosTerminalResponse update(Long id, UpdatePosTerminalRequest req) {
         log.info("Updating pos terminal id={}", id);
         var entity = repository.findById(id)

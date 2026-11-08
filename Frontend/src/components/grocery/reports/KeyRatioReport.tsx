@@ -1,3 +1,7 @@
+/**
+ * Hosts sales/purchase, adjusted ratio, inventory ratio and margin-impact views. These views have
+ * different data sources; some still use sample datasets.
+ */
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Ratio, FileBarChart, Package, TrendingDown } from "lucide-react";

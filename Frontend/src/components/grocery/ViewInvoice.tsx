@@ -1,3 +1,7 @@
+/**
+ * Loads invoice summaries, then fetches items only for the selected invoice. The selected summary
+ * is not a substitute for the detail response.
+ */
 import { useQuery } from "@tanstack/react-query";
 import { request } from "@/lib/backend";
 import { useState, useEffect, useRef } from "react";

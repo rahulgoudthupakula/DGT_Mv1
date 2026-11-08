@@ -4,6 +4,11 @@ import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
+/**
+ * Partial update fields for a StoreSubscription record.
+ * The service treats null as unchanged, so this request cannot clear nullable fields.
+ */
+
 public record UpdateStoreSubscriptionRequest(
         @Size(max = 50) String storeId,
         Long subscriptionPlanId,

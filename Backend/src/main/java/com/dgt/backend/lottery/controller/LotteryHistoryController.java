@@ -1,5 +1,5 @@
 package com.dgt.backend.lottery.controller;
-import com.dgt.backend.access.ScopedAccess;
+import com.dgt.backend.access.security.ScopedAccess;
 import com.dgt.backend.common.entity.Rows;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
@@ -8,12 +8,17 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * Read-only pack lifecycle history built from receipt records, closed shifts, and audit events.
+ */
+
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/access/stores/{store}/lottery-pack-history")
 public class LotteryHistoryController {
  private final ScopedAccess a;private final LotteryDeliveryController permissions;
  public LotteryHistoryController(ScopedAccess a,LotteryDeliveryController permissions){this.a=a;this.permissions=permissions;}
+ // Authorize report access and combine pack state with chronological lifecycle events.
  @GetMapping @Transactional(readOnly=true) public Object get(@PathVariable String store){
   if(!permissions.allowed(store,"LOTTERY_VIEW_REPORTS"))throw a.denied();
   ZoneId zone=ZoneId.of(a.db.queryForObject("SELECT timezone FROM stores WHERE dgt_id=?",String.class,store));
@@ -35,6 +40,7 @@ public class LotteryHistoryController {
     WHERE i.pack_id=p.lottery_pack_id AND h.dgt_id=p.dgt_id AND h.shift_closed_at IS NOT NULL)c ON true
    WHERE p.dgt_id=? ORDER BY p.created_at DESC,p.lottery_pack_id DESC
    """,store);
+  // Collect direct pack actions and closing events associated through closing item rows.
   var events=a.db.queryForList("""
    SELECT p.lottery_pack_id::text AS pack,e.event_type,e.created_at,concat_ws(' ',u.first_name,u.last_name) AS actor,
     CASE WHEN e.event_type='LOTTERY_ACTIVATION_RECORDED' THEN coalesce(e.changes->>'reference',p.activation_reference)
@@ -56,5 +62,6 @@ public class LotteryHistoryController {
    var row=Rows.normalize(p);row.remove("received_at");row.remove("received_by");row.remove("receipt");row.put("timeline",timeline);row.put("lastActionDate",timeline.getLast().get("date"));result.add(row);}
   return Map.of("packs",result);
  }
+ // Format each event in the store timezone with readable actor/reference fallbacks.
  private Map<String,Object> event(String status,Object timestamp,Object actor,Object reference,String type,ZoneId zone){var time=((java.sql.Timestamp)timestamp).toInstant().atZone(zone);return Map.of("status",status,"date",time.toLocalDate().toString(),"time",time.format(DateTimeFormatter.ofPattern("HH:mm:ss")),"user",Objects.toString(actor,"Unknown"),"referenceId",Objects.toString(reference,"N/A"),"referenceType",type);}
 }

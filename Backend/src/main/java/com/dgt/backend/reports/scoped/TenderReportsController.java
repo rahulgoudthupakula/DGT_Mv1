@@ -1,6 +1,6 @@
 package com.dgt.backend.reports.scoped;
 
-import com.dgt.backend.access.ScopedAccess;
+import com.dgt.backend.access.security.ScopedAccess;
 import com.dgt.backend.common.entity.Rows;
 import java.time.*;
 import java.time.temporal.ChronoUnit;
@@ -14,25 +14,32 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @RestController
+// Register this controller only when all three tender feature flags are enabled.
 @ConditionalOnProperty(name={"app.tender.credit-card.enabled","app.tender.ebt.enabled","app.tender.fleet.enabled"},havingValue="true")
 @RequestMapping("/api/v1/access/stores/{store}/tender-reports")
+// Read credit-card or combined EBT/fleet batch data for the selected store.
 public class TenderReportsController {
  private final ScopedAccess a;
  public TenderReportsController(ScopedAccess a){this.a=a;}
+ // Keep batch dates and report rows consistent within a repeatable-read transaction.
  @GetMapping @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
  public Object get(@PathVariable String store,@RequestParam(defaultValue="card") String family,
    @RequestParam(required=false) LocalDate start,@RequestParam(required=false) LocalDate end,
    @RequestParam(required=false) LocalDate asOf){
   if(!a.admin(a.user(),a.company(store))&&!Boolean.TRUE.equals(a.db.queryForObject("SELECT EXISTS(SELECT 1 FROM user_roles r JOIN role_types t USING(role_type_id) WHERE r.dgt_id=? AND r.user_id=? AND r.is_active AND t.is_active AND upper(t.role_type_name)='MANAGER')",Boolean.class,store,a.user())))throw a.denied();
+  // Allow only the card or tender report families before choosing fixed SQL fragments.
   if(!Set.of("card","tender").contains(family))throw bad("Unknown report family");
+  // Validate report dates against the current date in the store timezone.
   var today=LocalDate.now(ZoneId.of(a.db.queryForObject("SELECT timezone FROM stores WHERE dgt_id=?",String.class,store)));
   String dates=family.equals("card")?"SELECT business_date FROM credit_card_batches WHERE dgt_id=?":"SELECT business_date FROM ebt_batches WHERE dgt_id=? UNION ALL SELECT business_date FROM fleet_batches WHERE dgt_id=?";
   Object[] args=family.equals("card")?new Object[]{store,today}:new Object[]{store,store,today};
   var latest=a.db.queryForObject("SELECT max(business_date) FROM ("+dates+") d WHERE business_date<=?",LocalDate.class,args);
   if(latest==null)latest=today;
+  // As-of mode starts in 1900 and cannot be combined with explicit period boundaries.
   if(asOf!=null){if(start!=null||end!=null)throw bad("Choose a period or an as-of date");end=asOf;start=LocalDate.of(1900,1,1);}
   else {if(end==null)end=latest;if(start==null)start=end.withDayOfMonth(1);}
   if(start.isAfter(end)||start.isBefore(LocalDate.of(1900,1,1))||end.isAfter(today)||(asOf==null&&ChronoUnit.DAYS.between(start,end)>365))throw bad("Choose up to 366 days ending today or earlier");
+  // Card reports use processor batches; the other family combines EBT and fleet batches.
   var rows=new ArrayList<Map<String,Object>>();
   if(family.equals("card"))rows.addAll(a.db.queryForList("""
    SELECT b.*, 'card' AS kind,p.processor_name AS group_name,p.processor_id::text AS group_id,
@@ -53,6 +60,7 @@ public class TenderReportsController {
     FROM fleet_batches b WHERE b.dgt_id=? AND b.business_date BETWEEN ? AND ?
     """,store,start,end));
   }
+  // Normalize database values and include the resolved date range alongside the batch rows.
   return Map.of("today",today.toString(),"latest",latest.toString(),"start",start.toString(),"end",end.toString(),"rows",rows.stream().map(Rows::normalize).toList());
  }
  private ResponseStatusException bad(String message){return new ResponseStatusException(HttpStatus.BAD_REQUEST,message);}

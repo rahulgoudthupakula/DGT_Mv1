@@ -1,0 +1,618 @@
+[
+  {
+    "table": "billing_invoices",
+    "module": "billing",
+    "entity": "BillingInvoice",
+    "primaryKey": "invoice_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "brands",
+    "module": "products",
+    "entity": "Brand",
+    "primaryKey": "brand_id",
+    "idType": "Long",
+    "masterWrites": true
+  },
+  {
+    "table": "daily_closing_deposits",
+    "module": "dailyclosing",
+    "entity": "DailyClosingDeposit",
+    "primaryKey": "deposit_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "daily_closing_tenders",
+    "module": "dailyclosing",
+    "entity": "DailyClosingTender",
+    "primaryKey": "tender_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "daily_expenses",
+    "module": "dailyclosing",
+    "entity": "DailyExpense",
+    "primaryKey": "expenses_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "departments",
+    "module": "departments",
+    "entity": "Department",
+    "primaryKey": "department_id",
+    "idType": "Long",
+    "masterWrites": true
+  },
+  {
+    "table": "employee_compensation",
+    "module": "employees",
+    "entity": "EmployeeCompensation",
+    "primaryKey": "compensation_id",
+    "idType": "Long",
+    "masterWrites": true
+  },
+  {
+    "table": "employee_documents",
+    "module": "employees",
+    "entity": "EmployeeDocument",
+    "primaryKey": "employee_document_id",
+    "idType": "Long",
+    "masterWrites": true
+  },
+  {
+    "table": "employee_emergency_contacts",
+    "module": "employees",
+    "entity": "EmployeeEmergencyContact",
+    "primaryKey": "emergency_contact_id",
+    "idType": "Long",
+    "masterWrites": true
+  },
+  {
+    "table": "employee_schedules",
+    "module": "employees",
+    "entity": "EmployeeSchedule",
+    "primaryKey": "schedule_id",
+    "idType": "Long",
+    "masterWrites": true
+  },
+  {
+    "table": "employee_status_history",
+    "module": "employees",
+    "entity": "EmployeeStatusHistory",
+    "primaryKey": "status_history_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "employee_store_assignments",
+    "module": "employees",
+    "entity": "EmployeeStoreAssignment",
+    "primaryKey": "employee_store_assignment_id",
+    "idType": "Long",
+    "masterWrites": true
+  },
+  {
+    "table": "employee_time_entries",
+    "module": "employees",
+    "entity": "EmployeeTimeEntrie",
+    "primaryKey": "time_entry_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "employee_time_off_requests",
+    "module": "employees",
+    "entity": "EmployeeTimeOffRequest",
+    "primaryKey": "time_off_request_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "employees",
+    "module": "employees",
+    "entity": "Employee",
+    "primaryKey": "employee_id",
+    "idType": "Long",
+    "masterWrites": true
+  },
+  {
+    "table": "everyday_closing",
+    "module": "dailyclosing",
+    "entity": "EverydayClosing",
+    "primaryKey": "everyday_closing_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "fuel_grades",
+    "module": "fuel",
+    "entity": "FuelGrade",
+    "primaryKey": "fuel_grade_id",
+    "idType": "Long",
+    "masterWrites": true
+  },
+  {
+    "table": "fuel_invoice_details",
+    "module": "fuel",
+    "entity": "FuelInvoiceDetail",
+    "primaryKey": "fuel_invoice_details_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "fuel_invoice_items",
+    "module": "fuel",
+    "entity": "FuelInvoiceItem",
+    "primaryKey": "fuel_invoice_item_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "fuel_prices",
+    "module": "fuel",
+    "entity": "FuelPrice",
+    "primaryKey": "fuel_price_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "fuel_pumps",
+    "module": "fuel",
+    "entity": "FuelPump",
+    "primaryKey": "pump_id",
+    "idType": "Long",
+    "masterWrites": true
+  },
+  {
+    "table": "fuel_tank_grade_assignments",
+    "module": "fuel",
+    "entity": "FuelTankGradeAssignment",
+    "primaryKey": "assignment_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "fuel_tank_readings",
+    "module": "fuel",
+    "entity": "FuelTankReading",
+    "primaryKey": "tank_reading_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "fuel_tanks",
+    "module": "fuel",
+    "entity": "FuelTank",
+    "primaryKey": "tank_id",
+    "idType": "Long",
+    "masterWrites": true
+  },
+  {
+    "table": "grocery_invoice_items",
+    "module": "invoices",
+    "entity": "GroceryInvoiceItem",
+    "primaryKey": "grocery_invoice_item_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "inventory",
+    "module": "inventory",
+    "entity": "Inventory",
+    "primaryKey": "inventory_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "inventory_movements",
+    "module": "inventorymovements",
+    "entity": "InventoryMovement",
+    "primaryKey": "movement_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "inventory_reduction_requests",
+    "module": "inventory",
+    "entity": "InventoryReductionRequest",
+    "primaryKey": "reduction_request_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "inventory_return_items",
+    "module": "inventory",
+    "entity": "InventoryReturnItem",
+    "primaryKey": "return_item_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "inventory_returns",
+    "module": "inventory",
+    "entity": "InventoryReturn",
+    "primaryKey": "return_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "inventory_shrinkage",
+    "module": "inventory",
+    "entity": "InventoryShrinkage",
+    "primaryKey": "shrinkage_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "inventory_shrinkage_items",
+    "module": "inventory",
+    "entity": "InventoryShrinkageItem",
+    "primaryKey": "shrinkage_item_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "inventory_transfer_items",
+    "module": "inventory",
+    "entity": "InventoryTransferItem",
+    "primaryKey": "transfer_item_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "inventory_transfers",
+    "module": "inventory",
+    "entity": "InventoryTransfer",
+    "primaryKey": "transfer_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "invoice_adjustments",
+    "module": "invoices",
+    "entity": "InvoiceAdjustment",
+    "primaryKey": "invoice_adjustment_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "invoice_audit_log",
+    "module": "invoices",
+    "entity": "InvoiceAuditLog",
+    "primaryKey": "invoice_audit_log_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "invoice_charges",
+    "module": "invoices",
+    "entity": "InvoiceCharge",
+    "primaryKey": "invoice_charge_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "invoice_documents",
+    "module": "invoices",
+    "entity": "InvoiceDocument",
+    "primaryKey": "invoice_document_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "invoices",
+    "module": "invoices",
+    "entity": "Invoice",
+    "primaryKey": "invoice_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "lottery_games",
+    "module": "lottery",
+    "entity": "LotteryGame",
+    "primaryKey": "lottery_game_id",
+    "idType": "Long",
+    "masterWrites": true
+  },
+  {
+    "table": "lottery_pack_inventory",
+    "module": "lottery",
+    "entity": "LotteryPackInventory",
+    "primaryKey": "lottery_pack_inventory_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "lottery_pack_inventory_items",
+    "module": "lottery",
+    "entity": "LotteryPackInventoryItem",
+    "primaryKey": "lottery_pack_inventory_item_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "lottery_packs",
+    "module": "lottery",
+    "entity": "LotteryPack",
+    "primaryKey": "lottery_pack_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "lottery_settings",
+    "module": "lottery",
+    "entity": "LotterySetting",
+    "primaryKey": "lottery_setting_id",
+    "idType": "Long",
+    "masterWrites": true
+  },
+  {
+    "table": "lottery_settlements",
+    "module": "lottery",
+    "entity": "LotterySettlement",
+    "primaryKey": "lottery_settlement_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "modules",
+    "module": "identity",
+    "entity": "Module",
+    "primaryKey": "module_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "new_arrivals",
+    "module": "products",
+    "entity": "NewArrival",
+    "primaryKey": "new_arrivals_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "permissions",
+    "module": "identity",
+    "entity": "Permission",
+    "primaryKey": "permission_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "pos_terminals",
+    "module": "sales",
+    "entity": "PosTerminal",
+    "primaryKey": "terminal_id",
+    "idType": "Long",
+    "masterWrites": true
+  },
+  {
+    "table": "price_groups",
+    "module": "productstoreprices",
+    "entity": "PriceGroup",
+    "primaryKey": "price_group_id",
+    "idType": "Long",
+    "masterWrites": true
+  },
+  {
+    "table": "product_barcodes",
+    "module": "productbarcodes",
+    "entity": "ProductBarcode",
+    "primaryKey": "product_barcode_id",
+    "idType": "Long",
+    "masterWrites": true
+  },
+  {
+    "table": "product_price_groups",
+    "module": "productstoreprices",
+    "entity": "ProductPriceGroup",
+    "primaryKey": "product_price_group_id",
+    "idType": "Long",
+    "masterWrites": true
+  },
+  {
+    "table": "product_store_prices",
+    "module": "productstoreprices",
+    "entity": "ProductStorePrice",
+    "primaryKey": "store_price_id",
+    "idType": "Long",
+    "masterWrites": true
+  },
+  {
+    "table": "product_vendors",
+    "module": "productvendors",
+    "entity": "ProductVendor",
+    "primaryKey": "product_vendor_id",
+    "idType": "Long",
+    "masterWrites": true
+  },
+  {
+    "table": "products",
+    "module": "products",
+    "entity": "Product",
+    "primaryKey": "product_id",
+    "idType": "Long",
+    "masterWrites": true
+  },
+  {
+    "table": "promotion_products",
+    "module": "promotions",
+    "entity": "PromotionProduct",
+    "primaryKey": "promotion_product_id",
+    "idType": "Long",
+    "masterWrites": true
+  },
+  {
+    "table": "promotions",
+    "module": "promotions",
+    "entity": "Promotion",
+    "primaryKey": "promotion_id",
+    "idType": "Long",
+    "masterWrites": true
+  },
+  {
+    "table": "role_types",
+    "module": "identity",
+    "entity": "RoleType",
+    "primaryKey": "role_type_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "sale_payments",
+    "module": "sales",
+    "entity": "SalePayment",
+    "primaryKey": "sale_payment_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "sales",
+    "module": "sales",
+    "entity": "Sale",
+    "primaryKey": "sale_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "sales_items",
+    "module": "sales",
+    "entity": "SaleItem",
+    "primaryKey": "sales_item_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "status_types",
+    "module": "identity",
+    "entity": "StatusType",
+    "primaryKey": "status_type_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "store_business_hours",
+    "module": "stores",
+    "entity": "StoreBusinessHour",
+    "primaryKey": "business_hours_id",
+    "idType": "Long",
+    "masterWrites": true
+  },
+  {
+    "table": "store_contact_info",
+    "module": "stores",
+    "entity": "StoreContactInfo",
+    "primaryKey": "contact_info_id",
+    "idType": "Long",
+    "masterWrites": true
+  },
+  {
+    "table": "store_departments",
+    "module": "departments",
+    "entity": "StoreDepartment",
+    "primaryKey": "store_department_id",
+    "idType": "Long",
+    "masterWrites": true
+  },
+  {
+    "table": "store_sub_departments",
+    "module": "departments",
+    "entity": "StoreSubDepartment",
+    "primaryKey": "store_sub_department_id",
+    "idType": "Long",
+    "masterWrites": true
+  },
+  {
+    "table": "store_subscriptions",
+    "module": "billing",
+    "entity": "StoreSubscription",
+    "primaryKey": "subscription_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "stores",
+    "module": "stores",
+    "entity": "Store",
+    "primaryKey": "dgt_id",
+    "idType": "String",
+    "masterWrites": true
+  },
+  {
+    "table": "subscription_plans",
+    "module": "billing",
+    "entity": "SubscriptionPlan",
+    "primaryKey": "subscription_plan_id",
+    "idType": "Long",
+    "masterWrites": true
+  },
+  {
+    "table": "tender_types",
+    "module": "sales",
+    "entity": "TenderType",
+    "primaryKey": "tender_type_id",
+    "idType": "Long",
+    "masterWrites": true
+  },
+  {
+    "table": "user_roles",
+    "module": "identity",
+    "entity": "UserRole",
+    "primaryKey": "user_role_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "users",
+    "module": "identity",
+    "entity": "User",
+    "primaryKey": "user_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "vendor_audit_log",
+    "module": "vendors",
+    "entity": "VendorAuditLog",
+    "primaryKey": "audit_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "vendor_contacts",
+    "module": "vendors",
+    "entity": "VendorContact",
+    "primaryKey": "contact_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "vendor_item_cost_history",
+    "module": "vendors",
+    "entity": "VendorItemCostHistory",
+    "primaryKey": "cost_history_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "vendor_price_settings",
+    "module": "vendors",
+    "entity": "VendorPriceSetting",
+    "primaryKey": "setting_id",
+    "idType": "Long",
+    "masterWrites": false
+  },
+  {
+    "table": "vendors",
+    "module": "vendors",
+    "entity": "Vendor",
+    "primaryKey": "vendor_id",
+    "idType": "Long",
+    "masterWrites": true
+  }
+]

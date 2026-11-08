@@ -1,3 +1,7 @@
+/**
+ * Collects a delivery draft and passes it to onSaved; the parent owns persistence and refresh.
+ * Keep entered quantities and costs separate from saved invoice data.
+ */
 import { useMemo, useState } from "react";
 import { Plus, Trash2, Search } from "lucide-react";
 import { format } from "date-fns";

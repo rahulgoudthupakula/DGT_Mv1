@@ -14,12 +14,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * JPA CRUD operations for Permission.
+ * The caller is responsible for authorization and workflow validation; these queries add no store predicate.
+ */
+
 @Slf4j
 @Service
 public class PermissionService {
     private final PermissionRepository repository;
     public PermissionService(PermissionRepository repository) { this.repository = repository; }
 
+    /** Load a page sorted by primary key and map its records to response DTOs. */
     public PageResponse<PermissionResponse> list(int page, int size) {
         log.debug("Listing permission page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("permissionId")));
@@ -27,6 +33,7 @@ public class PermissionService {
         return new PageResponse<>(p.getContent().stream().map(PermissionResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    /** Load a record by ID or return HTTP 404. */
     public PermissionResponse get(Long id) {
         log.debug("Fetching permission id={}", id);
         return PermissionResponse.from(repository.findById(id)
@@ -37,6 +44,7 @@ public class PermissionService {
     
     }
 
+    /** Persist the supplied fields in one transaction and return the saved values. */
     @Transactional
     public PermissionResponse create(CreatePermissionRequest req) {
         log.info("Creating permission");
@@ -52,6 +60,7 @@ public class PermissionService {
         return PermissionResponse.from(saved);
     }
 
+    /** Apply only non-null fields in one transaction, leaving omitted fields unchanged. */
     @Transactional
     public PermissionResponse update(Long id, UpdatePermissionRequest req) {
         log.info("Updating permission id={}", id);

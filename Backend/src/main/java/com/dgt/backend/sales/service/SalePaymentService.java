@@ -16,10 +16,12 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
+// Coordinate sale payment persistence and response mapping; caller authorization is handled at the controller.
 public class SalePaymentService {
     private final SalePaymentRepository repository;
     public SalePaymentService(SalePaymentRepository repository) { this.repository = repository; }
 
+    // Read a page sorted by primary key and include the total record count.
     public PageResponse<SalePaymentResponse> list(int page, int size) {
         log.debug("Listing sale payment page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("salePaymentId")));
@@ -27,6 +29,7 @@ public class SalePaymentService {
         return new PageResponse<>(p.getContent().stream().map(SalePaymentResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    // Map the stored record to the API response, or return HTTP 404 when absent.
     public SalePaymentResponse get(Long id) {
         log.debug("Fetching sale payment id={}", id);
         return SalePaymentResponse.from(repository.findById(id)
@@ -38,6 +41,7 @@ public class SalePaymentService {
     }
 
     @Transactional
+    // Build and save a record from the submitted create fields inside the transaction.
     public SalePaymentResponse create(CreateSalePaymentRequest req) {
         log.info("Creating sale payment");
         var entity = SalePayment.builder()
@@ -57,6 +61,7 @@ public class SalePaymentService {
     }
 
     @Transactional
+    // Load the existing record and apply only non-null fields; null does not clear a stored value.
     public SalePaymentResponse update(Long id, UpdateSalePaymentRequest req) {
         log.info("Updating sale payment id={}", id);
         var entity = repository.findById(id)

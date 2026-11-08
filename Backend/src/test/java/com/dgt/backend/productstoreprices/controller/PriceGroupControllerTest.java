@@ -1,6 +1,6 @@
 package com.dgt.backend.productstoreprices.controller;
 
-import com.dgt.backend.access.PagePermissions;
+import com.dgt.backend.access.security.PagePermissions;
 import com.dgt.backend.productstoreprices.dto.*;
 import com.dgt.backend.productstoreprices.service.PriceGroupService;
 import com.dgt.backend.common.dto.PageResponse;

@@ -1,3 +1,7 @@
+/**
+ * Reads approved shrinkage reductions and their recorded costs. Current stock is looked up
+ * separately from the request quantity; this view does not deduct stock again.
+ */
 import {request} from '@/lib/backend';
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

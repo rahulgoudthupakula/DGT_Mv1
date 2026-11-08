@@ -1,3 +1,7 @@
+/**
+ * Renders brand rows from useCigaretteReport, defaulting to the latest available day. The legacy
+ * mockRows variable refers to the hook result here.
+ */
 import {useCigaretteReport} from './useCigaretteReport';
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -29,27 +33,10 @@ interface CigaretteByBrandViewProps {
 }
 
 export const CigaretteByBrandView = ({ storeId,date }: CigaretteByBrandViewProps) => {
-  const report=useCigaretteReport(storeId);const mockRows=report.rows;
-  const filteredRows = date
-    ? mockRows.filter((row) => {
-        const rowDate = parse(row.date, "MM/dd/yyyy", new Date());
-        return isSameDay(rowDate, date);
-      })
-    : mockRows.filter((row) => row.dateKey === mockRows[mockRows.length-1]?.dateKey); // default: latest day
-
-  const selectedDay = filteredRows[0];
-
-  const totals = filteredRows.reduce(
-    (acc, r) => ({
-      soldCarton: acc.soldCarton + r.soldCarton,
-      soldPack: acc.soldPack + r.soldPack,
-      purchase: acc.purchase + r.purchase,
-      adjustments: acc.adjustments + r.adjustments,
-      systemCount: acc.systemCount + r.systemCount,
-      missingExtra: acc.missingExtra + r.missingExtra,
-    }),
-    { soldCarton: 0, soldPack: 0, purchase: 0, adjustments: 0, systemCount: 0, missingExtra: 0 }
-  );
+  const report=useCigaretteReport(storeId,date,date,!date);const mockRows=report.rows;
+  const filteredRows=mockRows;
+  const selectedDay=filteredRows[0];
+  const totals=report.totals;
 
   if(report.pending)return <p>Loading cigarette reports…</p>;if(report.error)return <p role="alert">{String(report.error)}</p>;
   return (
@@ -119,7 +106,7 @@ export const CigaretteByBrandView = ({ storeId,date }: CigaretteByBrandViewProps
                       <TableCell className={`text-xs text-right font-bold border-l ${
                         totals.missingExtra < 0 ? "text-destructive" : totals.missingExtra > 0 ? "text-[hsl(var(--success))]" : ""
                       }`}>
-                        {totals.missingExtra > 0 ? `+${totals.missingExtra}` : totals.missingExtra}
+                        {totals.missingExtra==null?"—":totals.missingExtra > 0 ? `+${totals.missingExtra}` : totals.missingExtra}
                       </TableCell>
                     </TableRow>
                   </TableFooter>

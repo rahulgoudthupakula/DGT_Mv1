@@ -2,6 +2,11 @@ package com.dgt.backend.inventory.dto;
 
 import jakarta.validation.constraints.Size;
 
+/**
+ * Partial update payload for InventoryReturn.
+ * The service ignores null fields, so omitted values are preserved rather than cleared.
+ */
+
 public record UpdateInventoryReturnRequest(
         @Size(max = 50) String dgtId,
         Long vendorId,

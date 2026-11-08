@@ -4,6 +4,10 @@ import com.dgt.backend.inventory.entity.InventoryShrinkageItem;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
+/**
+ * Response DTO for stored InventoryShrinkageItem fields.
+ */
+
 public record InventoryShrinkageItemResponse(
         Long shrinkageItemId,
         Long shrinkageId,
@@ -14,6 +18,7 @@ public record InventoryShrinkageItemResponse(
         String reason,
         OffsetDateTime createdAt
 ) {
+    /** Copy entity fields to the response without changing the stored record. */
     public static InventoryShrinkageItemResponse from(InventoryShrinkageItem e) {
         return new InventoryShrinkageItemResponse(
                 e.getShrinkageItemId(), e.getShrinkageId(), e.getProductId(),

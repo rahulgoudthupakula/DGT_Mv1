@@ -1,6 +1,6 @@
 package com.dgt.backend.workforce;
 
-import com.dgt.backend.access.ScopedAccess;
+import com.dgt.backend.access.security.ScopedAccess;
 import com.dgt.backend.common.entity.Rows;
 import org.springframework.stereotype.Service;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -17,11 +17,12 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 @ConditionalOnProperty(name="app.workforce.enabled",havingValue="true")
 public class WorkforceService {
+ private final com.dgt.backend.access.security.PagePermissions pages;
  @org.springframework.beans.factory.annotation.Value("${app.workforce.shift-changes.enabled:false}")
  private boolean shiftChangesEnabled;
  private final ScopedAccess a;
  private final ObjectMapper json;
- public WorkforceService(ScopedAccess a,ObjectMapper json){this.a=a;this.json=json;}
+ public WorkforceService(ScopedAccess a,ObjectMapper json,com.dgt.backend.access.security.PagePermissions pages){this.pages=pages;this.a=a;this.json=json;}
  private ResponseStatusException bad(String m){return new ResponseStatusException(HttpStatus.BAD_REQUEST,m);}
  private ResponseStatusException conflict(String m){return new ResponseStatusException(HttpStatus.CONFLICT,m);}
  private long number(Object v){return ((Number)v).longValue();}
@@ -92,7 +93,7 @@ public class WorkforceService {
  private void interval(RequestInput p){if(p.startDate()==null||p.endDate()==null||p.endDate().isBefore(p.startDate())||p.endDate().isAfter(p.startDate().plusDays(365)))throw bad("Choose an ordered date range of at most one year");}
  private void published(Map<String,Object> s){future(s);if(!"PUBLISHED".equals(s.get("status")))throw bad("Select a published shift");}
  @Transactional public Object request(String store,RequestInput p,UUID key){log.info("Workforce request store={} kind={}", store, p.kind());lock(store);
-  new com.dgt.backend.access.PagePermissions(a).requireAny(store,"TIME_OFF".equals(p.kind())?"WORKWEEK_PAGE_TIME_OFF_REQUEST":Set.of("AVAILABILITY","EXCEPTION").contains(p.kind()==null?"":p.kind())?"WORKWEEK_PAGE_WEEK_SCHEDULE_AVAILABILITY":"WORKWEEK_PAGE_WEEK_SCHEDULE_COVERAGE");if(p.employeeId()==null)throw bad("Choose an employee");subject(store,p.employeeId());if(!shiftChangesEnabled&&Set.of("COVER","SWAP").contains(p.kind()==null?"":p.kind()))throw bad("Coverage requests and shift swaps are off for now");bounded(p.reason(),500,"Reason");String encoded=json.writeValueAsString(p);
+  pages.requireAny(store,"TIME_OFF".equals(p.kind())?"WORKWEEK_PAGE_TIME_OFF_REQUEST":Set.of("AVAILABILITY","EXCEPTION").contains(p.kind()==null?"":p.kind())?"WORKWEEK_PAGE_WEEK_SCHEDULE_AVAILABILITY":"WORKWEEK_PAGE_WEEK_SCHEDULE_COVERAGE");if(p.employeeId()==null)throw bad("Choose an employee");subject(store,p.employeeId());if(!shiftChangesEnabled&&Set.of("COVER","SWAP").contains(p.kind()==null?"":p.kind()))throw bad("Coverage requests and shift swaps are off for now");bounded(p.reason(),500,"Reason");String encoded=json.writeValueAsString(p);
   var previous=a.db.queryForList("SELECT request_id,dgt_id,payload::text FROM workforce_requests WHERE submitted_by=? AND request_key=?",a.user(),key);if(!previous.isEmpty()){if(!store.equals(previous.getFirst().get("dgt_id"))||!json.readTree(previous.getFirst().get("payload").toString()).equals(json.readTree(encoded)))throw conflict("Request key already used");return result(number(previous.getFirst().get("request_id")));}
   if(!Set.of("AVAILABILITY","EXCEPTION","TIME_OFF","COVER","SWAP").contains(p.kind()==null?"":p.kind()))throw bad("Choose a request type");
   if(!p.kind().equals("SWAP")&&p.otherShiftId()!=null)throw bad("Only swaps take a second shift");

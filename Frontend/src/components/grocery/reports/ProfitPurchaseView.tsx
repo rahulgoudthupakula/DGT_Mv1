@@ -1,3 +1,7 @@
+/**
+ * Displays daily figures from ProfitData context. This view does not independently fetch invoice
+ * payments; unavailable cost-derived values remain visibly unknown.
+ */
 import {useProfitData} from './ProfitData';
 import { useMemo } from "react";
 import { usePagination } from "@/hooks/use-pagination";
@@ -31,16 +35,8 @@ export const ProfitPurchaseView = () => {
  const report=useProfitData();const mockData:DayCashFlow[]=report.days;
   const { paginated, page, totalPages, totalItems, pageSize, hasPrev, hasNext, nextPage, prevPage } = usePagination(mockData, 10);
 
-  const totals = useMemo(() => mockData.reduce(
-    (acc, row) => ({
-      sales: acc.sales + row.sales,
-      purchases: acc.purchases + row.purchases,
-      netCashFlow: acc.netCashFlow + row.netCashFlow,
-    }),
-    { sales: 0, purchases: 0, netCashFlow: 0 }
-  ), [mockData]);
-
-  const totalProfitAfterAdj = totals.netCashFlow + mockAdjustment;
+  const totals=report.dailyTotals??{};
+  const totalProfitAfterAdj=null;
 
   return (
     <div className="space-y-4">

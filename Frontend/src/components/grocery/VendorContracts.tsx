@@ -1,3 +1,7 @@
+/**
+ * Creates or edits store vendor contracts. Existing contracts carry If-Match versions; blank
+ * optional form fields are converted to null before submission.
+ */
 import {useState} from 'react';
 import {useQuery,useQueryClient} from '@tanstack/react-query';
 import {request} from '@/lib/backend';

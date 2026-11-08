@@ -1,3 +1,7 @@
+/**
+ * Hosts detailed Grocery sales reporting and filters. It uses the grocery-reports sales contract,
+ * which is separate from the dashboard summary endpoint.
+ */
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { SalesFilters, type GroupBy } from "./SalesFilters";

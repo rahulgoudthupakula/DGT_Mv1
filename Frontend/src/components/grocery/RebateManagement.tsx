@@ -1,3 +1,7 @@
+/**
+ * Legacy rebate management component. The store-aware rebate workspace is under
+ * rebate/RebateManagementPage; do not assume this standalone UI persists that workflow.
+ */
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";

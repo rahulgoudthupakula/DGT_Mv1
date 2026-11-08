@@ -14,12 +14,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * JPA CRUD operations for FuelPrice.
+ * The caller is responsible for authorization and workflow validation; these queries add no store predicate.
+ */
+
 @Slf4j
 @Service
 public class FuelPriceService {
     private final FuelPriceRepository repository;
     public FuelPriceService(FuelPriceRepository repository) { this.repository = repository; }
 
+    /** Load a page sorted by primary key and map its records to response DTOs. */
     public PageResponse<FuelPriceResponse> list(int page, int size) {
         log.debug("Listing fuel price page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("fuelPriceId")));
@@ -27,6 +33,7 @@ public class FuelPriceService {
         return new PageResponse<>(p.getContent().stream().map(FuelPriceResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    /** Load a record by ID or return HTTP 404. */
     public FuelPriceResponse get(Long id) {
         log.debug("Fetching fuel price id={}", id);
         return FuelPriceResponse.from(repository.findById(id)
@@ -37,6 +44,7 @@ public class FuelPriceService {
     
     }
 
+    /** Persist the supplied fields in one transaction and return the saved values. */
     @Transactional
     public FuelPriceResponse create(CreateFuelPriceRequest req) {
         log.info("Creating fuel price");
@@ -54,6 +62,7 @@ public class FuelPriceService {
         return FuelPriceResponse.from(saved);
     }
 
+    /** Apply only non-null fields in one transaction, leaving omitted fields unchanged. */
     @Transactional
     public FuelPriceResponse update(Long id, UpdateFuelPriceRequest req) {
         log.info("Updating fuel price id={}", id);

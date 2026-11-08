@@ -1,3 +1,7 @@
+/**
+ * Connected invoice-entry workflow. Lists and details are queried separately; POST creates an
+ * invoice and PUT edits one using its version. Scanning/upload extraction is not connected.
+ */
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { request } from "@/lib/backend";
 import { useState } from "react";
@@ -128,6 +132,7 @@ export const OrdersInvoices = ({storeId}:{storeId:string}) => {
   const pricebookItems=catalogQuery.data?.items??[];
   const invoices:Invoice[]=(query.data?.invoices??[]).map(i=>({deliveryDate:'',deliveryTime:'',notes:'',freight:0,fuelSurcharge:0,handlingFee:0,discount:0,vendorAddress:'',vendorPhone:'',salesRepName:'',driverName:'',driverNumber:'',routeId:'',dueDate:'',poNumber:'',receivingId:'',customerId:'',customerName:'',customerAddress:'',customerPhone:'',termsNet:'',tax:0,otherCharges:0,paymentStatus:'' as Invoice['paymentStatus'],createdBy:'',createdAt:'',approvedBy:null,approvedAt:null,...i,id:String(i.id)} as Invoice));
   const [editingInvoice,setEditingInvoice]=useState<{id:string;version:string}|null>(null);
+  // Use the saved version for edits; creation and editing share the same refresh path.
   const postDelivery=async(input:PostDeliveryInput)=>{const result=await request(editingInvoice?`${path}/${editingInvoice.id}`:path,{method:editingInvoice?'PUT':'POST',headers:editingInvoice?{'If-Match':editingInvoice.version}:undefined,body:JSON.stringify(input)});await client.invalidateQueries({queryKey:['invoice-entry',storeId]});return result;};
   const [selectedInvoiceSnapshot, setSelectedInvoice] = useState<Invoice | null>(null);
   const detailQuery=useQuery({queryKey:['invoice-entry',storeId,selectedInvoiceSnapshot?.id],enabled:!!selectedInvoiceSnapshot,queryFn:()=>request<{invoice:Partial<Invoice>;items:InvoiceItem[];version:string;purchaseOrderId:string|null}>(`${path}/${selectedInvoiceSnapshot!.id}`)});

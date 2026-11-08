@@ -5,6 +5,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
+/**
+ * Response DTO for stored LotterySetting fields.
+ */
+
 public record LotterySettingResponse(
         Long lotterySettingId,
         String dgtId,
@@ -15,6 +19,7 @@ public record LotterySettingResponse(
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
 ) {
+    /** Copy entity fields to the response without changing the stored record. */
     public static LotterySettingResponse from(LotterySetting e) {
         return new LotterySettingResponse(
                 e.getLotterySettingId(), e.getDgtId(), e.getMaxOpenPacksPerGame(),

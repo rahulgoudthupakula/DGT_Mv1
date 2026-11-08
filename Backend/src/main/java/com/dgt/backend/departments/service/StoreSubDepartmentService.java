@@ -14,12 +14,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * JPA CRUD operations for StoreSubDepartment.
+ * The caller is responsible for authorization and workflow validation; these queries add no store predicate.
+ */
+
 @Slf4j
 @Service
 public class StoreSubDepartmentService {
     private final StoreSubDepartmentRepository repository;
     public StoreSubDepartmentService(StoreSubDepartmentRepository repository) { this.repository = repository; }
 
+    /** Load a page sorted by primary key and map its records to response DTOs. */
     public PageResponse<StoreSubDepartmentResponse> list(int page, int size) {
         log.debug("Listing store sub department page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("storeSubDepartmentId")));
@@ -27,6 +33,7 @@ public class StoreSubDepartmentService {
         return new PageResponse<>(p.getContent().stream().map(StoreSubDepartmentResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    /** Load a record by ID or return HTTP 404. */
     public StoreSubDepartmentResponse get(Long id) {
         log.debug("Fetching store sub department id={}", id);
         return StoreSubDepartmentResponse.from(repository.findById(id)
@@ -37,6 +44,7 @@ public class StoreSubDepartmentService {
     
     }
 
+    /** Persist the supplied fields in one transaction and return the saved values. */
     @Transactional
     public StoreSubDepartmentResponse create(CreateStoreSubDepartmentRequest req) {
         log.info("Creating store sub department");
@@ -52,6 +60,7 @@ public class StoreSubDepartmentService {
         return StoreSubDepartmentResponse.from(saved);
     }
 
+    /** Apply only non-null fields in one transaction, leaving omitted fields unchanged. */
     @Transactional
     public StoreSubDepartmentResponse update(Long id, UpdateStoreSubDepartmentRequest req) {
         log.info("Updating store sub department id={}", id);

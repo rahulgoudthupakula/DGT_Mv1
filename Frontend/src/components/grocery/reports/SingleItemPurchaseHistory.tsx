@@ -1,3 +1,7 @@
+/**
+ * Loads purchase lines, then applies vendor, status and item search filters. Previous-cost
+ * comparisons come from the purchase report response.
+ */
 import {usePurchaseReports} from './usePurchaseReports';
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -34,27 +38,11 @@ export const SingleItemPurchaseHistory = ({storeId}:{storeId:string}) => {
   const [vendorFilter, setVendorFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const query=usePurchaseReports(storeId,startDate,endDate);
+  const query=usePurchaseReports(storeId,startDate,endDate,{vendor:vendorFilter,status:statusFilter,search:searchQuery});
   const mockRows=query.data?.items??[];
 
-  // Unique vendors for filter
-  const vendors = [...new Set(mockRows.map((r) => r.vendor))];
-
-  // Apply filters
-  const filteredRows = mockRows.filter((row) => {
-    const matchesSearch =
-      searchQuery === "" ||
-      row.productName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      row.scanCode.includes(searchQuery);
-    const matchesVendor = vendorFilter === "all" || row.vendor === vendorFilter;
-    const matchesStatus =
-      statusFilter === "all" ||
-      (statusFilter === "invoiced" && row.invoiced) ||
-      (statusFilter === "uninvoiced" && !row.invoiced);
-    const matchesStart = true;
-    const matchesEnd = true;
-    return matchesSearch && matchesVendor && matchesStatus && matchesStart && matchesEnd;
-  });
+  const vendors:string[]=query.data?.vendors??[];
+  const filteredRows=mockRows;
 
   return (
     <div className="space-y-4">
@@ -157,7 +145,7 @@ export const SingleItemPurchaseHistory = ({storeId}:{storeId:string}) => {
       {/* ── Purchase History Table ──────────────────────── */}
       <Card>
         <CardContent className="pt-4">
-          <SingleItemPurchaseTable
+          <SingleItemPurchaseTable totals={query.data?.itemTotals??{}}
             data={filteredRows}
             costSpikeThreshold={COST_SPIKE_THRESHOLD}
           />

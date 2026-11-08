@@ -3,6 +3,7 @@ package com.dgt.backend.products.dto;
 import com.dgt.backend.products.entity.Product;
 import java.time.OffsetDateTime;
 
+// Response projection for the product record, including database identity and lifecycle timestamps.
 public record ProductResponse(
         Long productId,
         Long storeSubDepartmentId,
@@ -17,6 +18,7 @@ public record ProductResponse(
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
 ) {
+    // Copy entity fields into the response without exposing the persistence object itself.
     public static ProductResponse from(Product e) {
         return new ProductResponse(
                 e.getProductId(), e.getStoreSubDepartmentId(), e.getProductName(),

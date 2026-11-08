@@ -1,2 +1,3 @@
+// Reserved package for legacy payroll-result entity mappings; no implementation classes are declared here.
 /** No payroll-result table exists in the inspected schema. Implementation awaits the approved payroll schema. */
 package com.dgt.backend.payroll.entity;

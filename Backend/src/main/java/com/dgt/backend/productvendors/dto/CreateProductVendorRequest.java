@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 
+// Creation payload for the generic product vendor link API; declared constraints run when validated by the controller.
 public record CreateProductVendorRequest(
         @NotNull Long productId,
         @NotNull Long vendorId,

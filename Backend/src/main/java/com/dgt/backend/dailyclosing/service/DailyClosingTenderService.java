@@ -14,12 +14,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * JPA record operations for DailyClosingTender.
+ * Copies supplied values; store authorization and closing reconciliation are not performed here.
+ */
+
 @Slf4j
 @Service
 public class DailyClosingTenderService {
     private final DailyClosingTenderRepository repository;
     public DailyClosingTenderService(DailyClosingTenderRepository repository) { this.repository = repository; }
 
+    /** Read records ordered by primary key and map the page to response DTOs. */
     public PageResponse<DailyClosingTenderResponse> list(int page, int size) {
         log.debug("Listing daily closing tender page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("tenderId")));
@@ -27,6 +33,7 @@ public class DailyClosingTenderService {
         return new PageResponse<>(p.getContent().stream().map(DailyClosingTenderResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    /** Load one record, or fail with HTTP 404 when it does not exist. */
     public DailyClosingTenderResponse get(Long id) {
         log.debug("Fetching daily closing tender id={}", id);
         return DailyClosingTenderResponse.from(repository.findById(id)
@@ -37,6 +44,7 @@ public class DailyClosingTenderService {
     
     }
 
+    /** Save the supplied record fields atomically; no derived closing totals are calculated. */
     @Transactional
     public DailyClosingTenderResponse create(CreateDailyClosingTenderRequest req) {
         log.info("Creating daily closing tender");
@@ -53,6 +61,7 @@ public class DailyClosingTenderService {
         return DailyClosingTenderResponse.from(saved);
     }
 
+    /** Apply only non-null fields in one transaction, preserving omitted values. */
     @Transactional
     public DailyClosingTenderResponse update(Long id, UpdateDailyClosingTenderRequest req) {
         log.info("Updating daily closing tender id={}", id);

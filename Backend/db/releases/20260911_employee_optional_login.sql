@@ -1,0 +1,10 @@
+BEGIN;
+SET LOCAL lock_timeout='5s';
+SET LOCAL statement_timeout='30s';
+DO $$ BEGIN IF current_database()<>'dgt' THEN RAISE EXCEPTION 'Real dgt only'; END IF; END $$;
+ALTER TABLE employees ALTER COLUMN user_id DROP NOT NULL;
+ALTER TABLE employees ADD COLUMN first_name varchar(100), ADD COLUMN last_name varchar(100);
+UPDATE employees e SET first_name=u.first_name,last_name=u.last_name FROM users u WHERE e.user_id=u.user_id;
+ALTER TABLE employees ADD CONSTRAINT employee_identity_required CHECK(user_id IS NOT NULL OR (first_name IS NOT NULL AND length(trim(first_name))>0 AND last_name IS NOT NULL AND length(trim(last_name))>0));
+ALTER TABLE employee_store_assignments ALTER COLUMN role_type_id DROP NOT NULL;
+COMMIT;

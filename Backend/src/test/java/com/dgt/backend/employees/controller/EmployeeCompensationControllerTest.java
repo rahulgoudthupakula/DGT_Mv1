@@ -1,6 +1,6 @@
 package com.dgt.backend.employees.controller;
 
-import com.dgt.backend.access.PagePermissions;
+import com.dgt.backend.access.security.PagePermissions;
 import com.dgt.backend.employees.dto.*;
 import com.dgt.backend.employees.service.EmployeeCompensationService;
 import com.dgt.backend.common.dto.PageResponse;

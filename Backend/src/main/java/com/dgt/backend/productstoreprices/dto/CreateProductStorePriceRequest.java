@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 
+// Creation payload for the generic product store price API; declared constraints run when validated by the controller.
 public record CreateProductStorePriceRequest(
         @NotBlank @Size(max = 50) String dgtId,
         @NotNull Long productId,

@@ -1,3 +1,7 @@
+/**
+ * Shared rebate form types and option labels. Static option lists are UI choices, not evidence of
+ * saved programs, vendors or earned rebates.
+ */
 export interface RebateTier {
   from: string;
   to: string;

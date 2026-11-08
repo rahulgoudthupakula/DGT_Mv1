@@ -16,10 +16,12 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
+// Coordinate vendor contract/contact record persistence and response mapping; caller authorization is handled at the controller.
 public class VendorContactService {
     private final VendorContactRepository repository;
     public VendorContactService(VendorContactRepository repository) { this.repository = repository; }
 
+    // Read a page sorted by primary key and include the total record count.
     public PageResponse<VendorContactResponse> list(int page, int size) {
         log.debug("Listing vendor contact page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("contactId")));
@@ -27,6 +29,7 @@ public class VendorContactService {
         return new PageResponse<>(p.getContent().stream().map(VendorContactResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    // Map the stored record to the API response, or return HTTP 404 when absent.
     public VendorContactResponse get(Long id) {
         log.debug("Fetching vendor contact id={}", id);
         return VendorContactResponse.from(repository.findById(id)
@@ -38,6 +41,7 @@ public class VendorContactService {
     }
 
     @Transactional
+    // Build and save a record from the submitted create fields inside the transaction.
     public VendorContactResponse create(CreateVendorContactRequest req) {
         log.info("Creating vendor contact");
         var entity = VendorContact.builder()
@@ -60,6 +64,7 @@ public class VendorContactService {
     }
 
     @Transactional
+    // Load the existing record and apply only non-null fields; null does not clear a stored value.
     public VendorContactResponse update(Long id, UpdateVendorContactRequest req) {
         log.info("Updating vendor contact id={}", id);
         var entity = repository.findById(id)

@@ -4,6 +4,10 @@ import com.dgt.backend.fuel.entity.FuelTankGradeAssignment;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
+/**
+ * Response DTO for stored FuelTankGradeAssignment fields.
+ */
+
 public record FuelTankGradeAssignmentResponse(
         Long assignmentId,
         Long tankId,
@@ -13,6 +17,7 @@ public record FuelTankGradeAssignmentResponse(
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
 ) {
+    /** Copy entity fields to the response without changing the stored record. */
     public static FuelTankGradeAssignmentResponse from(FuelTankGradeAssignment e) {
         return new FuelTankGradeAssignmentResponse(
                 e.getAssignmentId(), e.getTankId(), e.getFuelGradeId(),

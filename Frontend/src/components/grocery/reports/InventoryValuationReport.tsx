@@ -1,3 +1,7 @@
+/**
+ * Hosts valuation views. Category views use current stock; date views must be checked separately
+ * because they still contain sample historical data.
+ */
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

@@ -1,3 +1,7 @@
+/**
+ * Expiry workflow UI currently backed by mockExpiringItems. Moving an item calls the supplied
+ * parent callback; this component does not persist an expiry record.
+ */
 import { useState } from "react";
 import { usePagination } from "@/hooks/use-pagination";
 import { toast } from "@/hooks/use-toast";

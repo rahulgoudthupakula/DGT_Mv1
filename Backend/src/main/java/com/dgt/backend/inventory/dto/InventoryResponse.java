@@ -4,6 +4,10 @@ import com.dgt.backend.inventory.entity.Inventory;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
+/**
+ * Response DTO for stored Inventory fields.
+ */
+
 public record InventoryResponse(
         Long inventoryId,
         String dgtId,
@@ -14,6 +18,7 @@ public record InventoryResponse(
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
 ) {
+    /** Copy entity fields to the response without changing the stored record. */
     public static InventoryResponse from(Inventory e) {
         return new InventoryResponse(
                 e.getInventoryId(), e.getDgtId(), e.getProductId(),

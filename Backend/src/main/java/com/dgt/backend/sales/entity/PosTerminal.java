@@ -9,8 +9,10 @@ import java.time.*;
 @Entity
 @Table(name = "pos_terminals")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+// JPA mapping for pos_terminals; related record IDs are scalar fields rather than entity associations.
 public class PosTerminal {
 
+    // Database-generated primary key used by the repository.
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "terminal_id")
@@ -29,10 +31,12 @@ public class PosTerminal {
     private String terminalStatus;
 
     @Column(name = "created_at", updatable = false)
+    // Hibernate populates this timestamp when the entity is first persisted.
     @CreationTimestamp
     private OffsetDateTime createdAt;
 
     @Column(name = "updated_at")
+    // Hibernate refreshes this timestamp when the entity is updated.
     @UpdateTimestamp
     private OffsetDateTime updatedAt;
 }

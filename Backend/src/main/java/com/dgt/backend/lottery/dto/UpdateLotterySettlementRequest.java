@@ -6,6 +6,11 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
+/**
+ * Partial update payload for LotterySettlement.
+ * The service ignores null fields, so omitted values are preserved rather than cleared.
+ */
+
 public record UpdateLotterySettlementRequest(
         @Size(max = 50) String dgtId,
         Long vendorId,

@@ -16,10 +16,12 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
+// Coordinate brand persistence and response mapping; caller authorization is handled at the controller.
 public class BrandService {
     private final BrandRepository repository;
     public BrandService(BrandRepository repository) { this.repository = repository; }
 
+    // Read a page sorted by primary key and include the total record count.
     public PageResponse<BrandResponse> list(int page, int size) {
         log.debug("Listing brand page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("brandId")));
@@ -27,6 +29,7 @@ public class BrandService {
         return new PageResponse<>(p.getContent().stream().map(BrandResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    // Map the stored record to the API response, or return HTTP 404 when absent.
     public BrandResponse get(Long id) {
         log.debug("Fetching brand id={}", id);
         return BrandResponse.from(repository.findById(id)
@@ -38,6 +41,7 @@ public class BrandService {
     }
 
     @Transactional
+    // Build and save a record from the submitted create fields inside the transaction.
     public BrandResponse create(CreateBrandRequest req) {
         log.info("Creating brand");
         var entity = Brand.builder()
@@ -50,6 +54,7 @@ public class BrandService {
     }
 
     @Transactional
+    // Load the existing record and apply only non-null fields; null does not clear a stored value.
     public BrandResponse update(Long id, UpdateBrandRequest req) {
         log.info("Updating brand id={}", id);
         var entity = repository.findById(id)

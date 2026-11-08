@@ -1,3 +1,7 @@
+/**
+ * Displays a program and loads eligible products for its store and program ID. Earnings
+ * calculation and document upload are not implemented by this detail view.
+ */
 import {useQuery} from '@tanstack/react-query';
 import {request} from '@/lib/backend';
 import { useState } from "react";

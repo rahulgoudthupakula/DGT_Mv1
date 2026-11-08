@@ -16,10 +16,12 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
+// Coordinate store business hours persistence and response mapping; caller authorization is handled at the controller.
 public class StoreBusinessHourService {
     private final StoreBusinessHourRepository repository;
     public StoreBusinessHourService(StoreBusinessHourRepository repository) { this.repository = repository; }
 
+    // Read a page sorted by primary key and include the total record count.
     public PageResponse<StoreBusinessHourResponse> list(int page, int size) {
         log.debug("Listing store business hour page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("businessHoursId")));
@@ -27,6 +29,7 @@ public class StoreBusinessHourService {
         return new PageResponse<>(p.getContent().stream().map(StoreBusinessHourResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    // Map the stored record to the API response, or return HTTP 404 when absent.
     public StoreBusinessHourResponse get(Long id) {
         log.debug("Fetching store business hour id={}", id);
         return StoreBusinessHourResponse.from(repository.findById(id)
@@ -38,6 +41,7 @@ public class StoreBusinessHourService {
     }
 
     @Transactional
+    // Build and save a record from the submitted create fields inside the transaction.
     public StoreBusinessHourResponse create(CreateStoreBusinessHourRequest req) {
         log.info("Creating store business hour");
         var entity = StoreBusinessHour.builder()
@@ -53,6 +57,7 @@ public class StoreBusinessHourService {
     }
 
     @Transactional
+    // Load the existing record and apply only non-null fields; null does not clear a stored value.
     public StoreBusinessHourResponse update(Long id, UpdateStoreBusinessHourRequest req) {
         log.info("Updating store business hour id={}", id);
         var entity = repository.findById(id)

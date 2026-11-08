@@ -1,3 +1,8 @@
+/**
+ * Synchronizes invoice costs before loading vendor pricing history. Saves preferences and item
+ * cost changes with versions; stored preferences do not by themselves implement automatic alerts
+ * or approvals.
+ */
 import {useState} from 'react';
 import {useQuery,useQueryClient} from '@tanstack/react-query';
 import {request} from '@/lib/backend';
@@ -13,6 +18,7 @@ type History={id:string;item:string;vendor:string;oldCost:number|null;newCost:nu
 type CostItem={id:number;item:string;vendor:string;cost:number;unit:string;version:string};
 export function VendorPricing({storeId}:{storeId:string}){
  const path=`/access/stores/${encodeURIComponent(storeId)}/vendors/pricing`,client=useQueryClient();
+ // Loading history first asks the backend to synchronize invoice costs; this query includes a POST side effect.
  const query=useQuery({queryKey:['vendor-pricing',storeId],queryFn:async()=>{await request(path+'/invoice-costs',{method:'POST'});return request<{settings:Settings;configured:boolean;history:History[]}>(path);}});
  const [draft,setDraft]=useState<Settings|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const items=useQuery({queryKey:['vendor-cost-items',storeId],queryFn:()=>request<CostItem[]>(path+'/items')});

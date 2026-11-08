@@ -6,9 +6,15 @@ import java.sql.*;
 import tools.jackson.databind.*;
 import tools.jackson.databind.json.JsonMapper;
 
+/**
+ * Converts JDBC row values to API-friendly types while preserving column names and order.
+ * Only password_hash is removed; callers must select other response fields appropriately.
+ */
+
 public final class Rows {
     private static final ObjectMapper JSON=JsonMapper.builder().build();
     private Rows() {}
+    // Normalize SQL temporal values and PostgreSQL objects; do not mutate the original row.
     public static Map<String,Object> normalize(Map<String,Object> row) {
         Map<String,Object> result=new LinkedHashMap<>();
         row.forEach((key,value) -> {
@@ -21,6 +27,7 @@ public final class Rows {
         });
         return result;
     }
+    // Read a nullable typed value, allowing JDBC numeric values to become Long or Integer.
     public static <T> T value(Map<String,Object> row,String column,Class<T> type) {
         Object value=row.get(column);
         if(value==null) return null;

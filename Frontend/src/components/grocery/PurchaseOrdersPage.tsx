@@ -1,3 +1,7 @@
+/**
+ * Loads store permissions and the purchase-order catalog before building vendor order groups.
+ * Draft quantities feed the order workflow; catalog stock is not changed by editing a draft.
+ */
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { ChevronDown, ChevronRight, Download, Eye, FileText, PackageCheck, Plus, Search, Send, ShoppingCart, Trash2, XCircle } from "lucide-react";
@@ -14,7 +18,7 @@ import { TabsList } from "@/components/ui/tabs";
 import { PermissionTabs as Tabs, PermissionTabsContent as TabsContent, PermissionTabsTrigger as TabsTrigger } from "@/components/ui/permission-tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {request} from '@/lib/backend';
-interface PricebookItem {sku:string;barcode:string;name:string;dept:string;category:string;vendor:string;cost:number;stock:number;pack:number;moq:number;target:number;lead_time_days:number|null;}
+interface PricebookItem {sku:string;barcode:string;name:string;dept:string;category:string;vendor:string;cost:number;stock:number;pack:number;moq:number;target:number;lead_time_days:number|null;suggestedQuantity:number;}
 
 import { useAppNavigation } from "@/contexts/NavigationContext";
 import { loadPurchaseOrders, createPurchaseOrder, updatePurchaseOrderStatus, addLinesToPurchaseOrder, type PurchaseOrder, type PurchaseOrderLineInput, type PurchaseOrderSource, type PurchaseOrderStatus } from "@/lib/purchaseOrders";
@@ -80,7 +84,14 @@ export const PurchaseOrdersPage = ({storeId}:{storeId:string}) => {
   const [busy,setBusy]=useState(false);
   const [createKey,setCreateKey]=useState('');
   const vendors=useMemo(()=>[...new Set(pricebookItems.map(i=>i.vendor))].sort(),[pricebookItems]);
-  useEffect(()=>{if(!storeId)return;request<PricebookItem[]>(`/access/stores/${encodeURIComponent(storeId)}/purchase-orders/catalog`).then(data=>setCatalog(data.map(i=>({...i,cost:i.cost==null?NaN:Number(i.cost),stock:Number(i.stock),pack:Number(i.pack),moq:Number(i.moq),target:Number(i.target)})))).catch(e=>toast.error(String(e)));},[storeId]);
+  useEffect(()=>{
+    let cancelled=false;
+    setCatalog([]);
+    if(storeId)request<PricebookItem[]>(`/access/stores/${encodeURIComponent(storeId)}/purchase-orders/catalog`)
+      .then(data=>{if(!cancelled)setCatalog(data.map(i=>({...i,cost:i.cost==null?NaN:Number(i.cost),stock:Number(i.stock),pack:Number(i.pack),moq:Number(i.moq),target:Number(i.target),suggestedQuantity:Number(i.suggestedQuantity)})));})
+      .catch(e=>{if(!cancelled)toast.error(String(e));});
+    return ()=>{cancelled=true;};
+  },[storeId]);
   const { navigateTo } = useAppNavigation();
   const [tab, setTab] = useState("suggested");
   useEffect(()=>{if(!permissions.canCreate&&permissions.canApprove)setTab("history");},[permissions]);
@@ -106,17 +117,16 @@ export const PurchaseOrdersPage = ({storeId}:{storeId:string}) => {
 
   const productRows = useMemo<ProductOrderRow[]>(() => pricebookItems.map((item) => {
     const currentStock=item.stock,pack=item.pack;
-    const needed=Math.max(0,item.target-currentStock);
-    const suggested=needed>0?Math.ceil(Math.max(needed,item.moq)/pack)*pack:0;
+    // Recommendations are calculated by the backend; local edits only preview an order.
+    const suggested=item.suggestedQuantity;
     return {item,stock:currentStock,dailySales:0,daysLeft:NaN,casePack:pack,suggested};
   }), [pricebookItems]);
 
   useEffect(() => {
-    setSuggestedQty((current) => {
-      if (Object.keys(current).length) return current;
-      return Object.fromEntries(productRows.map((row) => [row.item.sku, row.suggested]));
-    });
-  }, [productRows]);
+    // Never carry another store's draft quantities or manually added items into this store.
+    setSuggestedQty({}); setAddedGuideItems({}); setRemovedGuideItems([]);
+    setCreateContext(null); setSelectedOrder(null); setAddItemsOrder(null);
+  }, [storeId]);
 
   const refreshOrders = useCallback(async () => {
     if(!storeId)return;
@@ -160,7 +170,7 @@ export const PurchaseOrdersPage = ({storeId}:{storeId:string}) => {
     const lines: PurchaseOrderLineInput[] = createContext.rows.map((row) => ({ sku: row.item.sku, barcode: row.item.barcode, itemName: row.item.name, department: row.item.dept, orderedQuantity: createContext.quantities[row.item.sku] ?? 0, casePackSize: row.casePack, unitCost: row.item.cost }));
     try {
       const order = await createPurchaseOrder(storeId,{ vendor: createContext.vendor, source: createContext.source, expectedDeliveryDate: expectedDate, notes, lines },createKey);
-      toast.success(`${order.po_number} created as a draft.`); setCreateContext(null); await refreshOrders(); setTab("history");
+      toast.success(`${order.poNumber} created as a draft (${money(order.totalValue)}).`); setCreateContext(null); await refreshOrders(); setSelectedOrder(order); setTab("history");
     } catch (error) { toast.error(error instanceof Error ? error.message : "Purchase order could not be created."); } finally {setBusy(false);}
   };
 
@@ -184,7 +194,8 @@ export const PurchaseOrdersPage = ({storeId}:{storeId:string}) => {
       unitCost: row.item.cost,
     }));
     try {
-      await addLinesToPurchaseOrder(storeId,addItemsOrder, lines);
+      const savedOrder = await addLinesToPurchaseOrder(storeId,addItemsOrder, lines);
+      setSelectedOrder(savedOrder);
       toast.success("Items added and purchase order totals updated.");
       setAddItemsOrder(null);
       setAddItemsQty({});

@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
+// Creation payload for the generic sale payment API; declared constraints run when validated by the controller.
 public record CreateSalePaymentRequest(
         @NotNull Long saleId,
         Long tenderTypeId,

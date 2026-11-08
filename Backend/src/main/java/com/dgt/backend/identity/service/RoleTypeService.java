@@ -14,12 +14,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * JPA CRUD operations for RoleType.
+ * The caller is responsible for authorization and workflow validation; these queries add no store predicate.
+ */
+
 @Slf4j
 @Service
 public class RoleTypeService {
     private final RoleTypeRepository repository;
     public RoleTypeService(RoleTypeRepository repository) { this.repository = repository; }
 
+    /** Load a page sorted by primary key and map its records to response DTOs. */
     public PageResponse<RoleTypeResponse> list(int page, int size) {
         log.debug("Listing role type page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("roleTypeId")));
@@ -27,6 +33,7 @@ public class RoleTypeService {
         return new PageResponse<>(p.getContent().stream().map(RoleTypeResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    /** Load a record by ID or return HTTP 404. */
     public RoleTypeResponse get(Long id) {
         log.debug("Fetching role type id={}", id);
         return RoleTypeResponse.from(repository.findById(id)
@@ -37,6 +44,7 @@ public class RoleTypeService {
     
     }
 
+    /** Persist the supplied fields in one transaction and return the saved values. */
     @Transactional
     public RoleTypeResponse create(CreateRoleTypeRequest req) {
         log.info("Creating role type");
@@ -50,6 +58,7 @@ public class RoleTypeService {
         return RoleTypeResponse.from(saved);
     }
 
+    /** Apply only non-null fields in one transaction, leaving omitted fields unchanged. */
     @Transactional
     public RoleTypeResponse update(Long id, UpdateRoleTypeRequest req) {
         log.info("Updating role type id={}", id);

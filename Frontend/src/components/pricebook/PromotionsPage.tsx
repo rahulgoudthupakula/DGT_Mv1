@@ -31,7 +31,7 @@ export const PromotionsPage=({storeId}:{storeId:string})=>{
  const availableItems=pricebookItems.filter(i=>i.active&&!form.products.includes(String(i.id)));
  const addProduct=()=>{if(!itemToAdd)return;setForm(f=>({...f,products:[...f.products,itemToAdd],quantities:{...f.quantities,[itemToAdd]:'1'}}));setItemToAdd('');};
  const removeProduct=(id:string)=>setForm(f=>({...f,products:f.products.filter(p=>p!==id)}));
- const openEdit=(p:Promotion)=>{setError('');setForm({name:p.name,type:p.type,products:p.rules.map(i=>String(i.productId)),quantities:Object.fromEntries(p.rules.map(i=>[String(i.productId),String(i.quantity)])),start:p.start,end:p.end,discountValue:p.discountValue==null?'':String(p.discountValue),bundlePrice:p.discountValue==null?'':String(p.discountValue),buyQty:p.buyQty==null?'':String(p.buyQty),freeQty:p.freeQty==null?'':String(p.freeQty)});setItemToAdd('');setEditPromo(p);};
+ const openEdit=(p:Promotion)=>{if(p.status==='Expired')return;setError('');setForm({name:p.name,type:p.type,products:p.rules.map(i=>String(i.productId)),quantities:Object.fromEntries(p.rules.map(i=>[String(i.productId),String(i.quantity)])),start:p.start,end:p.end,discountValue:p.discountValue==null?'':String(p.discountValue),bundlePrice:p.discountValue==null?'':String(p.discountValue),buyQty:p.buyQty==null?'':String(p.buyQty),freeQty:p.freeQty==null?'':String(p.freeQty)});setItemToAdd('');setEditPromo(p);};
  async function save(edit:boolean){
   setError('');if(!form.name.trim()||!form.type||!form.products.length||!form.start||!form.end){setError('Complete the name, type, products and dates.');return;}
   const raw=form.type==='Bundle'?form.bundlePrice:form.discountValue;
@@ -204,7 +204,7 @@ export const PromotionsPage=({storeId}:{storeId:string})=>{
         {[
           { label: "Active Promotions", value: String(activeCount), icon: Tag },
           { label: "Upcoming", value: String(upcomingCount), icon: Calendar },
-          { label: "Expired (30d)", value: String(expiredCount), icon: Calendar },
+          { label: "Expired in last 30 days", value: String(expiredCount), icon: Calendar },
         ].map(({ label, value, icon: Icon }) => (
           <Card key={label}>
             <CardContent className="pt-4 flex items-center gap-3">
@@ -258,9 +258,9 @@ export const PromotionsPage=({storeId}:{storeId:string})=>{
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setViewPromo(p)} aria-label="View">
                         <Eye className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" disabled={!p.active} onClick={() => {attempt.current={payload:'',key:''};openEdit(p);}} aria-label="Edit">
+                      {p.status !== 'Expired' && <Button variant="ghost" size="icon" className="h-8 w-8" disabled={!p.active} onClick={() => {attempt.current={payload:'',key:''};openEdit(p);}} aria-label="Edit">
                         <Pencil className="h-4 w-4" />
-                      </Button>
+                      </Button>}
                       <Button variant="ghost" size="icon" className="h-8 w-8" disabled={!p.active} onClick={() => {setError('');setDeletePromo(p);}} aria-label="Deactivate">
                         <X className="h-4 w-4" />
                       </Button>

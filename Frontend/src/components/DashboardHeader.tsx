@@ -1,3 +1,4 @@
+import { useTheme } from "next-themes";
 import { useStoreAccess } from "@/lib/store-access";
 import { canNavigatePage, canNavigateSection } from "@/lib/page-permissions";
 import {disabledModules} from '@/lib/moduleAvailability';
@@ -9,6 +10,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuCheckboxItem,
   DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
@@ -183,8 +185,8 @@ const NavPillBar = ({ navItems, activeNav, onNavClick }: { navItems: string[]; a
             onClick={() => onNavClick(item)}
             className={`whitespace-nowrap transition-all duration-200 ease-out px-3 h-7 text-[11px] rounded-full relative z-10 ${
               activeNav === item
-                ? "bg-background text-foreground font-bold shadow-md -translate-y-2 scale-[1.08] ring-1 ring-border/40"
-                : "text-background/90 hover:text-background hover:bg-background/10 hover:scale-[1.02] translate-y-0"
+                ? "bg-background text-foreground font-bold shadow-md -translate-y-2 scale-[1.08] ring-1 ring-border/40 dark:bg-primary dark:text-primary-foreground dark:translate-y-0 dark:scale-100"
+                : "text-background/90 hover:text-background hover:bg-background/10 hover:scale-[1.02] translate-y-0 dark:text-white dark:hover:text-white dark:hover:bg-white/10"
             }`}
           >
             {item}
@@ -196,6 +198,8 @@ const NavPillBar = ({ navItems, activeNav, onNavClick }: { navItems: string[]; a
 };
 
 export const DashboardHeader = ({ stores, activeNav, activeSubNav, onNavClick, onSubNavClick, onProfilePageClick, onLiveCounterClick, selectedStoreId, onStoreChange, onLogout, hideSubNav }: DashboardHeaderProps) => {
+  const { resolvedTheme, setTheme } = useTheme();
+  const darkMode = resolvedTheme === "dark";
   const [storeSearch, setStoreSearch] = useState("");
   const pageAccess = useStoreAccess(selectedStoreId);
   const visibleNavItems = navItems.filter(item=>canNavigateSection(pageAccess.data,item));
@@ -356,6 +360,15 @@ export const DashboardHeader = ({ stores, activeNav, activeSubNav, onNavClick, o
               <MessageSquareText className="w-4 h-4" />
               <span>Support &amp; Training</span>
             </DropdownMenuItem>
+            <DropdownMenuCheckboxItem checked={darkMode} onCheckedChange={checked=>setTheme(checked?'dark':'light')}
+              onSelect={event=>event.preventDefault()} aria-label="Dark mode"
+              className="flex justify-between gap-2 px-2 py-3 cursor-pointer [&>span:first-child]:hidden">
+              <span className={darkMode?'text-muted-foreground':'font-medium'}>Light mode</span>
+              <span aria-hidden="true" className={`inline-flex h-6 w-11 shrink-0 items-center rounded-full border-2 border-transparent transition-colors ${darkMode?'bg-primary':'bg-input'}`}>
+                <span className={`h-5 w-5 rounded-full bg-background shadow transition-transform ${darkMode?'translate-x-5':'translate-x-0'}`} />
+              </span>
+              <span className={darkMode?'font-medium':'text-muted-foreground'}>Dark mode</span>
+            </DropdownMenuCheckboxItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive" onSelect={() => onLogout?.()}>
               <LogOut className="w-4 h-4" />

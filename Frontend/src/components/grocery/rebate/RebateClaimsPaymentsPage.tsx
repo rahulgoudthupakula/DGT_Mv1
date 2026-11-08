@@ -1,3 +1,7 @@
+/**
+ * Loads persisted rebate claims and sends workflow actions through POST. Version checks protect
+ * existing claims; payment request keys support retrying a payment without duplicating it.
+ */
 import {useQuery,useQueryClient} from '@tanstack/react-query';
 import {request} from '@/lib/backend';
 import {useRebates} from './useRebates';
@@ -93,6 +97,7 @@ const ClaimDetails = ({
 
   const closeDialog = () => setAction(null);
 
+  // Keep the same request key when retrying this payment so a lost response does not create a second payment.
   const [paymentKey,setPaymentKey]=useState(()=>crypto.randomUUID());
   const send=async(body:Record<string,unknown>)=>{if(await onUpdate(body)){closeDialog();setPaymentKey(crypto.randomUUID());}};
   const saveSubmit=()=>send({action:'submit',claimed:claimedAmount,submittedDate});

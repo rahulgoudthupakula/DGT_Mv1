@@ -1,6 +1,6 @@
 package com.dgt.backend.dailyclosing.scoped;
 
-import com.dgt.backend.access.ScopedAccess;
+import com.dgt.backend.access.security.ScopedAccess;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.*;
@@ -8,15 +8,23 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
 
+/**
+ * Validates manual closing readings and stores related expenses and deposits.
+ * The calling closing workflow supplies authorization and the encompassing transaction.
+ */
+
 @Component
 public class ClosingReconciliation {
  private final ScopedAccess access;
  public ClosingReconciliation(ScopedAccess access){this.access=access;}
+ // Fixed column allowlist used for reconciliation reads and SQL updates.
  public static final List<String> COLUMNS=List.of("opening_checks","closing_checks","card_jobber_settlement","card_bank_settlement",
   "lottery_online_sales","lottery_online_cash","lottery_scratch_cash","lottery_settlement","lottery_adjustment","lottery_online_credit","lottery_scratch_credit","lottery_commission","lottery_balance");
+ // Map form fields to dedicated closing expense types, separate from other expenses.
  private static final Map<String,String> EXPENSES=Map.of("cash_purchases","CLOSING_CASH_PURCHASE","pending_invoices_paid","CLOSING_PENDING_INVOICE_PAID");
  public static final List<String> NONNEGATIVE=List.of("opening_checks","closing_checks","cash_purchases","pending_invoices_paid","deposit_cash","deposit_checks");
  private BigDecimal n(Object v){return v==null?BigDecimal.ZERO:new BigDecimal(v.toString());}
+ // Combine header readings with active closing expenses and completed/deposited/confirmed deposits.
  public Map<String,Object> read(Map<String,Object> closing){
   var result=new LinkedHashMap<String,Object>();for(String key:COLUMNS)result.put(key,closing.get(key));
   for(String key:EXPENSES.keySet())result.put(key,BigDecimal.ZERO);
@@ -33,6 +41,7 @@ public class ClosingReconciliation {
    """,id);
   result.put("deposit_cash",deposits.get("cash"));result.put("deposit_checks",deposits.get("checks"));result.put("other_deposits",deposits.get("other"));result.put("unallocated_deposits",deposits.get("unallocated"));return result;
  }
+ // Merge allowed fields; enforce decimal precision, magnitude, and field-specific nonnegative rules.
  public Map<String,Object> validate(Map<String,BigDecimal> submitted,Map<String,Object> existing){
   var result=new LinkedHashMap<>(existing);if(submitted==null)return result;
   var allowed=new HashSet<>(COLUMNS);allowed.addAll(EXPENSES.keySet());allowed.addAll(List.of("deposit_cash","deposit_checks"));
@@ -45,14 +54,19 @@ public class ClosingReconciliation {
   return result;
  }
  private ResponseStatusException bad(String s){return new ResponseStatusException(HttpStatus.BAD_REQUEST,s);}
+ // Cash leaving the drawer through purchases, invoice-payment entries, and cash deposits.
  public BigDecimal cashOut(Map<String,Object> r){return n(r.get("cash_purchases")).add(n(r.get("pending_invoices_paid"))).add(n(r.get("deposit_cash")));}
+ // Combine closing cash/check deposits with other recorded deposits.
  public BigDecimal deposits(Map<String,Object> r){return n(r.get("deposit_cash")).add(n(r.get("deposit_checks"))).add(n(r.get("other_deposits")));}
+ // Persist readings in the caller transaction; archive replaced closing entries instead of deleting them.
  public void save(long id,LocalDate day,Map<String,Object> r){
   for(String column:COLUMNS)access.db.update("UPDATE everyday_closing SET "+column+"=? WHERE everyday_closing_id=?",r.get(column),id);
+  // These cash expense records do not change the payment status of an invoice.
   for(var entry:EXPENSES.entrySet()) {
    access.db.update("UPDATE daily_expenses SET archived_at=CURRENT_TIMESTAMP WHERE archived_at IS NULL AND everyday_closing_id=? AND expenses_type=?",id,entry.getValue());
    if(n(r.get(entry.getKey())).signum()>0)access.db.update("INSERT INTO daily_expenses(everyday_closing_id,expenses_date,expenses_type,description,amount,paid_by) VALUES (?,?,?,?,?,?)",id,day,entry.getValue(),"Cash payment recorded in daily closing; does not mark an invoice paid",r.get(entry.getKey()),access.user());
   }
+  // Replace only deposits created by this closing form, retaining unrelated deposit entries.
   access.db.update("UPDATE daily_closing_deposits SET archived_at=CURRENT_TIMESTAMP WHERE archived_at IS NULL AND everyday_closing_id=? AND closing_entry",id);
   BigDecimal cash=n(r.get("deposit_cash")),checks=n(r.get("deposit_checks"));
   if(cash.add(checks).signum()>0)access.db.update("""

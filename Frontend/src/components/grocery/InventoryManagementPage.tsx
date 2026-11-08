@@ -1,3 +1,7 @@
+/**
+ * Inventory adjustment workspace: child tabs handle reductions, returns and transfers for the
+ * selected store. Switching tabs alone does not apply a stock adjustment.
+ */
 import { useState } from "react";
 import { TabsList } from "@/components/ui/tabs";
 import { PermissionTabs as Tabs, PermissionTabsContent as TabsContent, PermissionTabsTrigger as TabsTrigger } from "@/components/ui/permission-tabs";

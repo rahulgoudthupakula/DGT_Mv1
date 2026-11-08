@@ -1,3 +1,7 @@
+/**
+ * Owns profit-report filters and provides one useProfitReport result to its child views. Shared
+ * context keeps the tabs on the same loaded report.
+ */
 import {useProfitReport,ProfitDataProvider} from './ProfitData';
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

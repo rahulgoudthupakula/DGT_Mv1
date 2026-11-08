@@ -1,6 +1,6 @@
 package com.dgt.backend.common.controller;
 
-import com.dgt.backend.access.PagePermissions;
+import com.dgt.backend.access.security.PagePermissions;
 import com.dgt.backend.inventory.controller.InventoryController;
 import com.dgt.backend.inventory.service.InventoryService;
 import org.junit.jupiter.api.Test;

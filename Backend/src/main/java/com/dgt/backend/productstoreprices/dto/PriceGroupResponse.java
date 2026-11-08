@@ -4,6 +4,7 @@ import com.dgt.backend.productstoreprices.entity.PriceGroup;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
+// Response projection for the price group record, including database identity and lifecycle timestamps.
 public record PriceGroupResponse(
         Long priceGroupId,
         String priceGroupName,
@@ -14,6 +15,7 @@ public record PriceGroupResponse(
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
 ) {
+    // Copy entity fields into the response without exposing the persistence object itself.
     public static PriceGroupResponse from(PriceGroup e) {
         return new PriceGroupResponse(
                 e.getPriceGroupId(), e.getPriceGroupName(), e.getDescription(),

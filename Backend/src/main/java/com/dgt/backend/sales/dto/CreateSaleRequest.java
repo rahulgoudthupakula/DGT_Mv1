@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
+// Creation payload for the generic sale API; declared constraints run when validated by the controller.
 public record CreateSaleRequest(
         @NotBlank @Size(max = 50) String storeId,
         Long cashierId,

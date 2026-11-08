@@ -14,12 +14,19 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * JPA CRUD operations for SubscriptionPlan records.
+ * Authorization is applied by the controller; these repository calls do not add store filtering.
+ * Renewal and plan-change calculations belong to StoreBilling.
+ */
+
 @Slf4j
 @Service
 public class SubscriptionPlanService {
     private final SubscriptionPlanRepository repository;
     public SubscriptionPlanService(SubscriptionPlanRepository repository) { this.repository = repository; }
 
+    /** Read a page sorted by the primary key and map entities to response DTOs. */
     public PageResponse<SubscriptionPlanResponse> list(int page, int size) {
         log.debug("Listing subscription plan page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("subscriptionPlanId")));
@@ -27,6 +34,7 @@ public class SubscriptionPlanService {
         return new PageResponse<>(p.getContent().stream().map(SubscriptionPlanResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    /** Load one record or return HTTP 404 when the identifier is unknown. */
     public SubscriptionPlanResponse get(Long id) {
         log.debug("Fetching subscription plan id={}", id);
         return SubscriptionPlanResponse.from(repository.findById(id)
@@ -37,6 +45,7 @@ public class SubscriptionPlanService {
     
     }
 
+    /** Persist the supplied fields in one transaction and return the saved values. */
     @Transactional
     public SubscriptionPlanResponse create(CreateSubscriptionPlanRequest req) {
         log.info("Creating subscription plan");
@@ -49,6 +58,7 @@ public class SubscriptionPlanService {
         return SubscriptionPlanResponse.from(saved);
     }
 
+    /** Update only non-null request fields in one transaction; omitted fields stay unchanged. */
     @Transactional
     public SubscriptionPlanResponse update(Long id, UpdateSubscriptionPlanRequest req) {
         log.info("Updating subscription plan id={}", id);

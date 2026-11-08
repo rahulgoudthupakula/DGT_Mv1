@@ -6,6 +6,11 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
+/**
+ * Generic creation payload for EverydayClosing.
+ * Annotations specify required fields and length limits; amounts are supplied by the caller.
+ */
+
 public record CreateEverydayClosingRequest(
         @NotBlank @Size(max = 50) String dgtId,
         @NotNull OffsetDateTime openingDatetime,

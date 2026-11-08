@@ -14,12 +14,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * Generic JPA user-record operations.
+ * Copies account metadata; signup, password hashing, and session issuance belong to separate access workflows.
+ */
+
 @Slf4j
 @Service
 public class UserService {
     private final UserRepository repository;
     public UserService(UserRepository repository) { this.repository = repository; }
 
+    /** Load a page sorted by primary key and map its records to response DTOs. */
     public PageResponse<UserResponse> list(int page, int size) {
         log.debug("Listing user page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("userId")));
@@ -27,6 +33,7 @@ public class UserService {
         return new PageResponse<>(p.getContent().stream().map(UserResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    /** Load a record by ID or return HTTP 404. */
     public UserResponse get(Long id) {
         log.debug("Fetching user id={}", id);
         return UserResponse.from(repository.findById(id)
@@ -37,6 +44,7 @@ public class UserService {
     
     }
 
+    /** Persist the supplied fields in one transaction and return the saved values. */
     @Transactional
     public UserResponse create(CreateUserRequest req) {
         log.info("Creating user");
@@ -54,6 +62,7 @@ public class UserService {
         return UserResponse.from(saved);
     }
 
+    /** Apply only non-null fields in one transaction, leaving omitted fields unchanged. */
     @Transactional
     public UserResponse update(Long id, UpdateUserRequest req) {
         log.info("Updating user id={}", id);

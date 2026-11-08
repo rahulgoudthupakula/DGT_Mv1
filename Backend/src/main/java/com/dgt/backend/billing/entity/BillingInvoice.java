@@ -6,11 +6,17 @@ import org.hibernate.annotations.CreationTimestamp;
 import java.math.BigDecimal;
 import java.time.*;
 
+/**
+ * JPA mapping of billing_invoices for the generic record API.
+ * Database identifiers are stored as scalar values rather than JPA relationship objects.
+ */
+
 @Entity
 @Table(name = "billing_invoices")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class BillingInvoice {
 
+    // Database-generated primary key.
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "invoice_id")
@@ -34,6 +40,7 @@ public class BillingInvoice {
     @Column(name = "period_end", nullable = false)
     private LocalDate periodEnd;
 
+    // Decimal money is persisted with two fractional digits.
     @Column(name = "subtotal", nullable = false, precision = 12, scale = 2)
     private BigDecimal subtotal;
 
@@ -53,6 +60,7 @@ public class BillingInvoice {
     private String invoiceDocumentUrl;
 
     @Column(name = "created_at", updatable = false)
+    // Hibernate records the creation timestamp when the entity is inserted.
     @CreationTimestamp
     private OffsetDateTime createdAt;
 }

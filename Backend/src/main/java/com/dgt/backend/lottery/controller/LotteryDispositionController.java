@@ -1,6 +1,6 @@
 package com.dgt.backend.lottery.controller;
 
-import com.dgt.backend.access.ScopedAccess;
+import com.dgt.backend.access.security.ScopedAccess;
 import com.dgt.backend.common.entity.Rows;
 import java.math.BigDecimal;
 import java.util.*;
@@ -11,12 +11,18 @@ import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * Store pack returns and settlement workflow based on reviewed closing history.
+ * Records disposition state and settlement totals; no external payment or distributor call is made.
+ */
+
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/access/stores/{store}/lottery-dispositions")
 public class LotteryDispositionController {
+ private final com.dgt.backend.access.security.PagePermissions pages;
  private final ScopedAccess a; private final LotteryDeliveryController permissions; private final ObjectMapper json;
- public LotteryDispositionController(ScopedAccess a,LotteryDeliveryController permissions,ObjectMapper json){this.a=a;this.permissions=permissions;this.json=json;}
+ public LotteryDispositionController(ScopedAccess a,LotteryDeliveryController permissions,ObjectMapper json,com.dgt.backend.access.security.PagePermissions pages){this.pages=pages;this.a=a;this.permissions=permissions;this.json=json;}
  private void access(String store,String code){if(!permissions.allowed(store,code))throw a.denied();}
  private ResponseStatusException bad(String message){return new ResponseStatusException(HttpStatus.CONFLICT,message);}
  private void lock(String store){a.db.queryForObject("SELECT dgt_id FROM stores WHERE dgt_id=? FOR UPDATE",String.class,store);}
@@ -45,29 +51,38 @@ public class LotteryDispositionController {
  WHERE p.dgt_id=? AND p.delivery_decided_at IS NOT NULL AND p.status_id=(SELECT status_type_id FROM status_types WHERE status_name='APPROVED')
  ORDER BY p.lottery_pack_id
  """;
+ // Settlement requires closed/reviewed history and all remaining tickets sold or returned.
  private boolean ready(Map<String,Object> p){return Boolean.TRUE.equals(p.get("shiftClosed"))&&!Boolean.TRUE.equals(p.get("hasGaps"))&&p.get("pack_settlement_reference")==null&&("RETURNED".equals(p.get("return_status"))||((Number)p.get("ticketsUnsold")).intValue()==0)&&!"PENDING".equals(p.get("return_status"));}
+ // Returns require remaining tickets, complete closed history, and no prior return or settlement.
  private boolean returnable(Map<String,Object> p){return Boolean.TRUE.equals(p.get("shiftClosed"))&&!Boolean.TRUE.equals(p.get("hasGaps"))&&p.get("pack_settlement_reference")==null&&p.get("return_status")==null&&p.get("return_date")==null&&((Number)p.get("ticketsRemaining")).intValue()>0;}
+ // Build settlement and return lists with eligibility and blocking explanations.
  private Object data(String store){var settlements=new ArrayList<Map<String,Object>>();var returns=new ArrayList<Map<String,Object>>();for(var raw:a.db.queryForList(QUERY,store)){
   var p=Rows.normalize(raw);p.put("status",p.get("pack_settlement_reference")!=null?"settled":ready(raw)?"ready":"blocked");
   p.put("blockedReason",!Boolean.TRUE.equals(raw.get("shiftClosed"))?"Close the open shift first":Boolean.TRUE.equals(raw.get("hasGaps"))?"Closing history is incomplete or sales have not been reviewed":"Sell all tickets or confirm the return of remaining tickets first");settlements.add(p);
   if(((Number)raw.get("ticketsRemaining")).intValue()>0){var ret=new LinkedHashMap<>(p);ret.put("status",raw.get("pack_settlement_reference")!=null?"settled":"RETURNED".equals(raw.get("return_status"))?"returned":"PENDING".equals(raw.get("return_status"))?"pending":returnable(raw)?"eligible":"blocked");returns.add(ret);}
  }return Map.of("settlementPacks",settlements,"returnablePacks",returns,"canSettle",permissions.allowed(store,"LOTTERY_SETTLE_PACKS"),"canReturn",permissions.allowed(store,"LOTTERY_RETURN_PACKS"));}
+ // Read dispositions with either settlement or return permission.
  @GetMapping @Transactional(readOnly=true) public Object get(@PathVariable String store){if(!permissions.allowed(store,"LOTTERY_SETTLE_PACKS")&&!permissions.allowed(store,"LOTTERY_RETURN_PACKS"))throw a.denied();return data(store);}
+ // Pack identifier plus the xmin version reviewed by the operator.
  public record Selected(String id,String version){}
+ // Batch settlement, return request, or return confirmation with supporting reference details.
  public record Command(String action,List<Selected> packs,String returnType,String reason,String reference){}
+ // Enforce action-specific page and operation access, lock packs, and process the batch atomically.
  @PostMapping @Transactional public Object change(@PathVariable String store,@RequestBody Command in){
   if(!Set.of("SETTLE","REQUEST_RETURN","CONFIRM_RETURN").contains(Objects.toString(in.action(),"")))throw bad("Invalid action");
-  new com.dgt.backend.access.PagePermissions(a).requireAny(store,in.action().equals("SETTLE")?"LOTTERY_PAGE_RETURNS_SETTLE":"LOTTERY_PAGE_RETURNS_RETURN");
+  pages.requireAny(store,in.action().equals("SETTLE")?"LOTTERY_PAGE_RETURNS_SETTLE":"LOTTERY_PAGE_RETURNS_RETURN");
   access(store,in.action().equals("SETTLE")?"LOTTERY_SETTLE_PACKS":"LOTTERY_RETURN_PACKS");lock(store);a.db.queryForList("SELECT lottery_pack_id FROM lottery_packs WHERE dgt_id=? FOR UPDATE",store);
   if(in.packs()==null||in.packs().isEmpty()||in.packs().size()>1000)throw bad("Select 1–1,000 packs");
   var all=new HashMap<String,Map<String,Object>>();for(var p:a.db.queryForList(QUERY,store))all.put(p.get("id").toString(),p);
   var seen=new HashSet<String>();for(var selected:in.packs()){
    if(selected==null||!seen.add(selected.id()))throw bad("Invalid or duplicate pack");var p=all.get(selected.id());
    if(p==null||!Objects.equals(p.get("version"),selected.version()))throw bad("Pack changed; refresh before trying again");long id=((Number)p.get("lottery_pack_id")).longValue();
+   // Freeze gross sales and commission under a generated internal settlement reference.
    if(in.action().equals("SETTLE")){
     if(!ready(p))throw bad("Pack is not ready: close and reconcile its shifts, then sell or return remaining tickets");
     String ref="SET-"+UUID.randomUUID();
     a.db.update("UPDATE lottery_packs SET pack_settlement_reference=?,pack_settled_at=CURRENT_TIMESTAMP,pack_settled_by=?,settled_gross=?,settled_commission=?,updated_at=CURRENT_TIMESTAMP WHERE lottery_pack_id=?",ref,a.user(),p.get("grossSales"),p.get("commission"),id);
+   // Require full return for unsold packs and partial return for packs with recorded sales.
    }else if(in.action().equals("REQUEST_RETURN")){
     if(!returnable(p))throw bad("Pack is not eligible for return; close and reconcile its shift first");
     int sold=((Number)p.get("ticketsSold")).intValue();String type=sold==0?"full":"partial";

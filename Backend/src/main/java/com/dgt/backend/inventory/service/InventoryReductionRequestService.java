@@ -14,12 +14,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * JPA CRUD operations for InventoryReductionRequest.
+ * The caller is responsible for authorization and workflow validation; these queries add no store predicate.
+ */
+
 @Slf4j
 @Service
 public class InventoryReductionRequestService {
     private final InventoryReductionRequestRepository repository;
     public InventoryReductionRequestService(InventoryReductionRequestRepository repository) { this.repository = repository; }
 
+    /** Load a page sorted by primary key and map its records to response DTOs. */
     public PageResponse<InventoryReductionRequestResponse> list(int page, int size) {
         log.debug("Listing inventory reduction request page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("reductionRequestId")));
@@ -27,6 +33,7 @@ public class InventoryReductionRequestService {
         return new PageResponse<>(p.getContent().stream().map(InventoryReductionRequestResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    /** Load a record by ID or return HTTP 404. */
     public InventoryReductionRequestResponse get(Long id) {
         log.debug("Fetching inventory reduction request id={}", id);
         return InventoryReductionRequestResponse.from(repository.findById(id)
@@ -37,9 +44,11 @@ public class InventoryReductionRequestService {
     
     }
 
+    /** Persist the supplied fields in one transaction and return the saved values. */
     @Transactional
     public InventoryReductionRequestResponse create(CreateInventoryReductionRequestRequest req) {
         log.info("Creating inventory reduction request");
+        // Save request metadata; this method does not approve the reduction or deduct stock.
         var entity = InventoryReductionRequest.builder()
                 .dgtId(req.dgtId())
                 .productId(req.productId())
@@ -57,6 +66,7 @@ public class InventoryReductionRequestService {
         return InventoryReductionRequestResponse.from(saved);
     }
 
+    /** Apply only non-null fields in one transaction, leaving omitted fields unchanged. */
     @Transactional
     public InventoryReductionRequestResponse update(Long id, UpdateInventoryReductionRequestRequest req) {
         log.info("Updating inventory reduction request id={}", id);

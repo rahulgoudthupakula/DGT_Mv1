@@ -7,12 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 
-type Field = "firstName" | "lastName" | "email" | "phone" | "businessName" | "storeName" | "storeCode";
-const personalFields: Field[] = ["firstName", "lastName", "email", "phone"];
+type Field = "firstName" | "lastName" | "email" | "countryCode" | "phone" | "businessName" | "storeName" | "storeCode";
+const personalFields: Field[] = ["firstName", "lastName", "email", "countryCode", "phone"];
 const companyFields: Field[] = ["businessName", "storeName", "storeCode"];
-const initialValues: Record<Field, string> = { firstName: "", lastName: "", email: "", phone: "", businessName: "", storeName: "", storeCode: "" };
-const labels: Record<Field, string> = { firstName: "First name", lastName: "Last name", email: "Email", phone: "Phone number", businessName: "Legal business / LLC name", storeName: "Store name", storeCode: "Store ID / Location Code" };
-const autocomplete: Partial<Record<Field, string>> = { firstName: "given-name", lastName: "family-name", email: "email", phone: "tel", businessName: "organization" };
+const initialValues: Record<Field, string> = { firstName: "", lastName: "", email: "", countryCode: "+1", phone: "", businessName: "", storeName: "", storeCode: "" };
+const labels: Record<Field, string> = { firstName: "First name", lastName: "Last name", email: "Email", countryCode: "Country code", phone: "Phone number", businessName: "Legal business / LLC name", storeName: "Store name", storeCode: "Store ID / Location Code" };
+const autocomplete: Partial<Record<Field, string>> = { firstName: "given-name", lastName: "family-name", email: "email", phone: "tel-national", countryCode: "tel-country-code", businessName: "organization" };
 
 export function SignupPage() {
   const [step, setStep] = useState<1 | 2>(1);
@@ -29,7 +29,8 @@ export function SignupPage() {
     const value = values[field];
     if (!value.trim()) return `${labels[field]} is required.`;
     if (field === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())) return "Enter a valid email address.";
-    if (field === "phone" && (!/^\+?[\d\s().-]+$/.test(value.trim()) || value.replace(/\D/g, "").length < 7 || value.replace(/\D/g, "").length > 15)) return "Enter a valid phone number with 7–15 digits, including the country code if needed.";
+    if (field === "countryCode" && !/^\+[1-9][0-9]{0,2}$/.test(value.trim())) return "Enter a country code starting with + (for example, +1).";
+    if (field === "phone" && !/^[0-9]{10}$/.test(value)) return "Phone number must contain exactly 10 digits (0–9). Enter the country code separately.";
     return undefined;
   }
   async function submit(event: FormEvent) {
@@ -50,14 +51,14 @@ export function SignupPage() {
     }
   }
   function input(field: Field) {
-    const type = field === "email" ? "email" : field === "phone" ? "tel" : "text";
+    const type = field === "email" ? "email" : (field === "phone" || field === "countryCode") ? "tel" : "text";
     const hint = field === "storeCode" ? "Your existing location code—not the internal ID assigned by DGT." : undefined;
     return <div key={field} className="space-y-1.5">
       <Label htmlFor={`signup-${field}`}>{labels[field]}</Label>
       <div className="relative">
         <Input id={`signup-${field}`} name={field} type={type} required autoComplete={autocomplete[field] ?? "off"}
-          value={values[field]} disabled={busy} maxLength={field === "email" ? 254 : field === "phone" ? 40 : field === "businessName" ? 200 : field === "storeName" ? 150 : field === "storeCode" ? 50 : 100}
-          placeholder={field === "email" ? "you@example.com" : field === "phone" ? "+1 (555) 123-4567" : undefined}
+          value={values[field]} disabled={busy} maxLength={field === "email" ? 254 : field === "phone" ? 10 : field === "countryCode" ? 4 : field === "businessName" ? 200 : field === "storeName" ? 150 : field === "storeCode" ? 50 : 100}
+          placeholder={field === "email" ? "you@example.com" : field === "phone" ? "2025550123" : field === "countryCode" ? "+1" : undefined}
           aria-invalid={!!errors[field]} aria-describedby={[hint && `hint-${field}`, errors[field] && `error-${field}`].filter(Boolean).join(" ") || undefined}
           onChange={event => { setValues(old => ({ ...old, [field]: event.target.value })); setErrors(old => ({ ...old, [field]: undefined })); setReviewed(false); }}
           onBlur={() => setErrors(old => ({ ...old, [field]: validate(field) }))} />
@@ -82,7 +83,8 @@ export function SignupPage() {
         {reviewed ? <div role="status" className="rounded-md border bg-primary/5 p-5 space-y-2"><h1 className="text-lg font-semibold">Your request is under review</h1><p className="text-sm">After verification, you will receive your login credentials at the email address you provided.</p></div> : <form ref={form} noValidate onSubmit={submit} className="space-y-4">
           {step === 1 ? <>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">{input("firstName")}{input("lastName")}</div>
-            {personalFields.slice(2).map(input)}
+            {input("email")}
+            <div className="grid grid-cols-[110px_1fr] gap-3">{input("countryCode")}{input("phone")}</div>
           </> : <>
             {companyFields.map(input)}
           </>}

@@ -4,6 +4,7 @@ import com.dgt.backend.sales.entity.SaleItem;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
+// Response projection for the sale item record, including database identity and lifecycle timestamps.
 public record SaleItemResponse(
         Long salesItemId,
         Long saleId,
@@ -18,6 +19,7 @@ public record SaleItemResponse(
         BigDecimal lineTotal,
         OffsetDateTime createdAt
 ) {
+    // Copy entity fields into the response without exposing the persistence object itself.
     public static SaleItemResponse from(SaleItem e) {
         return new SaleItemResponse(
                 e.getSalesItemId(), e.getSaleId(), e.getProductId(),

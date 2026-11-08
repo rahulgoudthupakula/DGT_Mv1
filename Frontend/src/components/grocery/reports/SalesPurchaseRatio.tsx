@@ -1,3 +1,7 @@
+/**
+ * Applies the entered date range to useRatioReports. A zero purchase denominator produces an
+ * unavailable ratio rather than infinity.
+ */
 import {useRatioReports} from './useRatioReports';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useState } from "react";

@@ -3,6 +3,10 @@ package com.dgt.backend.lottery.dto;
 import com.dgt.backend.lottery.entity.LotteryPack;
 import java.time.OffsetDateTime;
 
+/**
+ * Response DTO for stored LotteryPack fields.
+ */
+
 public record LotteryPackResponse(
         Long lotteryPackId,
         Long invoiceId,
@@ -17,6 +21,7 @@ public record LotteryPackResponse(
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
 ) {
+    /** Copy entity fields to the response without changing the stored record. */
     public static LotteryPackResponse from(LotteryPack e) {
         return new LotteryPackResponse(
                 e.getLotteryPackId(), e.getInvoiceId(), e.getDgtId(),

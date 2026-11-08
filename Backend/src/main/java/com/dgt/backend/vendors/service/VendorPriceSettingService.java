@@ -16,10 +16,12 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
+// Coordinate vendor pricing preferences persistence and response mapping; caller authorization is handled at the controller.
 public class VendorPriceSettingService {
     private final VendorPriceSettingRepository repository;
     public VendorPriceSettingService(VendorPriceSettingRepository repository) { this.repository = repository; }
 
+    // Read a page sorted by primary key and include the total record count.
     public PageResponse<VendorPriceSettingResponse> list(int page, int size) {
         log.debug("Listing vendor price setting page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("settingId")));
@@ -27,6 +29,7 @@ public class VendorPriceSettingService {
         return new PageResponse<>(p.getContent().stream().map(VendorPriceSettingResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    // Map the stored record to the API response, or return HTTP 404 when absent.
     public VendorPriceSettingResponse get(Long id) {
         log.debug("Fetching vendor price setting id={}", id);
         return VendorPriceSettingResponse.from(repository.findById(id)
@@ -38,6 +41,7 @@ public class VendorPriceSettingService {
     }
 
     @Transactional
+    // Build and save a record from the submitted create fields inside the transaction.
     public VendorPriceSettingResponse create(CreateVendorPriceSettingRequest req) {
         log.info("Creating vendor price setting");
         var entity = VendorPriceSetting.builder()
@@ -57,6 +61,7 @@ public class VendorPriceSettingService {
     }
 
     @Transactional
+    // Load the existing record and apply only non-null fields; null does not clear a stored value.
     public VendorPriceSettingResponse update(Long id, UpdateVendorPriceSettingRequest req) {
         log.info("Updating vendor price setting id={}", id);
         var entity = repository.findById(id)

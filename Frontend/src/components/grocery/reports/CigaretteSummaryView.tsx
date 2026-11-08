@@ -1,3 +1,7 @@
+/**
+ * Filters the cigarette hook summary by the selected date range. Pack and carton quantities retain
+ * their recorded units.
+ */
 import {useCigaretteReport} from './useCigaretteReport';
 import { Card, CardContent } from "@/components/ui/card";
 import { Package, Boxes, DollarSign, Tag } from "lucide-react";
@@ -33,29 +37,10 @@ interface CigaretteSummaryViewProps {
 }
 
 export const CigaretteSummaryView = ({ storeId,startDate, endDate }: CigaretteSummaryViewProps) => {
-  const report=useCigaretteReport(storeId);const mockRows=report.summary;
+  const report=useCigaretteReport(storeId,startDate,endDate);const mockRows=report.summary;
  const summaryCards=[{label:"Total Cartons on Hand",value:String(report.cartons),icon:Boxes},{label:"Total Packs on Hand",value:String(report.packs),icon:Package},{label:"Inventory Value (Cost)",value:report.cost==null?"—":"$"+report.cost.toFixed(2),icon:DollarSign},{label:"Inventory Value (Retail)",value:report.retail==null?"—":"$"+report.retail.toFixed(2),icon:Tag}];
-  const filteredRows = mockRows.filter((row) => {
-    if (!startDate && !endDate) return true;
-    const rowDate = parse(row.date, "MM/dd/yyyy", new Date());
-    if (startDate && endDate) return isWithinInterval(rowDate, { start: startDate, end: endDate });
-    if (startDate) return rowDate >= startDate;
-    if (endDate) return rowDate <= endDate;
-    return true;
-  });
-
-  const totals = filteredRows.reduce(
-    (acc, r) => ({
-      soldCarton: acc.soldCarton + r.soldCarton,
-      soldPack: acc.soldPack + r.soldPack,
-      purchase: acc.purchase + r.purchase,
-      adjustments: acc.adjustments + r.adjustments,
-      systemCount: acc.systemCount + r.systemCount,
-      manualCount: acc.manualCount + r.manualCount,
-      missingExtra: acc.missingExtra + r.missingExtra,
-    }),
-    { soldCarton: 0, soldPack: 0, purchase: 0, adjustments: 0, systemCount: 0, manualCount: 0, missingExtra: 0 }
-  );
+  const filteredRows=mockRows;
+  const totals=report.totals;
 
   if(report.pending)return <p>Loading cigarette reports…</p>;if(report.error)return <p role="alert">{String(report.error)}</p>;
   return (
@@ -144,7 +129,7 @@ export const CigaretteSummaryView = ({ storeId,startDate, endDate }: CigaretteSu
                       <TableCell className={`text-xs text-right font-bold border-l ${
                         totals.missingExtra < 0 ? "text-destructive" : totals.missingExtra > 0 ? "text-[hsl(var(--success))]" : ""
                       }`}>
-                        {totals.missingExtra > 0 ? `+${totals.missingExtra}` : totals.missingExtra}
+                        {totals.missingExtra==null?"—":totals.missingExtra > 0 ? `+${totals.missingExtra}` : totals.missingExtra}
                       </TableCell>
                     </TableRow>
                   </TableFooter>

@@ -11,6 +11,11 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * Generic StoreSubDepartment record API, currently denied by AccessPolicy.
+ * Store-specific workflows perform their own authorization separately.
+ */
+
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/store-sub-departments")
@@ -18,19 +23,23 @@ public class StoreSubDepartmentController {
     private final StoreSubDepartmentService service;
     public StoreSubDepartmentController(StoreSubDepartmentService service) { this.service = service; }
 
+    /** List a zero-based page after the access-policy check. */
     @GetMapping
     @PreAuthorize("@accessPolicy.check(authentication, 'store_sub_departments', 'READ')")
     public PageResponse<StoreSubDepartmentResponse> list(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) { return service.list(page, size); }
 
+    /** Fetch one record by its database ID; missing records return 404. */
     @GetMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'store_sub_departments', 'READ')")
     public StoreSubDepartmentResponse get(@PathVariable Long id) { return service.get(id); }
 
+    /** Validate the creation payload and return the saved record with HTTP 201. */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("@accessPolicy.check(authentication, 'store_sub_departments', 'WRITE')")
     public StoreSubDepartmentResponse create(@Valid @RequestBody CreateStoreSubDepartmentRequest request) { return service.create(request); }
 
+    /** Apply non-null update fields to an existing record. */
     @PatchMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'store_sub_departments', 'WRITE')")
     public StoreSubDepartmentResponse update(@PathVariable Long id, @RequestBody UpdateStoreSubDepartmentRequest request) { return service.update(id, request); }

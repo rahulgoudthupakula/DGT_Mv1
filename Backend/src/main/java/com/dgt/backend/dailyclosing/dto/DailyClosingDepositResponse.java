@@ -5,6 +5,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
+/**
+ * API representation of stored DailyClosingDeposit values, without recalculating closing totals.
+ */
+
 public record DailyClosingDepositResponse(
         Long depositId,
         Long everydayClosingId,
@@ -18,6 +22,7 @@ public record DailyClosingDepositResponse(
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
 ) {
+    /** Copy entity values into the response without additional database queries. */
     public static DailyClosingDepositResponse from(DailyClosingDeposit e) {
         return new DailyClosingDepositResponse(
                 e.getDepositId(), e.getEverydayClosingId(), e.getDepositDate(),

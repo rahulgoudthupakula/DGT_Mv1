@@ -1,6 +1,6 @@
 package com.dgt.backend.lottery.controller;
 
-import com.dgt.backend.access.ScopedAccess;
+import com.dgt.backend.access.security.ScopedAccess;
 import com.dgt.backend.common.entity.Rows;
 import java.util.*;
 import org.springframework.http.HttpStatus;
@@ -9,6 +9,11 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+
+/**
+ * Verifies confirmed packs and records external terminal/provider activation references.
+ * Recording a reference here does not activate a pack with an external provider.
+ */
 
 @Slf4j
 @RestController
@@ -19,6 +24,7 @@ public class LotteryVerificationController {
  private void access(String store,String code){if(!permissions.allowed(store,code))throw a.denied();}
  private ResponseStatusException bad(String text){return new ResponseStatusException(HttpStatus.BAD_REQUEST,text);}
  private ResponseStatusException conflict(){return new ResponseStatusException(HttpStatus.CONFLICT,"Pack changed or is not eligible. Refresh the page before trying again.");}
+ // Return confirmed packs eligible for verification/activation and caller capabilities.
  @GetMapping @Transactional(readOnly=true)
  public Object get(@PathVariable String store){boolean verify=permissions.allowed(store,"LOTTERY_CONFIRM_PACKS"),activate=permissions.allowed(store,"LOTTERY_ACTIVATE_PACKS");if(!verify&&!activate)throw a.denied();
  var packs=a.db.queryForList("""
@@ -38,9 +44,13 @@ public class LotteryVerificationController {
  WHERE p.dgt_id=? AND s.status_name='APPROVED' AND p.delivery_decided_at IS NOT NULL AND p.return_status IS NULL AND p.return_date IS NULL AND p.pack_settlement_reference IS NULL ORDER BY p.lottery_pack_id DESC
  """,store).stream().map(Rows::normalize).toList();return Map.of("packs",packs,"canVerify",verify,"canActivate",activate);
  }
+ // Pack version and optional external activation reference supplied by the operator.
  public record Selected(String id,String version,String reference){}
+ // Verification action, optional explanation, and selected packs.
  public record Decision(String action,String reason,List<Selected> packs){}
+ // Batch of packs with actual external activation references.
  public record Activation(List<Selected> packs){}
+ // Lock the store and eligible packs; reject duplicates, stale versions, or prior activation.
  private List<Map<String,Object>> lockPacks(String store,List<Selected> selected){
   if(selected==null||selected.isEmpty()||selected.size()>1000)throw bad("Select 1–1,000 packs");
   a.db.queryForObject("SELECT dgt_id FROM stores WHERE dgt_id=? FOR UPDATE",String.class,store);
@@ -51,6 +61,7 @@ public class LotteryVerificationController {
    if(found.getFirst().get("activation_reference")!=null)throw conflict();rows.add(found.getFirst());
   }return rows;
  }
+ // Move pending verification to verified/not verified, or restore not verified packs to pending.
  @PostMapping("/decision") @Transactional
  public Object decision(@PathVariable String store,@RequestBody Decision in){access(store,"LOTTERY_CONFIRM_PACKS");
   if(!Set.of("VERIFY","NOT_VERIFIED","RESTORE").contains(Objects.toString(in.action(),"")))throw bad("Invalid verification action");
@@ -62,6 +73,7 @@ public class LotteryVerificationController {
    a.audit(store,"LOTTERY_VERIFICATION_"+in.action(),row.get("lottery_pack_id").toString(),json.writeValueAsString(Map.of("action",in.action(),"reason",reason,"previousStatus",expected)));
   }return Map.of("updated",rows.size());
  }
+ // Record references only for verified active-game packs without previously recorded sales.
  @PostMapping("/activation") @Transactional
  public Object activation(@PathVariable String store,@RequestBody Activation in){access(store,"LOTTERY_ACTIVATE_PACKS");var rows=lockPacks(store,in.packs());
   for(int i=0;i<rows.size();i++){var row=rows.get(i);String reference=in.packs().get(i).reference();if(reference==null||reference.trim().isEmpty()||reference.trim().length()>150)throw bad("Enter the actual terminal/provider activation reference for each pack (maximum 150 characters)");

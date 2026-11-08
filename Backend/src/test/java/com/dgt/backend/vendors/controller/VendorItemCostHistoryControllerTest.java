@@ -1,6 +1,6 @@
 package com.dgt.backend.vendors.controller;
 
-import com.dgt.backend.access.PagePermissions;
+import com.dgt.backend.access.security.PagePermissions;
 import com.dgt.backend.vendors.dto.*;
 import com.dgt.backend.vendors.service.VendorItemCostHistoryService;
 import com.dgt.backend.common.dto.PageResponse;

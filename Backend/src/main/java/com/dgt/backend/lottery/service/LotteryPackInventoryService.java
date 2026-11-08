@@ -14,12 +14,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * JPA CRUD operations for LotteryPackInventory.
+ * The caller is responsible for authorization and workflow validation; these queries add no store predicate.
+ */
+
 @Slf4j
 @Service
 public class LotteryPackInventoryService {
     private final LotteryPackInventoryRepository repository;
     public LotteryPackInventoryService(LotteryPackInventoryRepository repository) { this.repository = repository; }
 
+    /** Load a page sorted by primary key and map its records to response DTOs. */
     public PageResponse<LotteryPackInventoryResponse> list(int page, int size) {
         log.debug("Listing lottery pack inventory page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("lotteryPackInventoryId")));
@@ -27,6 +33,7 @@ public class LotteryPackInventoryService {
         return new PageResponse<>(p.getContent().stream().map(LotteryPackInventoryResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    /** Load a record by ID or return HTTP 404. */
     public LotteryPackInventoryResponse get(Long id) {
         log.debug("Fetching lottery pack inventory id={}", id);
         return LotteryPackInventoryResponse.from(repository.findById(id)
@@ -37,6 +44,7 @@ public class LotteryPackInventoryService {
     
     }
 
+    /** Persist the supplied fields in one transaction and return the saved values. */
     @Transactional
     public LotteryPackInventoryResponse create(CreateLotteryPackInventoryRequest req) {
         log.info("Creating lottery pack inventory");
@@ -51,6 +59,7 @@ public class LotteryPackInventoryService {
         return LotteryPackInventoryResponse.from(saved);
     }
 
+    /** Apply only non-null fields in one transaction, leaving omitted fields unchanged. */
     @Transactional
     public LotteryPackInventoryResponse update(Long id, UpdateLotteryPackInventoryRequest req) {
         log.info("Updating lottery pack inventory id={}", id);

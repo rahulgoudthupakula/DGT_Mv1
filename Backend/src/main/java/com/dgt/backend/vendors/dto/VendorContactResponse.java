@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
+// Response projection for the vendor contract/contact record record, including database identity and lifecycle timestamps.
 public record VendorContactResponse(
         Long contactId,
         Long vendorId,
@@ -22,6 +23,7 @@ public record VendorContactResponse(
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
 ) {
+    // Copy entity fields into the response without exposing the persistence object itself.
     public static VendorContactResponse from(VendorContact e) {
         return new VendorContactResponse(
                 e.getContactId(), e.getVendorId(), e.getDgtId(),

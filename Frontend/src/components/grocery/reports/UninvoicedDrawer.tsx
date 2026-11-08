@@ -1,3 +1,7 @@
+/**
+ * Standalone UninvoicedDrawer UI contains local/sample state rather than a connected report query.
+ * Do not treat the displayed values or local actions as persisted business records.
+ */
 import {
   Drawer,
   DrawerClose,

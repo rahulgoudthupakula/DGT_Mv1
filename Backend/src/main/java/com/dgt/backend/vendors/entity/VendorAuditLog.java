@@ -8,8 +8,10 @@ import java.time.*;
 @Entity
 @Table(name = "vendor_audit_log")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+// JPA mapping for vendor_audit_log; related record IDs are scalar fields rather than entity associations.
 public class VendorAuditLog {
 
+    // Database-generated primary key used by the repository.
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "audit_id")
@@ -34,6 +36,7 @@ public class VendorAuditLog {
     private Long costHistoryId;
 
     @Column(name = "created_at", updatable = false)
+    // Hibernate populates this timestamp when the entity is first persisted.
     @CreationTimestamp
     private OffsetDateTime createdAt;
 }

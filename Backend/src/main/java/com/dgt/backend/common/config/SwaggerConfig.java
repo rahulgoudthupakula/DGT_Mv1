@@ -7,9 +7,14 @@ import org.springdoc.core.models.GroupedOpenApi;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * Defines API documentation and module groups. Listing an endpoint here does not enable it or grant access.
+ */
+
 @Configuration
 public class SwaggerConfig {
 
+    /** Document security schemes; runtime authentication remains controlled by SecurityConfig. */
     @Bean
     public OpenAPI openAPI() {
         return new OpenAPI()
@@ -28,6 +33,21 @@ public class SwaggerConfig {
                     .description("JWT obtained from POST /api/v1/access/session")));
     }
 
+    /** Group all apis endpoints for Swagger navigation only. */
+    @Bean
+    public GroupedOpenApi allApisGroup() {
+        return GroupedOpenApi.builder().group("00-all-apis").displayName("All APIs (includes disabled routes)")
+            .pathsToMatch("/api/v1/**").build();
+    }
+
+    /** Group pos simulator endpoints for Swagger navigation only. */
+    @Bean
+    public GroupedOpenApi posSimulatorGroup() {
+        return GroupedOpenApi.builder().group("21-pos-simulator").displayName("POS Simulator")
+            .pathsToMatch("/api/v1/pos/**", "/api/v1/access/stores/{store}/pos/**").build();
+    }
+
+    /** Group auth endpoints for Swagger navigation only. */
     @Bean
     public GroupedOpenApi authGroup() {
         return GroupedOpenApi.builder().group("01-authentication").displayName("Authentication & Profile")
@@ -41,6 +61,7 @@ public class SwaggerConfig {
             .build();
     }
 
+    /** Group store permissions endpoints for Swagger navigation only. */
     @Bean
     public GroupedOpenApi storePermissionsGroup() {
         return GroupedOpenApi.builder().group("02-store-permissions").displayName("Store Access & Permissions")
@@ -57,6 +78,7 @@ public class SwaggerConfig {
             .build();
     }
 
+    /** Group stores endpoints for Swagger navigation only. */
     @Bean
     public GroupedOpenApi storesGroup() {
         return GroupedOpenApi.builder().group("03-stores").displayName("Stores")
@@ -67,6 +89,7 @@ public class SwaggerConfig {
             .build();
     }
 
+    /** Group employees endpoints for Swagger navigation only. */
     @Bean
     public GroupedOpenApi employeesGroup() {
         return GroupedOpenApi.builder().group("04-employees").displayName("Employees")
@@ -84,6 +107,7 @@ public class SwaggerConfig {
             .build();
     }
 
+    /** Group workforce endpoints for Swagger navigation only. */
     @Bean
     public GroupedOpenApi workforceGroup() {
         return GroupedOpenApi.builder().group("05-workforce").displayName("Workforce")
@@ -91,6 +115,7 @@ public class SwaggerConfig {
             .build();
     }
 
+    /** Group billing endpoints for Swagger navigation only. */
     @Bean
     public GroupedOpenApi billingGroup() {
         return GroupedOpenApi.builder().group("06-billing").displayName("Billing")
@@ -102,6 +127,7 @@ public class SwaggerConfig {
             .build();
     }
 
+    /** Group sales endpoints for Swagger navigation only. */
     @Bean
     public GroupedOpenApi salesGroup() {
         return GroupedOpenApi.builder().group("07-sales").displayName("Sales & POS")
@@ -115,6 +141,7 @@ public class SwaggerConfig {
             .build();
     }
 
+    /** Group daily closing endpoints for Swagger navigation only. */
     @Bean
     public GroupedOpenApi dailyClosingGroup() {
         return GroupedOpenApi.builder().group("08-daily-closing").displayName("Daily Closing")
@@ -127,6 +154,7 @@ public class SwaggerConfig {
             .build();
     }
 
+    /** Group tender endpoints for Swagger navigation only. */
     @Bean
     public GroupedOpenApi tenderGroup() {
         return GroupedOpenApi.builder().group("09-tender").displayName("Tender (Credit Card, EBT, Fleet)")
@@ -137,6 +165,7 @@ public class SwaggerConfig {
             .build();
     }
 
+    /** Group gas endpoints for Swagger navigation only. */
     @Bean
     public GroupedOpenApi gasGroup() {
         return GroupedOpenApi.builder().group("10-gas").displayName("Gas & Fuel")
@@ -157,6 +186,7 @@ public class SwaggerConfig {
             .build();
     }
 
+    /** Group lottery endpoints for Swagger navigation only. */
     @Bean
     public GroupedOpenApi lotteryGroup() {
         return GroupedOpenApi.builder().group("11-lottery").displayName("Lottery")
@@ -176,6 +206,7 @@ public class SwaggerConfig {
             .build();
     }
 
+    /** Group pricebook endpoints for Swagger navigation only. */
     @Bean
     public GroupedOpenApi pricebookGroup() {
         return GroupedOpenApi.builder().group("12-pricebook").displayName("Price Book & Grocery")
@@ -197,6 +228,7 @@ public class SwaggerConfig {
             .build();
     }
 
+    /** Group products endpoints for Swagger navigation only. */
     @Bean
     public GroupedOpenApi productsGroup() {
         return GroupedOpenApi.builder().group("13-products").displayName("Products & Catalog")
@@ -215,6 +247,7 @@ public class SwaggerConfig {
             .build();
     }
 
+    /** Group vendors endpoints for Swagger navigation only. */
     @Bean
     public GroupedOpenApi vendorsGroup() {
         return GroupedOpenApi.builder().group("14-vendors").displayName("Vendors")
@@ -227,6 +260,7 @@ public class SwaggerConfig {
             .build();
     }
 
+    /** Group inventory endpoints for Swagger navigation only. */
     @Bean
     public GroupedOpenApi inventoryGroup() {
         return GroupedOpenApi.builder().group("15-inventory").displayName("Inventory")
@@ -243,6 +277,7 @@ public class SwaggerConfig {
             .build();
     }
 
+    /** Group invoices endpoints for Swagger navigation only. */
     @Bean
     public GroupedOpenApi invoicesGroup() {
         return GroupedOpenApi.builder().group("16-invoices").displayName("Invoices")
@@ -256,6 +291,7 @@ public class SwaggerConfig {
             .build();
     }
 
+    /** Group departments endpoints for Swagger navigation only. */
     @Bean
     public GroupedOpenApi departmentsGroup() {
         return GroupedOpenApi.builder().group("17-departments").displayName("Departments")
@@ -267,6 +303,7 @@ public class SwaggerConfig {
             .build();
     }
 
+    /** Group reports endpoints for Swagger navigation only. */
     @Bean
     public GroupedOpenApi reportsGroup() {
         return GroupedOpenApi.builder().group("18-reports").displayName("Reports")
@@ -278,6 +315,7 @@ public class SwaggerConfig {
             .build();
     }
 
+    /** Group payroll endpoints for Swagger navigation only. */
     @Bean
     public GroupedOpenApi payrollGroup() {
         return GroupedOpenApi.builder().group("19-payroll").displayName("Payroll")
@@ -285,6 +323,7 @@ public class SwaggerConfig {
             .build();
     }
 
+    /** Group system endpoints for Swagger navigation only. */
     @Bean
     public GroupedOpenApi systemGroup() {
         return GroupedOpenApi.builder().group("20-system").displayName("System & Identity")

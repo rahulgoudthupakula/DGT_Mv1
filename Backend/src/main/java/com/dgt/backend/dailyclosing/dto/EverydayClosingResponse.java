@@ -4,6 +4,10 @@ import com.dgt.backend.dailyclosing.entity.EverydayClosing;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
+/**
+ * API representation of stored EverydayClosing values, without recalculating closing totals.
+ */
+
 public record EverydayClosingResponse(
         Long everydayClosingId,
         String dgtId,
@@ -21,6 +25,7 @@ public record EverydayClosingResponse(
         Long closedBy,
         OffsetDateTime updatedAt
 ) {
+    /** Copy entity values into the response without additional database queries. */
     public static EverydayClosingResponse from(EverydayClosing e) {
         return new EverydayClosingResponse(
                 e.getEverydayClosingId(), e.getDgtId(), e.getOpeningDatetime(),

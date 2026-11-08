@@ -14,12 +14,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * JPA record operations for EverydayClosing.
+ * Copies supplied values; store authorization and closing reconciliation are not performed here.
+ */
+
 @Slf4j
 @Service
 public class EverydayClosingService {
     private final EverydayClosingRepository repository;
     public EverydayClosingService(EverydayClosingRepository repository) { this.repository = repository; }
 
+    /** Read records ordered by primary key and map the page to response DTOs. */
     public PageResponse<EverydayClosingResponse> list(int page, int size) {
         log.debug("Listing everyday closing page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("everydayClosingId")));
@@ -27,6 +33,7 @@ public class EverydayClosingService {
         return new PageResponse<>(p.getContent().stream().map(EverydayClosingResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    /** Load one record, or fail with HTTP 404 when it does not exist. */
     public EverydayClosingResponse get(Long id) {
         log.debug("Fetching everyday closing id={}", id);
         return EverydayClosingResponse.from(repository.findById(id)
@@ -37,6 +44,7 @@ public class EverydayClosingService {
     
     }
 
+    /** Save the supplied record fields atomically; no derived closing totals are calculated. */
     @Transactional
     public EverydayClosingResponse create(CreateEverydayClosingRequest req) {
         log.info("Creating everyday closing");
@@ -60,6 +68,7 @@ public class EverydayClosingService {
         return EverydayClosingResponse.from(saved);
     }
 
+    /** Apply only non-null fields in one transaction, preserving omitted values. */
     @Transactional
     public EverydayClosingResponse update(Long id, UpdateEverydayClosingRequest req) {
         log.info("Updating everyday closing id={}", id);

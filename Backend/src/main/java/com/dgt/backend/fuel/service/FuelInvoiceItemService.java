@@ -14,12 +14,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * JPA CRUD operations for FuelInvoiceItem.
+ * The caller is responsible for authorization and workflow validation; these queries add no store predicate.
+ */
+
 @Slf4j
 @Service
 public class FuelInvoiceItemService {
     private final FuelInvoiceItemRepository repository;
     public FuelInvoiceItemService(FuelInvoiceItemRepository repository) { this.repository = repository; }
 
+    /** Load a page sorted by primary key and map its records to response DTOs. */
     public PageResponse<FuelInvoiceItemResponse> list(int page, int size) {
         log.debug("Listing fuel invoice item page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("fuelInvoiceItemId")));
@@ -27,6 +33,7 @@ public class FuelInvoiceItemService {
         return new PageResponse<>(p.getContent().stream().map(FuelInvoiceItemResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    /** Load a record by ID or return HTTP 404. */
     public FuelInvoiceItemResponse get(Long id) {
         log.debug("Fetching fuel invoice item id={}", id);
         return FuelInvoiceItemResponse.from(repository.findById(id)
@@ -37,6 +44,7 @@ public class FuelInvoiceItemService {
     
     }
 
+    /** Persist the supplied fields in one transaction and return the saved values. */
     @Transactional
     public FuelInvoiceItemResponse create(CreateFuelInvoiceItemRequest req) {
         log.info("Creating fuel invoice item");
@@ -53,6 +61,7 @@ public class FuelInvoiceItemService {
         return FuelInvoiceItemResponse.from(saved);
     }
 
+    /** Apply only non-null fields in one transaction, leaving omitted fields unchanged. */
     @Transactional
     public FuelInvoiceItemResponse update(Long id, UpdateFuelInvoiceItemRequest req) {
         log.info("Updating fuel invoice item id={}", id);

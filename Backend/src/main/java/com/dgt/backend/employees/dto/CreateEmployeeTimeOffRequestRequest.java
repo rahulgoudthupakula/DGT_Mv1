@@ -6,6 +6,11 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
+/**
+ * Creation payload for EmployeeTimeOffRequest.
+ * Bean Validation annotations declare field requirements for the generic API.
+ */
+
 public record CreateEmployeeTimeOffRequestRequest(
         @NotNull Long employeeId,
         JsonNode requestType,

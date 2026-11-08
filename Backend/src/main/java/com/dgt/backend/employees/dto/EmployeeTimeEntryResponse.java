@@ -4,6 +4,10 @@ import com.dgt.backend.employees.entity.EmployeeTimeEntry;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
+/**
+ * Response DTO for stored EmployeeTimeEntry fields.
+ */
+
 public record EmployeeTimeEntryResponse(
         Long timeEntryId,
         Long employeeId,
@@ -16,6 +20,7 @@ public record EmployeeTimeEntryResponse(
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
 ) {
+    /** Copy entity fields to the response without changing the stored record. */
     public static EmployeeTimeEntryResponse from(EmployeeTimeEntry e) {
         return new EmployeeTimeEntryResponse(
                 e.getTimeEntryId(), e.getEmployeeId(), e.getDgtId(),

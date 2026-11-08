@@ -16,10 +16,12 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
+// Coordinate new-arrival persistence and response mapping; caller authorization is handled at the controller.
 public class NewArrivalService {
     private final NewArrivalRepository repository;
     public NewArrivalService(NewArrivalRepository repository) { this.repository = repository; }
 
+    // Read a page sorted by primary key and include the total record count.
     public PageResponse<NewArrivalResponse> list(int page, int size) {
         log.debug("Listing new arrival page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("newArrivalsId")));
@@ -27,6 +29,7 @@ public class NewArrivalService {
         return new PageResponse<>(p.getContent().stream().map(NewArrivalResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    // Map the stored record to the API response, or return HTTP 404 when absent.
     public NewArrivalResponse get(Long id) {
         log.debug("Fetching new arrival id={}", id);
         return NewArrivalResponse.from(repository.findById(id)
@@ -38,6 +41,7 @@ public class NewArrivalService {
     }
 
     @Transactional
+    // Build and save a record from the submitted create fields inside the transaction.
     public NewArrivalResponse create(CreateNewArrivalRequest req) {
         log.info("Creating new arrival");
         var entity = NewArrival.builder()
@@ -54,6 +58,7 @@ public class NewArrivalService {
     }
 
     @Transactional
+    // Load the existing record and apply only non-null fields; null does not clear a stored value.
     public NewArrivalResponse update(Long id, UpdateNewArrivalRequest req) {
         log.info("Updating new arrival id={}", id);
         var entity = repository.findById(id)

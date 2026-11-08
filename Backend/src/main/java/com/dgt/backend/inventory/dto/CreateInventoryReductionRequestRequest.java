@@ -4,6 +4,11 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 
+/**
+ * Creation payload for InventoryReductionRequest.
+ * Bean Validation annotations declare field requirements for the generic API.
+ */
+
 public record CreateInventoryReductionRequestRequest(
         @NotBlank @Size(max = 50) String dgtId,
         Long productId,

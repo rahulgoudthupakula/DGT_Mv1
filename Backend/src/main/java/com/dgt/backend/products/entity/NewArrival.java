@@ -10,8 +10,10 @@ import java.time.*;
 @Entity
 @Table(name = "new_arrivals")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+// JPA mapping for new_arrivals; related record IDs are scalar fields rather than entity associations.
 public class NewArrival {
 
+    // Database-generated primary key used by the repository.
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "new_arrivals_id")
@@ -36,10 +38,12 @@ public class NewArrival {
     private Long statusId;
 
     @Column(name = "created_at", updatable = false)
+    // Hibernate populates this timestamp when the entity is first persisted.
     @CreationTimestamp
     private OffsetDateTime createdAt;
 
     @Column(name = "updated_at")
+    // Hibernate refreshes this timestamp when the entity is updated.
     @UpdateTimestamp
     private OffsetDateTime updatedAt;
 }

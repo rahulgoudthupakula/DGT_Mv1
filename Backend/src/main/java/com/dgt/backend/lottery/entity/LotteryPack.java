@@ -6,11 +6,17 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import java.time.*;
 
+/**
+ * JPA mapping of lottery_packs.
+ * Stores record fields and scalar relationship identifiers; workflow rules live outside this entity.
+ */
+
 @Entity
 @Table(name = "lottery_packs")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class LotteryPack {
 
+    // Database-generated primary key.
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "lottery_pack_id")
@@ -44,10 +50,12 @@ public class LotteryPack {
     private Long performedBy;
 
     @Column(name = "created_at", updatable = false)
+    // Hibernate supplies this timestamp when inserting the record.
     @CreationTimestamp
     private OffsetDateTime createdAt;
 
     @Column(name = "updated_at")
+    // Hibernate maintains this timestamp on entity updates.
     @UpdateTimestamp
     private OffsetDateTime updatedAt;
 }
