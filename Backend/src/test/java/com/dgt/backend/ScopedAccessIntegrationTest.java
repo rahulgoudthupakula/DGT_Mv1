@@ -12,14 +12,14 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import tools.jackson.databind.*;
 import static org.assertj.core.api.Assertions.*;
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={
- "app.workforce.enabled=true","app.tender.fleet.enabled=true","app.tender.ebt.enabled=true","app.tender.credit-card.enabled=true","app.daily-closing.enabled=true","app.sales.activity.enabled=true","app.gas.tank-report.enabled=true","app.gas.adjustments.enabled=true","app.gas.price.enabled=true","app.gas.delivery.enabled=true","app.gas.settings.enabled=true","app.pricebook.enabled=true","app.workweek.enabled=true","app.billing.enabled=true","app.profile.enabled=true","app.profile.rate-limit.max=1000","spring.datasource.url=jdbc:postgresql://127.0.0.1:55439/dgt_test","spring.datasource.username=${DGT_TEST_RUNTIME_USER:dgt_test}","spring.datasource.password=${DGT_TEST_RUNTIME_PASSWORD:only-test-password}","spring.flyway.enabled=true","logging.level.root=WARN","debug=false"})
+ "app.workforce.enabled=true","app.tender.fleet.enabled=true","app.tender.ebt.enabled=true","app.tender.credit-card.enabled=true","app.daily-closing.enabled=true","app.sales.activity.enabled=true","app.gas.tank-report.enabled=true","app.gas.adjustments.enabled=true","app.gas.price.enabled=true","app.gas.delivery.enabled=true","app.gas.settings.enabled=true","app.pricebook.enabled=true","app.workweek.enabled=true","app.billing.enabled=true","app.profile.enabled=true","app.profile.rate-limit.max=1000","spring.datasource.url=jdbc:postgresql://127.0.0.1:${DGT_TEST_PORT:55439}/dgt_test","spring.datasource.username=${DGT_TEST_RUNTIME_USER:dgt_test}","spring.datasource.password=${DGT_TEST_RUNTIME_PASSWORD:only-test-password}","spring.flyway.enabled=true","logging.level.root=WARN","debug=false"})
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class ScopedAccessIntegrationTest {
  @Value("${local.server.port}") int port;
  @Autowired com.dgt.backend.billing.service.StoreBilling billing;
  @Autowired JdbcTemplate runtimeDb;
- JdbcTemplate db=new JdbcTemplate(new org.springframework.jdbc.datasource.DriverManagerDataSource("jdbc:postgresql://127.0.0.1:55439/dgt_test","dgt_test","only-test-password"));@Autowired ObjectMapper json;
+ JdbcTemplate db=new JdbcTemplate(new org.springframework.jdbc.datasource.DriverManagerDataSource("jdbc:postgresql://127.0.0.1:"+System.getenv().getOrDefault("DGT_TEST_PORT","55439")+"/dgt_test","dgt_test","only-test-password"));@Autowired ObjectMapper json;
  HttpClient http=HttpClient.newHttpClient();Map<String,String> tokenCache=new HashMap<>();String tag=UUID.randomUUID().toString().substring(0,8),store,second,foreign;
  long company,otherCompany;Map<String,Long> users=new HashMap<>();Map<String,Long> assignments=new HashMap<>();
  String password="Only-local-integration-tests";long departmentModule,settingsModule;String customId;
@@ -498,7 +498,7 @@ class ScopedAccessIntegrationTest {
   long group=ok(req("admin","POST",access()+"/price-groups",groupInput),200).path("id").asLong();
   var promo=Map.of("name","Bulk assign promo","type","Bundle","products",List.of(Map.of("product_id",seed,"quantity",2)),"discount_value",5,"start","2030-01-01","end","2030-02-01");
   long promotion=ok(req("admin","POST",access()+"/promotions",promo),200).path("id").asLong();
-  item.put("name","Renamed in bulk");item.put("sku","LINKS-NEW-"+tag);item.put("barcode","BULKCODE-"+tag);item.put("retail",4.50);
+  item.put("name","Renamed in bulk");item.put("sku","LINKS-NEW-"+tag);item.put("barcode","21"+Long.parseUnsignedLong(tag,16));item.put("retail",4.50);
   var links=bulkLinksFor(id,group,List.of(vendor),List.of(promotion));String version=db.queryForObject("SELECT xmin::text FROM products WHERE product_id=?",String.class,id);
   ok(req("admin","POST",path+"/bulk",Map.of("rows",List.of(Map.of("id",id,"version",version,"item",item,"links",links)))),200);
   assertThat(db.queryForObject("SELECT retail_price FROM product_store_prices WHERE product_id=?",java.math.BigDecimal.class,id)).isEqualByComparingTo("4.50");
@@ -636,7 +636,7 @@ class ScopedAccessIntegrationTest {
  @Test @Order(29) void vendorItemTermsAndUnlink() throws Exception {
   String path=access()+"/vendors";
   long product=db.queryForObject("SELECT product_id FROM products WHERE dgt_id=? AND product_sku=?",Long.class,store,"DETAILS-"+tag);
-  long vendor=ok(req("admin","POST",path,Map.of("name","Terms vendor","active",true,"lead_time",7)),200).path("id").asLong();
+  long vendor=ok(req("admin","POST",path,Map.of("name","Terms vendor","phone","+12025550123","active",true,"lead_time",7)),200).path("id").asLong();
   String links=path+"/"+vendor+"/items";
   var input=new LinkedHashMap<String,Object>();input.put("product_id",product);input.put("unit_cost",24);input.put("unit_type","CASE");input.put("moq",2);
   ok(req("admin","POST",links,input),200);
@@ -682,7 +682,7 @@ class ScopedAccessIntegrationTest {
   var initial=ok(req("admin","GET",path,null),200);
   var dep=initial.path("departments").get(0);
   assertThat(dep.path("children").size()).isGreaterThan(0);
-  var body=new LinkedHashMap<String,Object>();body.put("name","Price Book test");body.put("sku","CODE-"+tag);body.put("barcode","BAR-"+tag);body.put("dept",dep.path("name").asText());body.put("sub_dept",dep.path("children").get(0).asText());body.put("retail",1.99);body.put("taxable",true);body.put("ebt_snap",false);body.put("allow_returns",true);body.put("active",true);
+  var body=new LinkedHashMap<String,Object>();body.put("name","Price Book test");body.put("unit_type","item");body.put("purchase_gross_cost",1.00);body.put("purchase_discount",0);body.put("sku","CODE-"+tag);body.put("barcode","24"+Long.parseUnsignedLong(tag,16));body.put("dept",dep.path("name").asText());body.put("sub_dept",dep.path("children").get(0).asText());body.put("retail",1.99);body.put("taxable",true);body.put("ebt_snap",false);body.put("allow_returns",true);body.put("active",true);
   long id=ok(req("admin","POST",path,body),200).path("id").asLong();
   ok(req("admin","POST",path,body),400);
   long secondId=ok(req("admin","POST","/access/stores/"+second+"/items",body),200).path("id").asLong();assertThat(secondId).isNotEqualTo(id);
@@ -695,7 +695,7 @@ class ScopedAccessIntegrationTest {
   assertThat(db.queryForObject("SELECT archived_at IS NOT NULL FROM product_barcodes WHERE product_barcode_id=?",Boolean.class,barcodeId)).isTrue();
   item=ok(req("admin","GET",path,null),200).path("items").get(0);
   assertThat(item.path("barcode").asText("")).isEmpty();
-  body.put("barcode","BAR-"+tag);
+  body.put("barcode","24"+Long.parseUnsignedLong(tag,16));
   ok(call("admin","PUT",path+"/"+id,body,item.path("version").asText(),null),200);
   assertThat(db.queryForObject("SELECT product_barcode_id FROM product_barcodes WHERE product_id=? AND archived_at IS NULL",Long.class,id)).isEqualTo(barcodeId);
   item=ok(req("admin","GET",path,null),200).path("items").get(0);
@@ -715,9 +715,9 @@ class ScopedAccessIntegrationTest {
   long role=db.queryForObject("SELECT role_type_id FROM user_roles WHERE user_role_id=?",Long.class,assignments.get("manager"));
   ok(req("admin","PUT",access()+"/role-permissions",Map.of("role_type_id",role,"code","PRICE_BOOK_ACCESS","allowed",true,"version","0")),200);
   ok(req("manager","GET",path,null),200);
-  body.put("sku","MANAGER-"+tag);body.put("barcode","MANAGER-BAR-"+tag);body.put("name","Manager item");
+  body.put("sku","MANAGER-"+tag);body.put("barcode","22"+Long.parseUnsignedLong(tag,16));body.put("name","Manager item");
   assertThat(ok(req("manager","POST",path,body),200).path("saved").asBoolean()).isTrue();
-  String vp=access()+"/vendors";var vb=Map.of("name","Vendor "+tag,"contact_name","Representative "+tag,"email","vendor@example.test","phone","5551234567","payment_terms","Net 30","lead_time",2,"active",true);
+  String vp=access()+"/vendors";var vb=Map.of("name","Vendor "+tag,"contact_name","Representative "+tag,"email","vendor@example.test","phone","+12025550123","payment_terms","Net 30","lead_time",2,"active",true);
   long vid=ok(req("admin","POST",vp,vb),200).path("id").asLong();assertThat(vid).isPositive();
   var vl=ok(req("admin","GET",vp,null),200);assertThat(vl.size()).isEqualTo(1);assertThat(vl.get(0).path("name").asText()).isEqualTo("Vendor "+tag);
   ok(req("other","GET",vp,null),403);ok(req("cashier","GET",vp,null),403);
@@ -759,7 +759,7 @@ class ScopedAccessIntegrationTest {
   contract.put("contract_type",types.get(0).asText());contract.put("end_date","2025-01-01");ok(req("admin","POST",vp+"/contracts",contract),400);
   contract.put("end_date","2026-12-31");contract.put("discount_value",101);ok(req("admin","POST",vp+"/contracts",contract),400);
 
-  body.put("sku","INVOICE-"+tag);body.put("barcode","INV-BAR-"+tag);long newProduct=ok(req("admin","POST",path,body),200).path("id").asLong();
+  body.put("sku","INVOICE-"+tag);body.put("barcode","23"+Long.parseUnsignedLong(tag,16));long newProduct=ok(req("admin","POST",path,body),200).path("id").asLong();
   long oldProduct=db.queryForObject("SELECT product_id FROM products WHERE dgt_id=? AND product_sku=?",Long.class,store,"MANAGER-"+tag);
   long invoiceId=db.queryForObject("INSERT INTO invoices(dgt_id,vendor_id,invoice_number,invoice_type,invoice_date,received_by,approved_by,approved_at) VALUES (?,?,?,'GROCERY',CURRENT_DATE,?,?,CURRENT_TIMESTAMP) RETURNING invoice_id",Long.class,store,vid,"INV-"+tag,users.get("admin"),users.get("admin"));
   for(long product:List.of(newProduct,oldProduct))db.update("INSERT INTO grocery_invoice_items(invoice_id,product_id,quantity,unit_type,unit_cost,item_line_total,is_product_new) VALUES (?,?,1,'ITEM',2,2,?)",invoiceId,product,product==newProduct);
@@ -1674,7 +1674,7 @@ class ScopedAccessIntegrationTest {
  }
  @Test @Order(1100) void rebateProgramsAndItemLinksAreStoreScopedAndPersistent() throws Exception {
   String path="/access/stores/"+store+"/rebates";
-  long vendor=ok(req("admin","POST","/access/stores/"+store+"/vendors",Map.of("name","Rebate provider","active",true)),200).get("id").asLong();
+  long vendor=ok(req("admin","POST","/access/stores/"+store+"/vendors",Map.of("name","Rebate provider","phone","+12025550123","active",true)),200).get("id").asLong();
   long product=db.queryForObject("SELECT min(product_id) FROM products WHERE dgt_id=? AND is_active",Long.class,store);
   long secondProduct=db.queryForObject("SELECT max(product_id) FROM products WHERE dgt_id=? AND is_active",Long.class,store);
   var form=new LinkedHashMap<String,Object>();form.put("name","Rebate test");form.put("vendor_id",Long.toString(vendor));form.put("vendor","ignored client provider label");form.put("offered_by_type","Vendor / Distributor");form.put("rebate_type","Percentage");form.put("start_date","2026-01-01");form.put("end_date","2099-12-31");form.put("status","Active");form.put("eligibility_scope","Specific Products");form.put("scope_value","");form.put("selected_product_ids",List.of(Long.toString(product)));form.put("qualification_type","No Minimum Requirement");form.put("target","");form.put("measurement_basis","Purchases");form.put("reward_type","Percentage");form.put("reward_value","5");form.put("calculation","On qualifying purchases");form.put("claim_frequency","Monthly");form.put("claim_required",true);form.put("submission_deadline_days","15");form.put("payment_method","Vendor Credit");form.put("tiers",List.of());form.put("description","Saved rules");
@@ -1756,7 +1756,7 @@ ok(call("admin","PUT",path+"/programs/"+id,form,program.get("version").asText(),
  }
  @Test @Order(1200) void groceryReportsUseApprovedStoreDataAndUnitCosts() throws Exception {
   String path=access()+"/grocery-reports";
-  long vendor=ok(req("admin","POST",access()+"/vendors",Map.of("name","Reports vendor","active",true)),200).get("id").asLong();
+  long vendor=ok(req("admin","POST",access()+"/vendors",Map.of("name","Reports vendor","phone","+12025550123","active",true)),200).get("id").asLong();
   long sub=db.queryForObject("SELECT min(s.store_sub_department_id) FROM store_sub_departments s JOIN store_departments d ON d.store_department_id=s.store_department_id WHERE s.dgt_id=? AND lower(d.store_department_name) NOT IN ('gas','fuel')",Long.class,store);
   long product=db.queryForObject("INSERT INTO products(dgt_id,store_sub_department_id,product_name,product_sku,unit_of_measure) VALUES (?,?,?, ?,'item') RETURNING product_id",Long.class,store,sub,"Report item","REPORT-"+tag);
   long invoice=db.queryForObject("INSERT INTO invoices(dgt_id,vendor_id,invoice_number,invoice_type,invoice_date,received_by,approved_by,approved_at) VALUES (?,?,?,'GROCERY','2026-01-05',?,?,now()) RETURNING invoice_id",Long.class,store,vendor,"REPORT-"+tag,users.get("admin"),users.get("admin"));
