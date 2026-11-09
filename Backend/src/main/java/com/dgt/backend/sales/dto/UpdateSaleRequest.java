@@ -4,6 +4,7 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
+// Partial-update payload: service code treats null fields as unchanged, including boxed Boolean flags.
 public record UpdateSaleRequest(
         @Size(max = 50) String storeId,
         Long cashierId,

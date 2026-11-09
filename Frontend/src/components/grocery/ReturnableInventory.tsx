@@ -1,4 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+/**
+ * Links approved reductions to vendor return slips. Creating a slip and changing its status are
+ * separate backend operations; the approved reduction remains the stock history source.
+ */
 import {useQuery} from '@tanstack/react-query';
 import {request} from '@/lib/backend';
 import { useEffect, useState } from "react";
@@ -195,6 +199,7 @@ export const ReturnableInventory = ({storeId}:{storeId:string}) => {
     );
   };
 
+  // Create the vendor paperwork from an already approved reduction rather than reducing stock again.
   const handleCreateReturn = async () => {
     if(saving)return;
     if(selectedItems.length!==1){setError('Select one approved item for this return slip.');return;}

@@ -1,6 +1,6 @@
 package com.dgt.backend.products.controller;
 
-import com.dgt.backend.access.PagePermissions;
+import com.dgt.backend.access.security.PagePermissions;
 import com.dgt.backend.products.dto.*;
 import com.dgt.backend.products.service.ProductService;
 import com.dgt.backend.common.dto.PageResponse;

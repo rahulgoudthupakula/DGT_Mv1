@@ -1,6 +1,6 @@
 package com.dgt.backend.grocery.reports;
 
-import com.dgt.backend.access.ScopedAccess;
+import com.dgt.backend.access.security.ScopedAccess;
 import com.dgt.backend.common.entity.Rows;
 import java.util.*;
 import java.time.*;
@@ -13,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 
+// Detailed Grocery reports: purchases, product/day sales and current stock. Dashboard summaries use SalesStatisticsController.
 @Slf4j
 @RestController
 @ConditionalOnProperty(name="app.pricebook.enabled",havingValue="true")
@@ -22,6 +23,7 @@ public class GroceryReportsController {
  public GroceryReportsController(ScopedAccess a){this.a=a;}
  private void access(String store){a.grant(a.user(),store,"PRICE_BOOK",false);}
  private BigDecimal n(Object v){return v==null?BigDecimal.ZERO:new BigDecimal(v.toString());}
+ // Aggregate invoice lines and charges separately to avoid multiplying header charges across item rows.
  private static final String PURCHASES="""
   WITH lines AS (SELECT l.invoice_id,sum(l.item_line_total) AS subtotal,sum(coalesce(l.line_tax,0)) AS tax
    FROM grocery_invoice_items l JOIN invoices i ON i.invoice_id=l.invoice_id
@@ -45,6 +47,7 @@ public class GroceryReportsController {
    AND (?::date IS NULL OR i.invoice_date>=?) AND (?::date IS NULL OR i.invoice_date<=?)
   ORDER BY i.invoice_date DESC,i.invoice_id DESC
   """;
+ // Approved invoices only. Partial/unknown payment states do not provide enough data to infer paid amounts.
  @GetMapping("/purchases") @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
  public Object purchases(@PathVariable String store,@RequestParam(required=false) LocalDate start,@RequestParam(required=false) LocalDate end){
   access(store);if(start!=null&&end!=null&&start.isAfter(end))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Start date must be before end date");
@@ -72,6 +75,7 @@ public class GroceryReportsController {
    WHERE i.dgt_id=? AND i.invoice_type='GROCERY' AND i.approved_at IS NOT NULL
    ORDER BY i.invoice_date,i.invoice_id,l.grocery_invoice_item_id
    """,store);
+  // Read earlier purchase lines too, then select visible invoices, so the first displayed line retains its prior cost.
   Map<String,Map<String,Object>> previous=new HashMap<>();List<Map<String,Object>> visible=new ArrayList<>();
   for(var row:lines){
    String product=row.get("productId").toString();var old=previous.get(product);
@@ -83,6 +87,7 @@ public class GroceryReportsController {
   }
   return Map.of("invoices",invoices.stream().map(Rows::normalize).toList(),"items",visible.stream().map(Rows::normalize).toList());
  }
+ // Return product/day aggregates for both current and prior periods; refunds reverse quantities and recorded amounts.
  @GetMapping("/sales") @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
  public Object sales(@PathVariable String store,@RequestParam(required=false) LocalDate start,@RequestParam(required=false) LocalDate end){
   access(store);ZoneId zone=ZoneId.of(a.db.queryForObject("SELECT timezone FROM stores WHERE dgt_id=?",String.class,store));
@@ -116,8 +121,10 @@ public class GroceryReportsController {
   return Map.of("rows",rows.stream().map(Rows::normalize).toList(),"start",start.toString(),"end",end.toString(),"days",days);
  }
 
+ // Current valuation inputs only: case costs become item costs, and missing inventory/prices stay null.
  @GetMapping("/stock") @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
- public Object stock(@PathVariable String store){
+ public Object stock(@PathVariable String store){return stockSource(store,true);}
+ private Object stockSource(String store,boolean includeMovements){
   access(store);
   var items=a.db.queryForList("""
    SELECT p.product_id::text AS id,p.product_name AS name,p.unit_of_measure AS unit,
@@ -135,13 +142,49 @@ public class GroceryReportsController {
    WHERE p.dgt_id=? AND lower(coalesce(d.store_department_name,'')) NOT IN ('gas','fuel')
    ORDER BY p.product_id
    """,store);
-  var movements=a.db.queryForList("""
+  // Use store-local movement dates for consumers reconstructing earlier quantities; no stock writes occur here.
+  var movements=includeMovements?a.db.queryForList("""
    SELECT m.movement_id::text AS id,m.product_id::text AS "productId",m.qty_changed AS qty,m.movement_type AS type,
     (m.created_at AT TIME ZONE s.timezone)::date::text AS date,m.unit_cost AS cost
    FROM inventory_movements m JOIN stores s ON s.dgt_id=m.dgt_id JOIN products p ON p.product_id=m.product_id AND p.dgt_id=m.dgt_id
    WHERE m.dgt_id=? ORDER BY m.created_at,m.movement_id
-   """,store);
+   """,store):List.<Map<String,Object>>of();
   return Map.of("items",items.stream().map(Rows::normalize).toList(),"movements",movements.stream().map(Rows::normalize).toList());
+ }
+
+ @SuppressWarnings("unchecked") private Map<String,Object> result(Object value){return (Map<String,Object>)value;}
+ @SuppressWarnings("unchecked") private List<Map<String,Object>> rows(Map<String,Object> value,String key){return (List<Map<String,Object>>)value.get(key);}
+ // Summary endpoints share the existing scoped source queries and one consistent read snapshot.
+ @GetMapping("/sales-summary") @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
+ public Object salesSummary(@PathVariable String store,@RequestParam(required=false) LocalDate start,@RequestParam(required=false) LocalDate end,@RequestParam(defaultValue="") String department){
+  var source=result(sales(store,start,end));var selected=rows(source,"rows").stream().filter(r->department.isEmpty()||r.get("department").toString().equalsIgnoreCase(department)).toList();
+  return GroceryReportSummaries.sales(selected,source.get("start").toString(),((Number)source.get("days")).longValue());
+ }
+ @GetMapping("/stock-summary") @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
+ public Object stockSummary(@PathVariable String store){return GroceryReportSummaries.stock(rows(result(stockSource(store,false)),"items"));}
+ @GetMapping("/profit-summary") @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
+ public Object profitSummary(@PathVariable String store,@RequestParam(required=false) LocalDate start,@RequestParam(required=false) LocalDate end,@RequestParam(defaultValue="") String search){
+  var source=result(sales(store,start,end));return GroceryReportSummaries.profit(rows(source,"rows"),source.get("start").toString(),((Number)source.get("days")).longValue(),search);
+ }
+ @GetMapping("/ratio-summary") @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
+ public Object ratioSummary(@PathVariable String store,@RequestParam(required=false) LocalDate start,@RequestParam(required=false) LocalDate end){
+  var source=result(sales(store,start,end));return GroceryReportSummaries.ratio(rows(source,"rows"),rows(result(purchases(store,start,end)),"invoices"),source.get("start").toString(),source.get("end").toString());
+ }
+
+ @GetMapping("/purchase-summary") @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
+ public Object purchaseSummary(@PathVariable String store,@RequestParam(required=false) LocalDate start,@RequestParam(required=false) LocalDate end,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="all") String vendor,@RequestParam(defaultValue="all") String status){
+  var source=result(purchases(store,start,end));var all=rows(source,"items");
+  var selected=all.stream().filter(r->(vendor.equals("all")||vendor.equals(r.get("vendor")))&&!status.equals("uninvoiced")&&(search.isEmpty()||r.get("productName").toString().toLowerCase(Locale.ROOT).contains(search.toLowerCase(Locale.ROOT))||r.get("scanCode").toString().contains(search))).toList();
+  for(var r:selected)r.put("costChangePercent",r.get("prevUnitCost")==null||n(r.get("prevUnitCost")).signum()<=0?null:GroceryReportSummaries.percent(n(r.get("unitCost")).subtract(n(r.get("prevUnitCost"))),r.get("prevUnitCost")));
+  var invoiceTotals=GroceryReportSummaries.totals(rows(source,"invoices"),"netPurchase","invoiceAmount","paidAmount","pendingAmount","rebateAmount");invoiceTotals.put("invoiceTotal",invoiceTotals.get("invoiceAmount"));
+  return Map.of("invoices",source.get("invoices"),"items",selected,"vendors",all.stream().map(r->r.get("vendor")).distinct().toList(),"invoiceTotals",invoiceTotals,"itemTotals",GroceryReportSummaries.totals(selected,"receivedQty","extendedCost","rebate","netCost"));
+ }
+ @GetMapping("/cigarette-summary") @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
+ public Object cigaretteSummary(@PathVariable String store,@RequestParam(required=false) LocalDate start,@RequestParam(required=false) LocalDate end,@RequestParam(defaultValue="false") boolean latest){
+  if(start!=null&&end!=null&&start.isAfter(end))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Start date must be before end date");
+  var sales=result(sales(store,null,null));var stock=result(stock(store));var purchases=result(purchases(store,null,null));
+  var report=GroceryReportSummaries.cigarettes(rows(sales,"rows"),rows(stock,"items"),rows(stock,"movements"),rows(purchases,"items"),sales.get("start").toString());
+  return GroceryReportSummaries.cigaretteWindow(report,start,end,latest);
  }
 
 }

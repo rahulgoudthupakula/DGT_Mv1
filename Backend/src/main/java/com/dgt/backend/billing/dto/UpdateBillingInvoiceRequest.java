@@ -5,6 +5,11 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
+/**
+ * Partial update fields for a BillingInvoice record.
+ * The service treats null as unchanged, so this request cannot clear nullable fields.
+ */
+
 public record UpdateBillingInvoiceRequest(
         @Size(max = 50) String storeId,
         Long subscriptionPlanId,

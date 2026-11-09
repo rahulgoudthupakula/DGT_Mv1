@@ -9,8 +9,10 @@ import java.time.*;
 @Entity
 @Table(name = "sales_items")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+// JPA mapping for sales_items; related record IDs are scalar fields rather than entity associations.
 public class SaleItem {
 
+    // Database-generated primary key used by the repository.
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "sales_item_id")
@@ -47,6 +49,7 @@ public class SaleItem {
     private BigDecimal lineTotal;
 
     @Column(name = "created_at", updatable = false)
+    // Hibernate populates this timestamp when the entity is first persisted.
     @CreationTimestamp
     private OffsetDateTime createdAt;
 }

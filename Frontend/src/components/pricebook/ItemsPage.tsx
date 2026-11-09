@@ -1,5 +1,7 @@
 import {useGroceryDefaults} from "@/lib/grocerySettings";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { usePagination } from "@/hooks/use-pagination";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { request, isPendingChange } from "@/lib/backend";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +16,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/com
 import { Separator } from "@/components/ui/separator";
 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Search, Plus, Download, X, Pencil, Trash2, Copy, Send, MoreHorizontal } from "lucide-react";
+import { Search, Plus, FileOutput, X, Pencil, Trash2, Copy, Send, MoreHorizontal } from "lucide-react";
 
 
 
@@ -69,8 +71,8 @@ type DrawerMode = "edit" | "add" | null;
 
 
 const CurrencyInput = ({
-  id, label, value, onChange, readOnly=false,
-}: { id: string; label: string; value: number; onChange: (v: number) => void; readOnly?:boolean }) => {
+  id, label, value, onChange, readOnly=false, onPresence,
+}: { id: string; label: string; value: number; onChange: (v: number) => void; readOnly?:boolean; onPresence?:(present:boolean)=>void }) => {
   const [draft,setDraft]=useState<string|null>(null);
   return (
   <div className="space-y-1.5">
@@ -85,7 +87,7 @@ const CurrencyInput = ({
         step="0.01"
         placeholder=""
         value={draft??(Number.isFinite(value)?value:"")}
-        onChange={(e) => {setDraft(e.target.value);onChange(e.target.value===''?0:Number(e.target.value));}}
+        onChange={(e) => {setDraft(e.target.value);onPresence?.(e.target.value!=='');onChange(e.target.value===''?0:Number(e.target.value));}}
         onBlur={()=>setDraft(null)}
         className="pl-6"
       />
@@ -100,7 +102,9 @@ export const ItemsPage = ({storeId}: {storeId:string}) => {
   const query=useQuery({queryKey:['pricebook-items',storeId],queryFn:()=>request<{items:Item[];departments:{name:string;children:string[]}[];canEdit:boolean}>(path),enabled:!!storeId});
   const items=(query.data?.items??[]).map(i=>({...emptyItem,...i,unitType:i.unitType??"item"}));
   const [busy,setBusy]=useState(false),[message,setMessage]=useState('');
-  async function save(){if(!form)return;if(marginPct>=100){setMessage('Margin must be less than 100%.');return;}setBusy(true);setMessage('');try{
+  const [attempted,setAttempted]=useState(false);
+  const [costProvided,setCostProvided]=useState(false);
+  async function save(){if(!form)return;setAttempted(true);if(Object.keys(fieldErrors).length){setMessage('Please correct the highlighted fields.');return;}if(marginPct>=100){setMessage('Margin must be less than 100%.');return;}setBusy(true);setMessage('');try{
     const body={name:form.name,sku:form.sku,barcode:form.barcode,dept:form.dept,subDept:form.subDept,retail:form.retail,taxable:form.taxable,ebtSnap:form.ebtSnap,allowReturns:form.allowReturns,active:form.active,ageRestricted:form.ageRestricted,reorderLevel:form.reorderLevel,unitType:form.unitType,unitsPerCase:form.unitsPerCase??null,purchaseGrossCost:form.unitType==='case'?form.caseGrossCost:form.itemGrossCost,purchaseDiscount:form.unitType==='case'?form.caseDiscount:form.itemDiscount,currentInventory:form.currentInventory??null,inventoryVersion:isAdd?'0':form.inventoryVersion??'0'};
     const result=await request(isAdd?path:`${path}/${editItem?.id}`,{method:isAdd?'POST':'PUT',headers:isAdd?{}:{'If-Match':editItem?.version??''},body:JSON.stringify(body)});
     setMessage(isPendingChange(result)?'Submitted for approval.':'Item saved.');setDrawerOpen(false);await Promise.all(['pricebook-items','vendor-pricing','vendor-available-items','price-groups','current-stock','stock-movements'].map(key=>client.invalidateQueries({queryKey:[key,storeId]})));
@@ -163,10 +167,16 @@ export const ItemsPage = ({storeId}: {storeId:string}) => {
       }
     });
 
+  const pagination = usePagination(filtered, 25);
+  useEffect(() => {
+    pagination.setPage(1);
+  }, [search, categoryFilter, vendorFilter, deptFilter, statusFilter, sortBy, storeId, pagination.setPage]);
+
   const calcMarginFromForm = (cost: number, retail: number) =>
     retail > 0 ? parseFloat((((retail - cost) / retail) * 100).toFixed(2)) : 0;
 
   const openEdit = (item: Item) => {
+    setAttempted(false);setMessage('');setCostProvided(item.cost!=null);
     setDrawerMode("edit");
     setEditItem(item);
     setForm({ ...item });
@@ -176,6 +186,7 @@ export const ItemsPage = ({storeId}: {storeId:string}) => {
 
   const openAdd = () => {
     if(defaults.isPending||defaults.isError){setMessage(defaults.isError?"Could not load store item defaults. Reload and try again.":"Loading store item defaults…");return;}
+    setAttempted(false);setMessage('');setCostProvided(false);
     setDrawerMode("add");
     setEditItem(null);
     setForm({ ...emptyItem, taxable:defaults.data?.defaultTaxType==null?emptyItem.taxable:defaults.data.defaultTaxType==='taxable' });
@@ -210,6 +221,19 @@ export const ItemsPage = ({storeId}: {storeId:string}) => {
 
   const isAdd = drawerMode === "add";
 
+  // Show all missing fields together on submit, and clear each message as it is corrected.
+  const fieldErrors:Record<string,string>={};
+  if(form){
+    if(!form.name.trim())fieldErrors.name='Enter an item name.';
+    if(!form.sku.trim())fieldErrors.sku='Enter a SKU.';
+    if(form.barcode.trim()&&!/^[0-9]+$/.test(form.barcode.trim()))fieldErrors.barcode='Barcode must contain numbers only (0–9). Letters, spaces and symbols are not allowed.';
+    if(!form.dept)fieldErrors.dept='Choose department.';
+    if(!form.subDept)fieldErrors.subDept='Choose subdepartment.';
+    if(!costProvided)fieldErrors.cost='Enter cost.';
+    else if(!Number.isFinite(form.cost)||form.cost<0)fieldErrors.cost='Enter a valid non-negative cost.';
+  }
+  const fieldError=(field:string)=>attempted&&fieldErrors[field]?<p id={`${field}-error`} role="alert" className="text-sm text-red-600">{fieldErrors[field]}</p>:null;
+
   const drawerFields = form ? (
     <div className="py-4 space-y-5">
 
@@ -218,37 +242,38 @@ export const ItemsPage = ({storeId}: {storeId:string}) => {
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Basic Info</p>
         <div className="space-y-1.5">
           <Label htmlFor="name">Item Name</Label>
-          <Input id="name" placeholder="e.g. Coca-Cola 20oz" value={form.name} onChange={(e) => handleFormChange("name", e.target.value)} />
+          <Input id="name" placeholder="e.g. Coca-Cola 20oz" value={form.name} onChange={(e) => handleFormChange("name", e.target.value)} />{fieldError("name")}
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="sku">SKU</Label><Input id="sku" value={form.sku} onChange={e=>handleFormChange("sku",e.target.value)} />
+          {fieldError("sku")}
           <Label htmlFor="barcode">Barcode</Label>
-          <Input id="barcode" placeholder="e.g. 049000042566" value={form.barcode} onChange={(e) => handleFormChange("barcode", e.target.value)} className="font-mono" />
+          <Input id="barcode" placeholder="e.g. 049000042566" value={form.barcode} onChange={(e) => handleFormChange("barcode", e.target.value)} className="font-mono" />{fieldError("barcode")}
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="dept">Department</Label>
           <Select value={form.dept} onValueChange={(v) => setForm({...form,dept:v,subDept:""})}>
-            <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
+            <SelectTrigger id="dept" aria-invalid={attempted&&!!fieldErrors.dept}><SelectValue placeholder="Select department" /></SelectTrigger>
             <SelectContent>
               {depts.length === 0 ? (
                 <div className="px-2 py-3 text-xs text-muted-foreground">No departments yet</div>
               ) : depts.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
               
             </SelectContent>
-          </Select>
+          </Select>{fieldError("dept")}
 
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="subDept">Sub-Department</Label>
           <Select value={form.subDept ?? ""} onValueChange={(v) => handleFormChange("subDept", v)}>
-            <SelectTrigger><SelectValue placeholder="Select sub-department" /></SelectTrigger>
+            <SelectTrigger id="subDept" aria-invalid={attempted&&!!fieldErrors.subDept}><SelectValue placeholder="Select sub-department" /></SelectTrigger>
             <SelectContent>
               {subDepts.length === 0 ? (
                 <div className="px-2 py-3 text-xs text-muted-foreground">No sub-departments yet</div>
               ) : subDepts.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
               
             </SelectContent>
-          </Select>
+          </Select>{fieldError("subDept")}
 
         </div>
 
@@ -259,7 +284,7 @@ export const ItemsPage = ({storeId}: {storeId:string}) => {
       {/* ── Retail Pricing ── */}
       <div className="space-y-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Retail Pricing</p>
-        <CurrencyInput id="cost" label="Cost" value={form.cost} onChange={(v) => handleFormChange("cost", v)} />
+        <CurrencyInput id="cost" label="Cost *" onPresence={setCostProvided} value={costProvided?form.cost:NaN} onChange={(v) => handleFormChange("cost", v)} />{fieldError("cost")}
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label htmlFor="retail">Retail Price</Label>
@@ -302,7 +327,7 @@ export const ItemsPage = ({storeId}: {storeId:string}) => {
       <div className="space-y-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Item Cost Breakdown</p>
         <div className="grid grid-cols-3 gap-3">
-          <CurrencyInput readOnly={form.unitType==='case'} id="itemGrossCost" label="Gross Cost" value={form.itemGrossCost} onChange={(v) => handleFormChange("itemGrossCost", v)} />
+          <CurrencyInput readOnly={form.unitType==='case'} id="itemGrossCost" onPresence={setCostProvided} label="Gross Cost" value={form.itemGrossCost} onChange={(v) => handleFormChange("itemGrossCost", v)} />
           <CurrencyInput readOnly={form.unitType==='case'} id="itemDiscount" label="Discount" value={form.itemDiscount} onChange={(v) => handleFormChange("itemDiscount", v)} />
           <CurrencyInput readOnly id="itemNetCost" label="Net Cost" value={form.itemNetCost} onChange={(v) => handleFormChange("itemNetCost", v)} />
         </div>
@@ -332,7 +357,7 @@ export const ItemsPage = ({storeId}: {storeId:string}) => {
       <div className="space-y-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Case Cost Breakdown</p>
         <div className="grid grid-cols-3 gap-3">
-          <CurrencyInput readOnly={form.unitType!=='case'} id="caseGrossCost" label="Gross Cost" value={form.caseGrossCost} onChange={(v) => handleFormChange("caseGrossCost", v)} />
+          <CurrencyInput readOnly={form.unitType!=='case'} id="caseGrossCost" onPresence={setCostProvided} label="Gross Cost" value={form.caseGrossCost} onChange={(v) => handleFormChange("caseGrossCost", v)} />
           <CurrencyInput readOnly={form.unitType!=='case'} id="caseDiscount" label="Discount" value={form.caseDiscount} onChange={(v) => handleFormChange("caseDiscount", v)} />
           <CurrencyInput readOnly id="caseNetCost" label="Net Cost" value={form.caseNetCost} onChange={(v) => handleFormChange("caseNetCost", v)} />
         </div>
@@ -406,7 +431,7 @@ export const ItemsPage = ({storeId}: {storeId:string}) => {
           <p className="text-sm text-muted-foreground">Create, edit, and manage item pricing rules</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" disabled><Download className="h-4 w-4 mr-1" /> Export</Button>
+          <Button variant="outline" size="sm" disabled><FileOutput className="h-4 w-4 mr-1" /> Export</Button>
           <Button size="sm" disabled={!query.data?.canEdit} onClick={openAdd}><Plus className="h-4 w-4 mr-1" /> Add Item</Button>
         </div>
       </div>
@@ -524,7 +549,7 @@ export const ItemsPage = ({storeId}: {storeId:string}) => {
                   </TableCell>
                 </TableRow>
               ) : (
-                filtered.map((item) => {
+                pagination.paginated.map((item) => {
                   const onHand = item.currentInventory;
                   const isLowStock = onHand!=null&&item.reorderLevel!=null&&onHand<=item.reorderLevel;
                   return (
@@ -575,7 +600,7 @@ export const ItemsPage = ({storeId}: {storeId:string}) => {
                             <DropdownMenuItem disabled={!query.data?.canEdit} onClick={() => openEdit(item)}>
                               <Pencil className="h-4 w-4 mr-2" /> Edit
                             </DropdownMenuItem>
-                            <DropdownMenuItem disabled={!query.data?.canEdit} onClick={() => { setDrawerMode("add"); setEditItem(null); setMarginPct(calcMarginFromForm(item.cost,item.retail)); setForm({ ...item, barcode: "", sku: item.sku + "-COPY", name: item.name + " (Copy)", currentInventory: undefined, inventoryVersion: '0' }); setDrawerOpen(true); }}>
+                            <DropdownMenuItem disabled={!query.data?.canEdit} onClick={() => { setAttempted(false);setMessage('');setCostProvided(item.cost!=null);setDrawerMode("add"); setEditItem(null); setMarginPct(calcMarginFromForm(item.cost,item.retail)); setForm({ ...item, barcode: "", sku: item.sku + "-COPY", name: item.name + " (Copy)", currentInventory: undefined, inventoryVersion: '0' }); setDrawerOpen(true); }}>
                               <Copy className="h-4 w-4 mr-2" /> Clone Item
                             </DropdownMenuItem>
                             <DropdownMenuItem disabled onClick={() => {}}>
@@ -594,6 +619,10 @@ export const ItemsPage = ({storeId}: {storeId:string}) => {
               )}
             </TableBody>
           </Table>
+          <TablePagination page={pagination.page} totalPages={pagination.totalPages}
+            totalItems={pagination.totalItems} pageSize={25}
+            hasPrev={pagination.hasPrev} hasNext={pagination.hasNext}
+            onPrev={pagination.prevPage} onNext={pagination.nextPage} />
         </CardContent>
       </Card>
 
@@ -608,7 +637,7 @@ export const ItemsPage = ({storeId}: {storeId:string}) => {
           </SheetHeader>
 
           <fieldset disabled={busy}>{drawerFields}</fieldset>
-          {message&&<p role="status">{message}</p>}
+          {message&&<p role="alert" className="text-sm text-red-600">{message}</p>}
 
           <SheetFooter className="flex gap-2 pt-2 pb-6">
             <Button disabled={busy} variant="outline" className="flex-1" onClick={() => setDrawerOpen(false)}>Cancel</Button>

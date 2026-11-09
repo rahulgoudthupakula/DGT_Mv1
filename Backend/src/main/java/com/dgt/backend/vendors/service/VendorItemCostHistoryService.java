@@ -16,10 +16,12 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
+// Coordinate vendor cost history persistence and response mapping; caller authorization is handled at the controller.
 public class VendorItemCostHistoryService {
     private final VendorItemCostHistoryRepository repository;
     public VendorItemCostHistoryService(VendorItemCostHistoryRepository repository) { this.repository = repository; }
 
+    // Read a page sorted by primary key and include the total record count.
     public PageResponse<VendorItemCostHistoryResponse> list(int page, int size) {
         log.debug("Listing vendor item cost history page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("costHistoryId")));
@@ -27,6 +29,7 @@ public class VendorItemCostHistoryService {
         return new PageResponse<>(p.getContent().stream().map(VendorItemCostHistoryResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    // Map the stored record to the API response, or return HTTP 404 when absent.
     public VendorItemCostHistoryResponse get(Long id) {
         log.debug("Fetching vendor item cost history id={}", id);
         return VendorItemCostHistoryResponse.from(repository.findById(id)
@@ -38,6 +41,7 @@ public class VendorItemCostHistoryService {
     }
 
     @Transactional
+    // Build and save a record from the submitted create fields inside the transaction.
     public VendorItemCostHistoryResponse create(CreateVendorItemCostHistoryRequest req) {
         log.info("Creating vendor item cost history");
         var entity = VendorItemCostHistory.builder()
@@ -56,6 +60,7 @@ public class VendorItemCostHistoryService {
     }
 
     @Transactional
+    // Load the existing record and apply only non-null fields; null does not clear a stored value.
     public VendorItemCostHistoryResponse update(Long id, UpdateVendorItemCostHistoryRequest req) {
         log.info("Updating vendor item cost history id={}", id);
         var entity = repository.findById(id)

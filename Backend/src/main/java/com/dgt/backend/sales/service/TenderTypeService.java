@@ -16,10 +16,12 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
+// Coordinate tender type persistence and response mapping; caller authorization is handled at the controller.
 public class TenderTypeService {
     private final TenderTypeRepository repository;
     public TenderTypeService(TenderTypeRepository repository) { this.repository = repository; }
 
+    // Read a page sorted by primary key and include the total record count.
     public PageResponse<TenderTypeResponse> list(int page, int size) {
         log.debug("Listing tender type page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("tenderTypeId")));
@@ -27,6 +29,7 @@ public class TenderTypeService {
         return new PageResponse<>(p.getContent().stream().map(TenderTypeResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    // Map the stored record to the API response, or return HTTP 404 when absent.
     public TenderTypeResponse get(Long id) {
         log.debug("Fetching tender type id={}", id);
         return TenderTypeResponse.from(repository.findById(id)
@@ -38,6 +41,7 @@ public class TenderTypeService {
     }
 
     @Transactional
+    // Build and save a record from the submitted create fields inside the transaction.
     public TenderTypeResponse create(CreateTenderTypeRequest req) {
         log.info("Creating tender type");
         var entity = TenderType.builder()
@@ -51,6 +55,7 @@ public class TenderTypeService {
     }
 
     @Transactional
+    // Load the existing record and apply only non-null fields; null does not clear a stored value.
     public TenderTypeResponse update(Long id, UpdateTenderTypeRequest req) {
         log.info("Updating tender type id={}", id);
         var entity = repository.findById(id)

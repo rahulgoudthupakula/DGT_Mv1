@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
+// Creation payload for the generic promotion API; declared constraints run when validated by the controller.
 public record CreatePromotionRequest(
         @Size(max = 50) String dgtId,
         @NotBlank @Size(max = 200) String promotionName,

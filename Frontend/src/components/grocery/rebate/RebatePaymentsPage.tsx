@@ -1,3 +1,7 @@
+/**
+ * Standalone RebatePaymentsPage UI contains local/sample state rather than a connected report
+ * query. Do not treat the displayed values or local actions as persisted business records.
+ */
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {

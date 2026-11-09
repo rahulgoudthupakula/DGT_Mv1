@@ -14,12 +14,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * JPA CRUD operations for LotterySetting.
+ * The caller is responsible for authorization and workflow validation; these queries add no store predicate.
+ */
+
 @Slf4j
 @Service
 public class LotterySettingService {
     private final LotterySettingRepository repository;
     public LotterySettingService(LotterySettingRepository repository) { this.repository = repository; }
 
+    /** Load a page sorted by primary key and map its records to response DTOs. */
     public PageResponse<LotterySettingResponse> list(int page, int size) {
         log.debug("Listing lottery setting page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("lotterySettingId")));
@@ -27,6 +33,7 @@ public class LotterySettingService {
         return new PageResponse<>(p.getContent().stream().map(LotterySettingResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    /** Load a record by ID or return HTTP 404. */
     public LotterySettingResponse get(Long id) {
         log.debug("Fetching lottery setting id={}", id);
         return LotterySettingResponse.from(repository.findById(id)
@@ -37,6 +44,7 @@ public class LotterySettingService {
     
     }
 
+    /** Persist the supplied fields in one transaction and return the saved values. */
     @Transactional
     public LotterySettingResponse create(CreateLotterySettingRequest req) {
         log.info("Creating lottery setting");
@@ -52,6 +60,7 @@ public class LotterySettingService {
         return LotterySettingResponse.from(saved);
     }
 
+    /** Apply only non-null fields in one transaction, leaving omitted fields unchanged. */
     @Transactional
     public LotterySettingResponse update(Long id, UpdateLotterySettingRequest req) {
         log.info("Updating lottery setting id={}", id);

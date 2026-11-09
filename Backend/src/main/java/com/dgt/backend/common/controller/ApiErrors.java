@@ -8,9 +8,14 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+/**
+ * Converts controller exceptions into HTTP ProblemDetail responses with consistent status codes.
+ */
+
 @Slf4j
 @RestControllerAdvice
 public class ApiErrors {
+    // Preserve the explicit status and reason supplied by application validation.
     @ExceptionHandler(ResponseStatusException.class)
     ResponseEntity<ProblemDetail> status(ResponseStatusException ex, HttpServletRequest req) {
         if (ex.getStatusCode().is5xxServerError()) {
@@ -20,6 +25,7 @@ public class ApiErrors {
         }
         return ResponseEntity.status(ex.getStatusCode()).body(ProblemDetail.forStatusAndDetail(ex.getStatusCode(),ex.getReason()));
     }
+    // Combine field-validation messages into an HTTP 400 response.
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<ProblemDetail> validation(MethodArgumentNotValidException ex, HttpServletRequest req) {
         log.warn("Validation failed on {} {}: {}", req.getMethod(), req.getRequestURI(), ex.getMessage());
@@ -27,6 +33,7 @@ public class ApiErrors {
             "Validation failed: " + ex.getBindingResult().getFieldErrors().stream()
                 .map(e -> e.getField() + " " + e.getDefaultMessage()).reduce((a, b) -> a + "; " + b).orElse("")));
     }
+    // Return a generic 409 constraint message without exposing database details to the client.
     @ExceptionHandler(DataIntegrityViolationException.class)
     ResponseEntity<ProblemDetail> integrity(DataIntegrityViolationException ex, HttpServletRequest req) {
         log.warn("Data integrity violation on {} {}: {}", req.getMethod(), req.getRequestURI(), ex.getMessage());
@@ -43,6 +50,18 @@ public class ApiErrors {
         log.warn("Method not allowed {} on {}", req.getMethod(), req.getRequestURI());
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(ProblemDetail.forStatusAndDetail(HttpStatus.METHOD_NOT_ALLOWED, "Method not allowed"));
     }
+    // Multipart parsing can fail before a controller runs; return useful client errors.
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    ResponseEntity<ProblemDetail> uploadTooLarge() {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(ProblemDetail.forStatusAndDetail(
+                HttpStatus.PAYLOAD_TOO_LARGE, "Uploaded file exceeds the allowed size."));
+    }
+    @ExceptionHandler(org.springframework.web.multipart.support.MissingServletRequestPartException.class)
+    ResponseEntity<ProblemDetail> missingUpload() {
+        return ResponseEntity.badRequest().body(ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_REQUEST, "Choose a receipt file."));
+    }
+    // Log unexpected failures and send a generic HTTP 500 response.
     @ExceptionHandler(Exception.class)
     ResponseEntity<ProblemDetail> handleGeneric(Exception ex, HttpServletRequest req) {
         log.error("Unhandled exception on {} {}", req.getMethod(), req.getRequestURI(), ex);

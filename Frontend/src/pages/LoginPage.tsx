@@ -1,15 +1,16 @@
-import { login, developmentDatabase } from "@/lib/backend";
+import { login, developmentDatabase, ApiError } from "@/lib/backend";
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Store } from "lucide-react";
+import { Store, Eye, EyeOff } from "lucide-react";
 
 export const LoginPage = ({ onLogin }: { onLogin: () => void }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword,setShowPassword]=useState(false);
   const [error, setError] = useState("");
 
   const [busy, setBusy] = useState(false);
@@ -23,7 +24,7 @@ export const LoginPage = ({ onLogin }: { onLogin: () => void }) => {
     }
     setBusy(true);
     try { await login(email, password); setPassword(""); onLogin(); }
-    catch (error) { setError(error instanceof Error ? error.message : "Sign in failed."); }
+    catch (error) { setError(error instanceof ApiError && error.status===401 ? "Email or password is incorrect. Please try again." : error instanceof Error ? error.message : "Unable to sign in. Please try again."); }
     finally { setBusy(false); }
   };
 
@@ -51,15 +52,17 @@ export const LoginPage = ({ onLogin }: { onLogin: () => void }) => {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="password">Password</Label>
-              <Input
+              <div className="relative"><Input
                 id="password"
-                type="password"
+                type={showPassword?"text":"password"}
+                autoComplete="current-password"
+                className="pr-12"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-              />
+              /><button type="button" className="absolute right-3 top-2.5" aria-label={showPassword?"Hide password":"Show password"} aria-pressed={showPassword} onClick={()=>setShowPassword(v=>!v)}>{showPassword?<EyeOff className="h-5 w-5"/>:<Eye className="h-5 w-5"/>}</button></div>
             </div>
-            {error && <p className="text-xs text-destructive">{error}</p>}
+            {error && <p role="alert" className="text-xs text-red-600">{error}</p>}
             <Button type="submit" className="w-full" disabled={busy}>
               {busy ? "Signing in…" : "Sign In"}
             </Button>

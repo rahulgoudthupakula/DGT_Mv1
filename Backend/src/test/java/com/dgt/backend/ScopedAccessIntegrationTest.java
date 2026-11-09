@@ -1,4 +1,5 @@
 package com.dgt.backend;
+import com.dgt.backend.pricebook.repository.ItemSellingPrice;
 import java.util.*;
 import java.net.*;
 import java.net.http.*;
@@ -53,7 +54,7 @@ class ScopedAccessIntegrationTest {
    else{long roleType=db.queryForObject("SELECT role_type_id FROM role_types WHERE role_type_name=?",Long.class,role.toUpperCase());long ar=db.queryForObject("INSERT INTO user_roles(user_id,role_type_id,dgt_id) VALUES (?,?,?) RETURNING user_role_id",Long.class,id,roleType,store);assignments.put(role,ar);for(String code:List.of("STORE_SETTINGS_VIEW","STORE_SETTINGS_EDIT","DEPARTMENTS_VIEW","DEPARTMENTS_EDIT"))db.update("INSERT INTO store_role_permissions(dgt_id,role_type_id,permission_code,allowed) VALUES (?,?,?,?)",store,roleType,code,!role.equals("accountant")||code.endsWith("_VIEW"));for(long module:List.of(settingsModule,departmentModule))db.update("INSERT INTO permissions(user_role_id,module_id,can_view,can_edit) VALUES (?,?,true,?)",ar,module,!role.equals("accountant"));}
   }
   // Legacy workflow tests explicitly enable their parent modules.
-  for(var section:com.dgt.backend.access.PagePermissions.SECTIONS)if(!section.defaultAllowed())
+  for(var section:com.dgt.backend.access.security.PagePermissions.SECTIONS)if(!section.defaultAllowed())
    db.update("INSERT INTO store_role_permissions(dgt_id,role_type_id,permission_code,allowed) SELECT ?,role_type_id,?,true FROM role_types WHERE role_type_name IN ('MANAGER','CASHIER','ACCOUNTANT')",store,section.code());
   db.update("INSERT INTO tender_types(tender_code,tender_name) VALUES ('CASH','Cash'),('CREDIT_CARD','Credit Card') ON CONFLICT(tender_code) DO NOTHING");
  }
@@ -778,7 +779,7 @@ class ScopedAccessIntegrationTest {
   long arrivalDept=db.queryForObject("SELECT store_department_id FROM store_sub_departments WHERE store_sub_department_id=?",Long.class,originalSub);
   long pendingSub=db.queryForObject("INSERT INTO store_sub_departments(dgt_id,store_department_id,store_sub_department_name,source_type) VALUES (?,?,'Pending arrival','UNCLASSIFIED') RETURNING store_sub_department_id",Long.class,store,arrivalDept);
   db.update("UPDATE products SET store_sub_department_id=? WHERE product_id=?",pendingSub,newProduct);
-  String effectiveSql="SELECT "+com.dgt.backend.pricebook.ItemSellingPrice.SQL+" FROM products p LEFT JOIN product_store_prices pr ON pr.product_id=p.product_id AND pr.dgt_id=p.dgt_id WHERE p.product_id=?";
+  String effectiveSql="SELECT "+com.dgt.backend.pricebook.repository.ItemSellingPrice.SQL+" FROM products p LEFT JOIN product_store_prices pr ON pr.product_id=p.product_id AND pr.dgt_id=p.dgt_id WHERE p.product_id=?";
   assertThat(db.queryForObject(effectiveSql,java.math.BigDecimal.class,newProduct)).isEqualByComparingTo("3.49");
   // MSRP remains per unit even when the invoice purchase unit is a case.
   var caseArrival=ok(req("admin","GET",arrivalsPath,null),200).path("arrivals").get(0);
@@ -845,7 +846,7 @@ class ScopedAccessIntegrationTest {
   ok(req("admin","POST",entry+"/"+id+"/approve",null),200);
   assertThat(db.queryForObject("SELECT available_quantity FROM inventory WHERE product_id=?",java.math.BigDecimal.class,product)).isEqualByComparingTo("24");
   assertThat(db.queryForObject("SELECT count(*) FROM inventory_movements WHERE product_id=?",Integer.class,product)).isEqualTo(1);
-  assertThat(db.queryForObject("SELECT "+com.dgt.backend.pricebook.ItemSellingPrice.SQL+" FROM products p LEFT JOIN product_store_prices pr ON pr.product_id=p.product_id AND pr.dgt_id=p.dgt_id WHERE p.product_id=?",java.math.BigDecimal.class,product)).isEqualByComparingTo("3.49");
+  assertThat(db.queryForObject("SELECT "+com.dgt.backend.pricebook.repository.ItemSellingPrice.SQL+" FROM products p LEFT JOIN product_store_prices pr ON pr.product_id=p.product_id AND pr.dgt_id=p.dgt_id WHERE p.product_id=?",java.math.BigDecimal.class,product)).isEqualByComparingTo("3.49");
   assertThat(ok(req("admin","GET",entry+"/"+id,null),200).path("items").get(0).path("msrp").asDouble()).isEqualTo(3.49);
  }
 
@@ -1849,11 +1850,15 @@ ok(call("admin","PUT",path+"/programs/"+id,form,program.get("version").asText(),
   var before=db.queryForObject("SELECT count(*) FROM inventory_movements WHERE dgt_id=?",Long.class,store);
   var report=ok(req("admin","GET",path+"?start=2026-06-10&end=2026-06-10",null),200);
   assertThat(report.path("days").asInt()).isEqualTo(1);assertThat(report.path("previousStart").asText()).isEqualTo("2026-06-09");assertThat(report.path("timezone").asText()).isEqualTo("America/New_York");
-  var rows=java.util.stream.StreamSupport.stream(report.path("rows").spliterator(),false).filter(r->r.path("name").asText().equals("Report item")).toList();assertThat(rows.size()).isEqualTo(2);
-  assertThat(rows.get(0).path("hour").asInt()).isEqualTo(23);assertThat(rows.get(0).path("gross").asDouble()).isEqualTo(20);assertThat(rows.get(1).path("direction").asInt()).isEqualTo(-1);assertThat(rows.get(1).path("discount").asDouble()).isEqualTo(1);
+  assertThat(report.has("rows")).isFalse();assertThat(report.path("schemaVersion").asInt()).isEqualTo(2);
+  var stats=report.path("stats");
+  assertThat(stats.path("hourlyTrend").size()).isEqualTo(24);
+  assertThat(stats.path("dailySalesData").size()).isEqualTo(1);
+  assertThat(stats.path("hasGrocery").asBoolean()).isTrue();
   var next=ok(req("admin","GET",path+"?start=2026-06-11&end=2026-06-11",null),200);
-  for(var r:next.path("rows"))if(r.path("name").asText().equals("Report item"))assertThat(r.path("date").asText()).isLessThan(next.path("start").asText());
-  for(var r:ok(req("admin","GET","/access/stores/"+second+"/sales-statistics?start=2026-06-10&end=2026-06-10",null),200).path("rows"))assertThat(r.path("name").asText()).isNotEqualTo("Report item");
+  assertThat(next.has("rows")).isFalse();
+  var other=ok(req("admin","GET","/access/stores/"+second+"/sales-statistics?start=2026-06-10&end=2026-06-10",null),200);
+  for(var r:other.path("stats").path("topSellingItems"))assertThat(r.path("name").asText()).isNotEqualTo("Report item");
   for(String query:List.of("?start=2026-06-11&end=2026-06-10","?start=2024-01-01&end=2026-06-10","?start=2999-01-01&end=2999-01-01"))ok(req("admin","GET",path+query,null),400);
   assertThat(db.queryForObject("SELECT count(*) FROM inventory_movements WHERE dgt_id=?",Long.class,store)).isEqualTo(before);
  }

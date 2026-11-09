@@ -1,3 +1,7 @@
+/**
+ * Displays daily/category profit data from the shared context. Missing historical cost prevents a
+ * reliable profit total.
+ */
 import {useProfitData} from './ProfitData';
 import { useMemo } from "react";
 import { usePagination } from "@/hooks/use-pagination";

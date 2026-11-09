@@ -4,6 +4,11 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 
+/**
+ * Creation payload for LotteryGame.
+ * Bean Validation annotations declare field requirements for the generic API.
+ */
+
 public record CreateLotteryGameRequest(
         @NotBlank @Size(max = 50) String dgtId,
         @Size(max = 50) String gameCode,

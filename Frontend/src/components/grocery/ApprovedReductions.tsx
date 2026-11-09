@@ -1,3 +1,7 @@
+/**
+ * Reads the store reductions API and displays requests for the requested route. These are workflow
+ * records; rendering the list does not change stock.
+ */
 import {useQuery} from '@tanstack/react-query';
 import {request} from '@/lib/backend';
 import {Table,TableHeader,TableHead,TableRow,TableBody,TableCell} from '@/components/ui/table';

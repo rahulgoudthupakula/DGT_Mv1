@@ -14,12 +14,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * JPA CRUD operations for EmployeeSchedule.
+ * The caller is responsible for authorization and workflow validation; these queries add no store predicate.
+ */
+
 @Slf4j
 @Service
 public class EmployeeScheduleService {
     private final EmployeeScheduleRepository repository;
     public EmployeeScheduleService(EmployeeScheduleRepository repository) { this.repository = repository; }
 
+    /** Load a page sorted by primary key and map its records to response DTOs. */
     public PageResponse<EmployeeScheduleResponse> list(int page, int size) {
         log.debug("Listing employee schedule page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("scheduleId")));
@@ -27,6 +33,7 @@ public class EmployeeScheduleService {
         return new PageResponse<>(p.getContent().stream().map(EmployeeScheduleResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    /** Load a record by ID or return HTTP 404. */
     public EmployeeScheduleResponse get(Long id) {
         log.debug("Fetching employee schedule id={}", id);
         return EmployeeScheduleResponse.from(repository.findById(id)
@@ -37,6 +44,7 @@ public class EmployeeScheduleService {
     
     }
 
+    /** Persist the supplied fields in one transaction and return the saved values. */
     @Transactional
     public EmployeeScheduleResponse create(CreateEmployeeScheduleRequest req) {
         log.info("Creating employee schedule");
@@ -55,6 +63,7 @@ public class EmployeeScheduleService {
         return EmployeeScheduleResponse.from(saved);
     }
 
+    /** Apply only non-null fields in one transaction, leaving omitted fields unchanged. */
     @Transactional
     public EmployeeScheduleResponse update(Long id, UpdateEmployeeScheduleRequest req) {
         log.info("Updating employee schedule id={}", id);

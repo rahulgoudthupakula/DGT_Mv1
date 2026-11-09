@@ -1,6 +1,6 @@
 package com.dgt.backend.departments.controller;
 
-import com.dgt.backend.access.PagePermissions;
+import com.dgt.backend.access.security.PagePermissions;
 import com.dgt.backend.departments.dto.*;
 import com.dgt.backend.departments.service.StoreSubDepartmentService;
 import com.dgt.backend.common.dto.PageResponse;

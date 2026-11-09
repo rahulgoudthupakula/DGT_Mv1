@@ -3,6 +3,7 @@ package com.dgt.backend.stores.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
+// Creation payload for the generic store API; declared constraints run when validated by the controller.
 public record CreateStoreRequest(
         @NotBlank @Size(max = 50) String dgtId,
         @Size(max = 50) String storeId,

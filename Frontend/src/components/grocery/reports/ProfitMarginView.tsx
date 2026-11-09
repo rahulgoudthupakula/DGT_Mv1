@@ -1,3 +1,7 @@
+/**
+ * Displays item/category margins from ProfitData context. Null costs and profits indicate
+ * unavailable historical cost data, not zero expenses.
+ */
 import {useProfitData} from './ProfitData';
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";

@@ -1,3 +1,7 @@
+/**
+ * Displays approved reductions from the reductions API alongside the non-returnable workflow UI.
+ * Read-only history and local form state must not be mistaken for an additional stock deduction.
+ */
 import {useQuery} from '@tanstack/react-query';
 import {request} from '@/lib/backend';
 import { useEffect, useState } from "react";

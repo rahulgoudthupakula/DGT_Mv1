@@ -4,6 +4,10 @@ import com.dgt.backend.employees.entity.EmployeeStoreAssignment;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
+/**
+ * Response DTO for stored EmployeeStoreAssignment fields.
+ */
+
 public record EmployeeStoreAssignmentResponse(
         Long employeeStoreAssignmentId,
         Long employeeId,
@@ -15,6 +19,7 @@ public record EmployeeStoreAssignmentResponse(
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
 ) {
+    /** Copy entity fields to the response without changing the stored record. */
     public static EmployeeStoreAssignmentResponse from(EmployeeStoreAssignment e) {
         return new EmployeeStoreAssignmentResponse(
                 e.getEmployeeStoreAssignmentId(), e.getEmployeeId(), e.getDgtId(),

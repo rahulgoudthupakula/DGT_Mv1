@@ -14,12 +14,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * JPA CRUD operations for LotteryPack.
+ * The caller is responsible for authorization and workflow validation; these queries add no store predicate.
+ */
+
 @Slf4j
 @Service
 public class LotteryPackService {
     private final LotteryPackRepository repository;
     public LotteryPackService(LotteryPackRepository repository) { this.repository = repository; }
 
+    /** Load a page sorted by primary key and map its records to response DTOs. */
     public PageResponse<LotteryPackResponse> list(int page, int size) {
         log.debug("Listing lottery pack page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("lotteryPackId")));
@@ -27,6 +33,7 @@ public class LotteryPackService {
         return new PageResponse<>(p.getContent().stream().map(LotteryPackResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    /** Load a record by ID or return HTTP 404. */
     public LotteryPackResponse get(Long id) {
         log.debug("Fetching lottery pack id={}", id);
         return LotteryPackResponse.from(repository.findById(id)
@@ -37,6 +44,7 @@ public class LotteryPackService {
     
     }
 
+    /** Persist the supplied fields in one transaction and return the saved values. */
     @Transactional
     public LotteryPackResponse create(CreateLotteryPackRequest req) {
         log.info("Creating lottery pack");
@@ -56,6 +64,7 @@ public class LotteryPackService {
         return LotteryPackResponse.from(saved);
     }
 
+    /** Apply only non-null fields in one transaction, leaving omitted fields unchanged. */
     @Transactional
     public LotteryPackResponse update(Long id, UpdateLotteryPackRequest req) {
         log.info("Updating lottery pack id={}", id);

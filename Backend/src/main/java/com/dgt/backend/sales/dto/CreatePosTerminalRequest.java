@@ -3,6 +3,7 @@ package com.dgt.backend.sales.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
+// Creation payload for the generic POS terminal API; declared constraints run when validated by the controller.
 public record CreatePosTerminalRequest(
         @NotBlank @Size(max = 50) String storeId,
         @NotBlank @Size(max = 50) String terminalCode,

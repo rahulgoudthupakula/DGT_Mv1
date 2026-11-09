@@ -14,23 +14,28 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/products")
+// Generic product API guarded by AccessPolicy; this is separate from the store-scoped pricebook endpoints.
 public class ProductController {
     private final ProductService service;
     public ProductController(ProductService service) { this.service = service; }
 
+    // Read a zero-based page; defaults are page 0 and 50 records.
     @GetMapping
     @PreAuthorize("@accessPolicy.check(authentication, 'products', 'READ')")
     public PageResponse<ProductResponse> list(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) { return service.list(page, size); }
 
+    // Read one record by its database identifier.
     @GetMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'products', 'READ')")
     public ProductResponse get(@PathVariable Long id) { return service.get(id); }
 
+    // Validate the create DTO and return HTTP 201 after the service saves it.
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("@accessPolicy.check(authentication, 'products', 'WRITE')")
     public ProductResponse create(@Valid @RequestBody CreateProductRequest request) { return service.create(request); }
 
+    // Apply non-null request fields; this endpoint does not declare @Valid on its update body.
     @PatchMapping("/{id}")
     @PreAuthorize("@accessPolicy.check(authentication, 'products', 'WRITE')")
     public ProductResponse update(@PathVariable Long id, @RequestBody UpdateProductRequest request) { return service.update(id, request); }

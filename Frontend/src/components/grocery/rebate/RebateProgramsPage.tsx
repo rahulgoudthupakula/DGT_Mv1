@@ -1,3 +1,7 @@
+/**
+ * Creates and updates program definitions through useRebates. Deactivation preserves the program;
+ * cloning starts a new draft rather than updating the original.
+ */
 import {useRebates} from './useRebates';
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

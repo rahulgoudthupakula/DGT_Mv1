@@ -1,9 +1,5 @@
-import {useQuery} from '@tanstack/react-query';
-import {request} from '@/lib/backend';
-import {format} from 'date-fns';
-import type {PurchaseInvoice} from './PurchaseInvoiceSummaryTable';
-import type {ItemPurchaseRow} from './SingleItemPurchaseTable';
-export function usePurchaseReports(storeId:string,start?:Date,end?:Date){
- const params=new URLSearchParams();if(start)params.set('start',format(start,'yyyy-MM-dd'));if(end)params.set('end',format(end,'yyyy-MM-dd'));
- return useQuery({queryKey:['grocery-purchases',storeId,params.toString()],queryFn:()=>request<{invoices:PurchaseInvoice[];items:ItemPurchaseRow[]}>('/access/stores/'+encodeURIComponent(storeId)+'/grocery-reports/purchases?'+params),enabled:!!storeId});
+import {useReportSummary} from './useReportSummary';
+/** Backend returns approved invoice details and totals for the selected filters. */
+export function usePurchaseReports(storeId:string,start?:Date,end?:Date,filters:Record<string,string>={}){
+ return useReportSummary(storeId,'purchase-summary',start,end,filters);
 }

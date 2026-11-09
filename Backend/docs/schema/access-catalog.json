@@ -1,0 +1,435 @@
+{
+  "columns": [
+    {
+      "table_name": "access_audit_events",
+      "column_name": "event_id",
+      "udt_name": "int8",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "access_audit_events",
+      "column_name": "company_id",
+      "udt_name": "int8",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "access_audit_events",
+      "column_name": "dgt_id",
+      "udt_name": "varchar",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "access_audit_events",
+      "column_name": "actor_user_id",
+      "udt_name": "int8",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "access_audit_events",
+      "column_name": "event_type",
+      "udt_name": "varchar",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "access_audit_events",
+      "column_name": "target_type",
+      "udt_name": "varchar",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "access_audit_events",
+      "column_name": "target_id",
+      "udt_name": "varchar",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "access_audit_events",
+      "column_name": "changes",
+      "udt_name": "jsonb",
+      "is_nullable": "NO",
+      "column_default": "'{}'::jsonb"
+    },
+    {
+      "table_name": "access_audit_events",
+      "column_name": "created_at",
+      "udt_name": "timestamptz",
+      "is_nullable": "NO",
+      "column_default": "CURRENT_TIMESTAMP"
+    },
+    {
+      "table_name": "approval_requests",
+      "column_name": "request_id",
+      "udt_name": "int8",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "approval_requests",
+      "column_name": "company_id",
+      "udt_name": "int8",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "approval_requests",
+      "column_name": "dgt_id",
+      "udt_name": "varchar",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "approval_requests",
+      "column_name": "module_id",
+      "udt_name": "int8",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "approval_requests",
+      "column_name": "requested_by",
+      "udt_name": "int8",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "approval_requests",
+      "column_name": "requester_role_id",
+      "udt_name": "int8",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "approval_requests",
+      "column_name": "required_approver",
+      "udt_name": "varchar",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "approval_requests",
+      "column_name": "operation_code",
+      "udt_name": "varchar",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "approval_requests",
+      "column_name": "target_id",
+      "udt_name": "varchar",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "approval_requests",
+      "column_name": "expected_versions",
+      "udt_name": "jsonb",
+      "is_nullable": "NO",
+      "column_default": "'{}'::jsonb"
+    },
+    {
+      "table_name": "approval_requests",
+      "column_name": "proposed_values",
+      "udt_name": "jsonb",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "approval_requests",
+      "column_name": "status",
+      "udt_name": "varchar",
+      "is_nullable": "NO",
+      "column_default": "'PENDING'::character varying"
+    },
+    {
+      "table_name": "approval_requests",
+      "column_name": "reviewed_by",
+      "udt_name": "int8",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "approval_requests",
+      "column_name": "review_note",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "approval_requests",
+      "column_name": "idempotency_key",
+      "udt_name": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "approval_requests",
+      "column_name": "created_at",
+      "udt_name": "timestamptz",
+      "is_nullable": "NO",
+      "column_default": "CURRENT_TIMESTAMP"
+    },
+    {
+      "table_name": "approval_requests",
+      "column_name": "reviewed_at",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "companies",
+      "column_name": "company_id",
+      "udt_name": "int8",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "companies",
+      "column_name": "company_name",
+      "udt_name": "varchar",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "companies",
+      "column_name": "is_active",
+      "udt_name": "bool",
+      "is_nullable": "NO",
+      "column_default": "true"
+    },
+    {
+      "table_name": "companies",
+      "column_name": "created_at",
+      "udt_name": "timestamptz",
+      "is_nullable": "NO",
+      "column_default": "CURRENT_TIMESTAMP"
+    },
+    {
+      "table_name": "companies",
+      "column_name": "updated_at",
+      "udt_name": "timestamptz",
+      "is_nullable": "NO",
+      "column_default": "CURRENT_TIMESTAMP"
+    },
+    {
+      "table_name": "company_admins",
+      "column_name": "company_id",
+      "udt_name": "int8",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "company_admins",
+      "column_name": "user_id",
+      "udt_name": "int8",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "company_admins",
+      "column_name": "is_active",
+      "udt_name": "bool",
+      "is_nullable": "NO",
+      "column_default": "true"
+    },
+    {
+      "table_name": "company_admins",
+      "column_name": "created_at",
+      "udt_name": "timestamptz",
+      "is_nullable": "NO",
+      "column_default": "CURRENT_TIMESTAMP"
+    },
+    {
+      "table_name": "company_admins",
+      "column_name": "updated_at",
+      "udt_name": "timestamptz",
+      "is_nullable": "NO",
+      "column_default": "CURRENT_TIMESTAMP"
+    },
+    {
+      "table_name": "module_approval_policies",
+      "column_name": "company_id",
+      "udt_name": "int8",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "module_approval_policies",
+      "column_name": "module_id",
+      "udt_name": "int8",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "module_approval_policies",
+      "column_name": "manager_requires_admin",
+      "udt_name": "bool",
+      "is_nullable": "NO",
+      "column_default": "false"
+    },
+    {
+      "table_name": "module_approval_policies",
+      "column_name": "updated_by",
+      "udt_name": "int8",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "module_approval_policies",
+      "column_name": "created_at",
+      "udt_name": "timestamptz",
+      "is_nullable": "NO",
+      "column_default": "CURRENT_TIMESTAMP"
+    },
+    {
+      "table_name": "module_approval_policies",
+      "column_name": "updated_at",
+      "udt_name": "timestamptz",
+      "is_nullable": "NO",
+      "column_default": "CURRENT_TIMESTAMP"
+    }
+  ],
+  "constraints": [
+    {
+      "table_name": "companies",
+      "conname": "companies_company_name_check",
+      "definition": "CHECK ((btrim((company_name)::text) <> ''::text))"
+    },
+    {
+      "table_name": "companies",
+      "conname": "companies_pkey",
+      "definition": "PRIMARY KEY (company_id)"
+    },
+    {
+      "table_name": "company_admins",
+      "conname": "company_admins_pkey",
+      "definition": "PRIMARY KEY (company_id, user_id)"
+    },
+    {
+      "table_name": "company_admins",
+      "conname": "company_admins_company_id_fkey",
+      "definition": "FOREIGN KEY (company_id) REFERENCES companies(company_id)"
+    },
+    {
+      "table_name": "company_admins",
+      "conname": "company_admins_user_id_fkey",
+      "definition": "FOREIGN KEY (user_id) REFERENCES users(user_id)"
+    },
+    {
+      "table_name": "module_approval_policies",
+      "conname": "module_approval_policies_pkey",
+      "definition": "PRIMARY KEY (company_id, module_id)"
+    },
+    {
+      "table_name": "module_approval_policies",
+      "conname": "module_approval_policies_company_id_fkey",
+      "definition": "FOREIGN KEY (company_id) REFERENCES companies(company_id)"
+    },
+    {
+      "table_name": "module_approval_policies",
+      "conname": "module_approval_policies_module_id_fkey",
+      "definition": "FOREIGN KEY (module_id) REFERENCES modules(module_id)"
+    },
+    {
+      "table_name": "module_approval_policies",
+      "conname": "module_approval_policies_updated_by_fkey",
+      "definition": "FOREIGN KEY (updated_by) REFERENCES users(user_id)"
+    },
+    {
+      "table_name": "approval_requests",
+      "conname": "approval_requests_required_approver_check",
+      "definition": "CHECK (((required_approver)::text = ANY ((ARRAY['MANAGER_OR_ADMIN'::character varying, 'ADMIN'::character varying])::text[])))"
+    },
+    {
+      "table_name": "approval_requests",
+      "conname": "approval_requests_expected_versions_check",
+      "definition": "CHECK ((jsonb_typeof(expected_versions) = 'object'::text))"
+    },
+    {
+      "table_name": "approval_requests",
+      "conname": "approval_requests_proposed_values_check",
+      "definition": "CHECK ((jsonb_typeof(proposed_values) = 'object'::text))"
+    },
+    {
+      "table_name": "approval_requests",
+      "conname": "approval_requests_status_check",
+      "definition": "CHECK (((status)::text = ANY ((ARRAY['PENDING'::character varying, 'APPROVED'::character varying, 'REJECTED'::character varying, 'CANCELLED'::character varying, 'STALE'::character varying])::text[])))"
+    },
+    {
+      "table_name": "approval_requests",
+      "conname": "approval_requests_check",
+      "definition": "CHECK (((reviewed_by IS NULL) OR (reviewed_by <> requested_by)))"
+    },
+    {
+      "table_name": "approval_requests",
+      "conname": "approval_requests_check1",
+      "definition": "CHECK ((((status)::text <> ALL ((ARRAY['APPROVED'::character varying, 'REJECTED'::character varying])::text[])) OR ((reviewed_by IS NOT NULL) AND (reviewed_at IS NOT NULL))))"
+    },
+    {
+      "table_name": "approval_requests",
+      "conname": "approval_requests_pkey",
+      "definition": "PRIMARY KEY (request_id)"
+    },
+    {
+      "table_name": "approval_requests",
+      "conname": "approval_requests_requested_by_idempotency_key_key",
+      "definition": "UNIQUE (requested_by, idempotency_key)"
+    },
+    {
+      "table_name": "approval_requests",
+      "conname": "approval_requests_company_id_fkey",
+      "definition": "FOREIGN KEY (company_id) REFERENCES companies(company_id)"
+    },
+    {
+      "table_name": "approval_requests",
+      "conname": "approval_requests_dgt_id_fkey",
+      "definition": "FOREIGN KEY (dgt_id) REFERENCES stores(dgt_id)"
+    },
+    {
+      "table_name": "approval_requests",
+      "conname": "approval_requests_module_id_fkey",
+      "definition": "FOREIGN KEY (module_id) REFERENCES modules(module_id)"
+    },
+    {
+      "table_name": "approval_requests",
+      "conname": "approval_requests_requested_by_fkey",
+      "definition": "FOREIGN KEY (requested_by) REFERENCES users(user_id)"
+    },
+    {
+      "table_name": "approval_requests",
+      "conname": "approval_requests_requester_role_id_fkey",
+      "definition": "FOREIGN KEY (requester_role_id) REFERENCES user_roles(user_role_id)"
+    },
+    {
+      "table_name": "approval_requests",
+      "conname": "approval_requests_reviewed_by_fkey",
+      "definition": "FOREIGN KEY (reviewed_by) REFERENCES users(user_id)"
+    },
+    {
+      "table_name": "access_audit_events",
+      "conname": "access_audit_events_pkey",
+      "definition": "PRIMARY KEY (event_id)"
+    },
+    {
+      "table_name": "access_audit_events",
+      "conname": "access_audit_events_company_id_fkey",
+      "definition": "FOREIGN KEY (company_id) REFERENCES companies(company_id)"
+    },
+    {
+      "table_name": "access_audit_events",
+      "conname": "access_audit_events_dgt_id_fkey",
+      "definition": "FOREIGN KEY (dgt_id) REFERENCES stores(dgt_id)"
+    },
+    {
+      "table_name": "access_audit_events",
+      "conname": "access_audit_events_actor_user_id_fkey",
+      "definition": "FOREIGN KEY (actor_user_id) REFERENCES users(user_id)"
+    }
+  ]
+}

@@ -1,0 +1,525 @@
+<!doctype html><meta charset="utf-8"><title>DGT Page API Guide</title><style>body{font:15px system-ui;max-width:1250px;margin:40px auto;padding:20px;color:#18243a}table{border-collapse:collapse;width:100%;margin:15px 0}td,th{border:1px solid #ccd3dd;padding:9px;text-align:left;overflow-wrap:anywhere}th{background:#356854;color:white}h1{border-bottom:2px solid #356854;padding-top:25px}.source{font-size:11px;color:#536176} @media print{h1{break-before:page}tr{break-inside:avoid}}</style>
+<h1 class="">DGT_Mv1 — Module and Page API Guide</h1>
+<p class="">Prepared 7 October 2026 · Current local source, including uncommitted POS and Swagger changes.</p>
+<h1 class="">How to use this document</h1>
+<p class="">This guide maps the requested 11 modules to their page/component route families. API presence is not proof of production deployment or successful execution. Backend references include associated operations in a shared workflow; verify the named handler when testing an individual button. Preview/gated pages are identified explicitly.</p>
+<p class="">All paths below include /api/v1. Use http://localhost:8181 for local testing. Replace {store}, {dgtId}, or {id} with the appropriate real identifier; DGT-1017 is case-sensitive. Resource {id} placeholders refer to that resource, not always a store.</p>
+<p class="">Most pages first use GET /api/v1/access/stores and GET /api/v1/access/stores/{store}/context. Context controls navigation; backend authorization still applies independently. These shared calls are documented once under Profile.</p>
+<p class="">GET reads; POST creates or performs an action; PUT saves/replaces; PATCH updates selected fields; DELETE removes an association where supported. If-Match and Idempotency-Key requirements are included when declared in the controller. JSON bodies may also carry version/source tokens.</p>
+<p class="">Known contract issue: the local backend globally configures snake_case while some frontend requests use camelCase. A documented endpoint can still fail validation because of this mismatch; this guide does not certify those requests as passing.</p>
+<h1 class="">Contents</h1>
+<p class="">1. Profile</p>
+<p class="">2. Price Book</p>
+<p class="">3. Workweek</p>
+<p class="">4. Payroll</p>
+<p class="">5. Inventory Valuation</p>
+<p class="">6. Sales and Performance Reports</p>
+<p class="">7. Tender Types</p>
+<p class="">8. Grocery</p>
+<p class="">9. Gas</p>
+<p class="">10. Lottery</p>
+<p class="">11. Everyday Closing Reports</p>
+<h1 class="">1. Profile</h1>
+<h2 class="">1.1 Shared store selector and access context</h2>
+<p class="">Store list selects the active store; context drives visible pages and controls. Legacy PUT /permissions is retired, not a working save route.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/me</td><td>Retrieve access: me.</td></tr><tr><td>GET</td><td>/api/v1/access/stores</td><td>List stores available to the signed-in user.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/context</td><td>Return roles and effective page/module permissions.</td></tr></table>
+<p class="">Backend: AccessController.</p>
+<p class="source">Frontend sources: Frontend/src/lib/store-access.ts; Frontend/src/pages/Index.tsx.</p>
+<h2 class="">1.2 Manage Stores / Add Child Store</h2>
+<p class="">Company-admin workflow: list company stores and create a child store.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/manage-stores</td><td>List records for the selected store.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/manage-stores</td><td>Create a record from the submitted form.</td></tr></table>
+<p class="">Headers declared by this route family: Idempotency-Key. Not every operation requires every header; inspect its Swagger definition.</p>
+<p class="">Backend: ChildStoreController.</p>
+<p class="source">Frontend sources: Frontend/src/components/profile/ManageStoresPage.tsx.</p>
+<h2 class="">1.3 Store Account Overview / Details / Contact / Business Hours</h2>
+<p class="">GET loads settings; PATCH saves store/contact/hours with version checks. Manager changes may require approval.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/stores/{dgtId}/settings</td><td>Load the current page data.</td></tr><tr><td>PATCH</td><td>/api/v1/stores/{dgtId}/settings</td><td>Save edits to an existing record.</td></tr><tr><td>GET</td><td>/api/v1/stores/{id}/business-day</td><td>Load the current page data.</td></tr></table>
+<p class="">Headers declared by this route family: Idempotency-Key, If-Match. Not every operation requires every header; inspect its Swagger definition.</p>
+<p class="">Backend: StoreSettingsController, StoreTimeController.</p>
+<p class="source">Frontend sources: Frontend/src/components/profile/StoreAccountOverview.tsx.</p>
+<h2 class="">1.4 Access &amp; Integrations / Department Access</h2>
+<p class="">List departments, add a store department, or activate/deactivate it.</p>
+<p class="">Related tab labels found in component tree: Department Access, Integration &amp; API Key, Roles &amp; Permissions.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/stores/{dgtId}/department-access</td><td>List records for the selected store.</td></tr><tr><td>POST</td><td>/api/v1/stores/{dgtId}/department-access</td><td>Create a record from the submitted form.</td></tr><tr><td>PATCH</td><td>/api/v1/stores/{dgtId}/department-access/{id}</td><td>Update store department access: toggle.</td></tr></table>
+<p class="">Headers declared by this route family: Idempotency-Key, If-Match. Not every operation requires every header; inspect its Swagger definition.</p>
+<p class="">Backend: StoreDepartmentAccessController.</p>
+<p class="source">Frontend sources: Frontend/src/components/profile/StoreManagementPage.tsx.</p>
+<h2 class="">1.5 Access &amp; Integrations / Roles &amp; Permissions</h2>
+<p class="">Role defaults and per-employee store overrides control module/page access.</p>
+<p class="">Related tab labels found in component tree: Department Access, Integration &amp; API Key, Roles &amp; Permissions.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/employee-access/{id}/permissions</td><td>Load the current page data.</td></tr><tr><td>PUT</td><td>/api/v1/access/stores/{store}/employee-access/{id}/permissions</td><td>Save the submitted settings or workflow data.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/role-permissions</td><td>Load the current page data.</td></tr><tr><td>PUT</td><td>/api/v1/access/stores/{store}/role-permissions</td><td>Save the submitted settings or workflow data.</td></tr><tr><td>PUT</td><td>/api/v1/access/stores/{store}/role-permissions/batch</td><td>Save or replace role access: save Batch.</td></tr></table>
+<p class="">Backend: EmployeePermissionController, RoleAccessController.</p>
+<p class="source">Frontend sources: Frontend/src/components/profile/StoreManagementPage.tsx.</p>
+<h2 class="">1.6 Access &amp; Integrations / Integration &amp; API Key</h2>
+<p class="">Do not confuse this original integration panel with the separate connected POS Settings workflow. No confirmed working API-key-management endpoint for this panel.</p>
+<p class="">Related tab labels found in component tree: Department Access, Integration &amp; API Key, Roles &amp; Permissions.</p>
+<p class="">API methods: No connected page workflow confirmed. Do not substitute blocked generic CRUD endpoints.</p>
+<p class="source">Frontend sources: Frontend/src/components/profile/StoreManagementPage.tsx.</p>
+<h2 class="">1.7 User Profile / Personal Details / Password</h2>
+<p class="">Read/edit personal details; password change verifies current password and revokes sessions. If-Match comes from GET profile version.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/profile</td><td>Load the current page data.</td></tr><tr><td>PATCH</td><td>/api/v1/access/profile</td><td>Save edits to an existing record.</td></tr><tr><td>PUT</td><td>/api/v1/access/profile/password</td><td>Validate current password, change it and revoke sessions.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.profile.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Headers declared by this route family: If-Match. Not every operation requires every header; inspect its Swagger definition.</p>
+<p class="">Backend: ProfileController.</p>
+<p class="source">Frontend sources: Frontend/src/components/profile/UserProfileManagementPage.tsx.</p>
+<h2 class="">1.8 User Profile / Login History / Sessions / Logout</h2>
+<p class="">View login history and active sessions; revoke a session or sign out. Login endpoint is shared with the login page.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/profile/history</td><td>Read recorded history.</td></tr><tr><td>GET</td><td>/api/v1/access/profile/sessions</td><td>List records for the selected store.</td></tr><tr><td>POST</td><td>/api/v1/access/profile/sessions/{id}/revoke</td><td>Revoke access/session/credential identified by the request.</td></tr><tr><td>POST</td><td>/api/v1/access/session</td><td>Create or execute profile session: login.</td></tr><tr><td>POST</td><td>/api/v1/access/session/logout</td><td>Create or execute profile session: logout.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.profile.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Backend: ProfileSessionController.</p>
+<p class="source">Frontend sources: Frontend/src/components/profile/UserProfileManagementPage.tsx.</p>
+<h2 class="">1.9 Subscriptions &amp; Billing / Plans / Add-ons / Invoices</h2>
+<p class="">One GET loads all billing sections; POST submits the chosen billing action. Charges are recorded as due; no payment collection.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/billing</td><td>Load the current page data.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/billing</td><td>Apply the billing action submitted in the request body.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.billing.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Headers declared by this route family: Idempotency-Key. Not every operation requires every header; inspect its Swagger definition.</p>
+<p class="">Backend: StoreBillingController.</p>
+<p class="source">Frontend sources: Frontend/src/components/profile/SubscriptionsBillingPage.tsx.</p>
+<h2 class="">1.10 POS Settings / Connection / Schedule / Mappings / History</h2>
+<p class="">Simulator administration only; requires store admin. Real Commander integration is unavailable.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/pos</td><td>Load the current page data.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/pos/connectors</td><td>Create a record from the submitted form.</td></tr><tr><td>PUT</td><td>/api/v1/access/stores/{store}/pos/connectors/{id}</td><td>Save or replace pos admin: schedule.</td></tr><tr><td>PUT</td><td>/api/v1/access/stores/{store}/pos/connectors/{id}/mapping</td><td>Save or replace pos admin: mapping.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/pos/connectors/{id}/revoke</td><td>Revoke access/session/credential identified by the request.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/pos/history/{id}</td><td>Retrieve pos admin: detail.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/pos/history/{id}/reprocess</td><td>Create or execute pos admin: retry.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/pos/targets</td><td>List existing records available for connector mapping.</td></tr></table>
+<p class="">Backend: PosAdminController.</p>
+<p class="source">Frontend sources: Frontend/src/components/profile/PosSettingsPage.tsx.</p>
+<h2 class="">1.11 POS Settings / Age Restrictions / Gas Grade Mapping / Z-Reading</h2>
+<p class="">Visible deferred sections; no connected save operation. Do not treat disabled controls as implemented features.</p>
+<p class="">API methods: No connected page workflow confirmed. Do not substitute blocked generic CRUD endpoints.</p>
+<p class="source">Frontend sources: Frontend/src/components/profile/PosSettingsPage.tsx.</p>
+<h2 class="">1.12 Support &amp; Training / Tickets / Conversation</h2>
+<p class="">Create/read tickets, messages and status changes through the staff-portal bridge.</p>
+<p class="">Related tab labels found in component tree: Feature Updates, Getting Started, Module Training.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/support-tickets</td><td>List records for the selected store.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/support-tickets</td><td>Create a record from the submitted form.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/support-tickets/{id}/messages</td><td>Retrieve support gateway: messages.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/support-tickets/{id}/messages</td><td>Create or execute support gateway: reply.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/support-tickets/{id}/status</td><td>Create or execute support gateway: status.</td></tr></table>
+<p class="">Headers declared by this route family: Idempotency-Key. Not every operation requires every header; inspect its Swagger definition.</p>
+<p class="">Backend: SupportGatewayController.</p>
+<p class="source">Frontend sources: Frontend/src/components/support/SupportHubPage.tsx.</p>
+<h1 class="">2. Price Book</h1>
+<h2 class="">2.1 Statistics</h2>
+<p class="">Aggregated sales statistics shared by dashboard/chart views.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/sales-statistics</td><td>Load the current page data.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.pricebook.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Backend: SalesStatisticsController.</p>
+<p class="source">Frontend sources: Frontend/src/components/pricebook/PricebookStatisticsPage.tsx.</p>
+<h2 class="">2.2 New Arrivals</h2>
+<p class="">Read newly received/created item information.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/new-arrivals</td><td>List records for the selected store.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.pricebook.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Backend: StoreNewArrivalsController.</p>
+<p class="source">Frontend sources: Frontend/src/components/pricebook/NewArrivalsPage.tsx.</p>
+<h2 class="">2.3 Items / Add Item / Edit Item</h2>
+<p class="">Item listing and create/update operations; bulk endpoints belong to Bulk Update below.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/items</td><td>List records for the selected store.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/items</td><td>Create a record from the submitted form.</td></tr><tr><td>PUT</td><td>/api/v1/access/stores/{store}/items/{id}</td><td>Save edits to an existing record.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.pricebook.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Headers declared by this route family: Idempotency-Key, If-Match. Not every operation requires every header; inspect its Swagger definition.</p>
+<p class="">Backend: PriceBookController.</p>
+<p class="source">Frontend sources: Frontend/src/components/pricebook/ItemsPage.tsx.</p>
+<h2 class="">2.4 Bulk Update / Options / Save</h2>
+<p class="">Load items/options and submit a grouped update. Uses an idempotency key; some changes require approval.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/items</td><td>List records for the selected store.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/items/bulk</td><td>Create or execute price book: bulk.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/items/bulk-options</td><td>Retrieve price book: bulk Options.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.pricebook.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Headers declared by this route family: Idempotency-Key. Not every operation requires every header; inspect its Swagger definition.</p>
+<p class="">Backend: PriceBookController.</p>
+<p class="source">Frontend sources: Frontend/src/components/pricebook/BulkUpdatePage.tsx.</p>
+<h2 class="">2.5 Inventory by Item / Item Movement Detail</h2>
+<p class="">Current stock and an individual item movement history; shared with Inventory Valuation.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/current-stock</td><td>List records for the selected store.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/current-stock/{id}/movements</td><td>Retrieve store stock: movements.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.pricebook.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Backend: StoreStockController.</p>
+<p class="source">Frontend sources: Frontend/src/components/pricebook/InventoryByItem.tsx; Frontend/src/components/pricebook/InventoryByItemDrawer.tsx.</p>
+<h2 class="">2.6 Vendor Management / Vendor List / Profile / Linked Items / Contracts</h2>
+<p class="">Vendor records and product links; contracts are part of this same route family.</p>
+<p class="">Related tab labels found in component tree: Audit Log, Contracts, Pricing, Vendors.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/vendors</td><td>List records for the selected store.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/vendors</td><td>Create a record from the submitted form.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/vendors/contracts</td><td>Retrieve store vendor: contracts.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/vendors/contracts</td><td>Create or execute store vendor: create Contract.</td></tr><tr><td>PUT</td><td>/api/v1/access/stores/{store}/vendors/contracts/{id}</td><td>Save or replace store vendor: update Contract.</td></tr><tr><td>PUT</td><td>/api/v1/access/stores/{store}/vendors/{id}</td><td>Save edits to an existing record.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/vendors/{id}/invoices/{invoiceId}/link-new-items</td><td>Create or execute store vendor: link New Invoice Items.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/vendors/{id}/items</td><td>Retrieve store vendor: items.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/vendors/{id}/items</td><td>Create or execute store vendor: link.</td></tr><tr><td>DELETE</td><td>/api/v1/access/stores/{store}/vendors/{id}/items/{product}</td><td>Delete or archive store vendor: unlink.</td></tr><tr><td>PUT</td><td>/api/v1/access/stores/{store}/vendors/{id}/items/{product}</td><td>Save or replace store vendor: edit Link.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.pricebook.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Headers declared by this route family: If-Match. Not every operation requires every header; inspect its Swagger definition.</p>
+<p class="">Backend: StoreVendorController.</p>
+<p class="source">Frontend sources: Frontend/src/components/grocery/VendorList.tsx; Frontend/src/components/grocery/VendorProfile.tsx.</p>
+<h2 class="">2.7 Vendor Management / Pricing Rules / Cost Updates / Audit</h2>
+<p class="">Read/save vendor pricing, change item costs and inspect audit records.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/vendors/audit</td><td>Read recorded configuration changes.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/vendors/pricing</td><td>Retrieve vendor pricing: pricing.</td></tr><tr><td>PUT</td><td>/api/v1/access/stores/{store}/vendors/pricing</td><td>Save the submitted settings or workflow data.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/vendors/pricing/invoice-costs</td><td>Create or execute vendor cost: invoices.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/vendors/pricing/items</td><td>Retrieve vendor cost: items.</td></tr><tr><td>PUT</td><td>/api/v1/access/stores/{store}/vendors/pricing/items/{id}/cost</td><td>Apply the billing action submitted in the request body.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.pricebook.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Headers declared by this route family: If-Match. Not every operation requires every header; inspect its Swagger definition.</p>
+<p class="">Backend: VendorCostController, VendorPricingController.</p>
+<p class="source">Frontend sources: Frontend/src/components/grocery/VendorProfile.tsx.</p>
+<h2 class="">2.8 Rebate Management / Programs / Eligible Items / Item Links</h2>
+<p class="">Manage rebate programs and item associations.</p>
+<p class="">Related tab labels found in component tree: Claims &amp; Payments, Programs, Rebate Items, Rebate Reports.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/rebates</td><td>List records for the selected store.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/rebates/items</td><td>Create or execute store rebate: add.</td></tr><tr><td>PUT</td><td>/api/v1/access/stores/{store}/rebates/items/{id}</td><td>Save or replace store rebate: edit.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/rebates/programs</td><td>Create a record from the submitted form.</td></tr><tr><td>PUT</td><td>/api/v1/access/stores/{store}/rebates/programs/{id}</td><td>Save edits to an existing record.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/rebates/programs/{id}/eligible</td><td>Retrieve store rebate: eligible Products.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.pricebook.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Headers declared by this route family: If-Match. Not every operation requires every header; inspect its Swagger definition.</p>
+<p class="">Backend: StoreRebateController.</p>
+<p class="source">Frontend sources: Frontend/src/components/grocery/rebate/RebateManagementPage.tsx.</p>
+<h2 class="">2.9 Rebate Management / Claims / Claim Actions</h2>
+<p class="">List/create claims and execute supported claim status actions.</p>
+<p class="">Related tab labels found in component tree: Claims &amp; Payments, Programs, Rebate Items, Rebate Reports.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/rebates/claims</td><td>List records for the selected store.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/rebates/claims</td><td>Create a record from the submitted form.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/rebates/claims/{claim}/actions</td><td>Create or execute store rebate claim: action.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.pricebook.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Headers declared by this route family: If-Match. Not every operation requires every header; inspect its Swagger definition.</p>
+<p class="">Backend: StoreRebateClaimController.</p>
+<p class="source">Frontend sources: Frontend/src/components/grocery/rebate/RebateManagementPage.tsx.</p>
+<h2 class="">2.10 Promotions / Add / Edit / Deactivate</h2>
+<p class="">Manage promotion definitions and lifecycle.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/promotions</td><td>List records for the selected store.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/promotions</td><td>Create a record from the submitted form.</td></tr><tr><td>PUT</td><td>/api/v1/access/stores/{store}/promotions/{id}</td><td>Save edits to an existing record.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/promotions/{id}/deactivate</td><td>Deactivate the selected definition.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.pricebook.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Headers declared by this route family: Idempotency-Key, If-Match. Not every operation requires every header; inspect its Swagger definition.</p>
+<p class="">Backend: StorePromotionController.</p>
+<p class="source">Frontend sources: Frontend/src/components/pricebook/PromotionsPage.tsx.</p>
+<h2 class="">2.11 Discounts / Add / Edit</h2>
+<p class="">Manage discount definitions. Checkout application is a separate backend workflow, not implied by this settings page.</p>
+<p class="">Related tab labels found in component tree: Discount Reasons, Discounts Given.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/discounts</td><td>List records for the selected store.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/discounts</td><td>Create a record from the submitted form.</td></tr><tr><td>PUT</td><td>/api/v1/access/stores/{store}/discounts/{id}</td><td>Save edits to an existing record.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.pricebook.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Headers declared by this route family: If-Match. Not every operation requires every header; inspect its Swagger definition.</p>
+<p class="">Backend: StoreDiscountController.</p>
+<p class="source">Frontend sources: Frontend/src/components/pricebook/DiscountsPage.tsx.</p>
+<h2 class="">2.12 Price Groups / Add / Edit / Deactivate</h2>
+<p class="">Maintain grouped pricing rules and group membership.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/price-groups</td><td>List records for the selected store.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/price-groups</td><td>Create a record from the submitted form.</td></tr><tr><td>PUT</td><td>/api/v1/access/stores/{store}/price-groups/{id}</td><td>Save edits to an existing record.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/price-groups/{id}/deactivate</td><td>Deactivate the selected definition.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.pricebook.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Headers declared by this route family: Idempotency-Key, If-Match. Not every operation requires every header; inspect its Swagger definition.</p>
+<p class="">Backend: StorePriceGroupController.</p>
+<p class="source">Frontend sources: Frontend/src/components/pricebook/PriceGroupsPage.tsx.</p>
+<h1 class="">3. Workweek</h1>
+<h2 class="">3.1 Employees / Add Employee / Edit Employee</h2>
+<p class="">Employee records, employment details and updates.</p>
+<p class="">Related tab labels found in component tree: Basic Info, Deductions, Deposit, Docs, Pay, Personal, Timeoff.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/employees</td><td>List records for the selected store.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/employees</td><td>Create a record from the submitted form.</td></tr><tr><td>PUT</td><td>/api/v1/access/stores/{store}/employees/{id}</td><td>Save edits to an existing record.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.workweek.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Backend: StoreEmployeesController.</p>
+<p class="source">Frontend sources: Frontend/src/components/payroll/PayrollEmployees.tsx.</p>
+<h2 class="">3.2 Employees / Website Access / Individual Permissions</h2>
+<p class="">Assign website access and per-store permission exceptions.</p>
+<p class="">Related tab labels found in component tree: Basic Info, Deductions, Deposit, Docs, Pay, Personal, Timeoff.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/employee-access/{id}/permissions</td><td>Load the current page data.</td></tr><tr><td>PUT</td><td>/api/v1/access/stores/{store}/employee-access/{id}/permissions</td><td>Save the submitted settings or workflow data.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/employee-access</td><td>List records for the selected store.</td></tr><tr><td>PUT</td><td>/api/v1/access/stores/{store}/employee-access/{id}</td><td>Save the submitted settings or workflow data.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.workweek.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Backend: EmployeePermissionController, EmployeeWebsiteAccessController.</p>
+<p class="source">Frontend sources: Frontend/src/components/payroll/PayrollEmployees.tsx.</p>
+<h2 class="">3.3 Week Schedule / Add Shift / Edit Shift / Cancel / Publish Week</h2>
+<p class="">The shared workforce GET supplies schedule data; shift and week writes manage the schedule.</p>
+<p class="">Related tab labels found in component tree: All Requests.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/workforce</td><td>Load existing data.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/workforce/shifts</td><td>Create or execute workforce: add.</td></tr><tr><td>PUT</td><td>/api/v1/access/stores/{store}/workforce/shifts/{id}</td><td>Save or replace workforce: edit.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/workforce/shifts/{id}/cancel</td><td>Cancel the selected record.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/workforce/week</td><td>Create or execute workforce: week.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.workforce.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Backend: WorkforceController.</p>
+<p class="source">Frontend sources: Frontend/src/components/payroll/WorkforcePage.tsx.</p>
+<h2 class="">3.4 Time Off Request / Submit Request</h2>
+<p class="">Uses shared workforce data and POST requests.</p>
+<p class="">Related tab labels found in component tree: All Requests.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/workforce</td><td>Load existing data.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/workforce/requests</td><td>Create or execute workforce: request.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.workforce.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Headers declared by this route family: Idempotency-Key. Not every operation requires every header; inspect its Swagger definition.</p>
+<p class="">Backend: WorkforceController.</p>
+<p class="source">Frontend sources: Frontend/src/components/payroll/WorkforcePage.tsx.</p>
+<h2 class="">3.5 Time Off Approvals / Approve or Reject</h2>
+<p class="">Uses shared workforce data and the request-decision operation.</p>
+<p class="">Related tab labels found in component tree: All Requests.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/workforce</td><td>Load existing data.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/workforce/requests/{id}/decision</td><td>Record an approval/rejection decision.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.workforce.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Backend: WorkforceController.</p>
+<p class="source">Frontend sources: Frontend/src/components/payroll/WorkforcePage.tsx.</p>
+<h2 class="">3.6 Time &amp; Attendance</h2>
+<p class="">Preview/gated page in the current Index navigation; no connected workflow established.</p>
+<p class="">API methods: No connected page workflow confirmed. Do not substitute blocked generic CRUD endpoints.</p>
+<p class="source">Frontend sources: Frontend/src/components/payroll/PayrollTimeAttendance.tsx.</p>
+<h1 class="">4. Payroll</h1>
+<h2 class="">4.1 Run Payroll</h2>
+<p class="">Preview/gated page; generic payroll CRUD routes are not evidence of a working payroll workflow.</p>
+<p class="">API methods: No connected page workflow confirmed. Do not substitute blocked generic CRUD endpoints.</p>
+<p class="source">Frontend sources: Frontend/src/components/payroll/PayrollRunPayroll.tsx.</p>
+<h2 class="">4.2 Paystubs</h2>
+<p class="">Preview/gated page; generic payroll CRUD routes are not evidence of a working payroll workflow.</p>
+<p class="">API methods: No connected page workflow confirmed. Do not substitute blocked generic CRUD endpoints.</p>
+<p class="source">Frontend sources: Frontend/src/components/payroll/PayrollPaystubs.tsx.</p>
+<h2 class="">4.3 Direct Deposit</h2>
+<p class="">Preview/gated page; generic payroll CRUD routes are not evidence of a working payroll workflow.</p>
+<p class="">API methods: No connected page workflow confirmed. Do not substitute blocked generic CRUD endpoints.</p>
+<p class="source">Frontend sources: Frontend/src/components/payroll/PayrollDirectDeposit.tsx.</p>
+<h2 class="">4.4 Taxes &amp; Filing</h2>
+<p class="">Preview/gated page; generic payroll CRUD routes are not evidence of a working payroll workflow.</p>
+<p class="">Related tab labels found in component tree: Forms Summary, Payments Made, Tax Liability.</p>
+<p class="">API methods: No connected page workflow confirmed. Do not substitute blocked generic CRUD endpoints.</p>
+<p class="source">Frontend sources: Frontend/src/components/payroll/PayrollTaxesFiling.tsx.</p>
+<h2 class="">4.5 Payroll Ledger</h2>
+<p class="">Preview/gated page; generic payroll CRUD routes are not evidence of a working payroll workflow.</p>
+<p class="">API methods: No connected page workflow confirmed. Do not substitute blocked generic CRUD endpoints.</p>
+<p class="source">Frontend sources: Frontend/src/components/payroll/PayrollLedger.tsx.</p>
+<h1 class="">5. Inventory Valuation</h1>
+<h2 class="">5.1 Current Stock / Item Movement Detail</h2>
+<p class="">Same component/API as Price Book Inventory by Item.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/current-stock</td><td>List records for the selected store.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/current-stock/{id}/movements</td><td>Retrieve store stock: movements.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.pricebook.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Backend: StoreStockController.</p>
+<p class="source">Frontend sources: Frontend/src/components/pricebook/InventoryByItem.tsx; Frontend/src/components/pricebook/InventoryByItemDrawer.tsx.</p>
+<h2 class="">5.2 Inventory Valuation Report</h2>
+<p class="">Report component uses grocery stock reports; the top-level Inventory Valuation route is not listed as connected in Index. Verify navigation access separately.</p>
+<p class="">Related tab labels found in component tree: At Cost – By Category, At Cost – By Date, At Retail – By Category, At Retail – By Date.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/grocery-reports/stock</td><td>Retrieve grocery reports: stock.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.pricebook.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Backend: GroceryReportsController.</p>
+<p class="source">Frontend sources: Frontend/src/components/grocery/reports/InventoryValuationReport.tsx.</p>
+<h1 class="">6. Sales and Performance Reports</h1>
+<h2 class="">6.1 POS Report / Report Hub</h2>
+<p class="">Report tabs share the same reporting endpoint; query filters select date range and report data.</p>
+<p class="">Related tab labels found in component tree: Department Sales, Fuel Sales by CC, Gas Sales, Item Sales, Item Sales History, Item Sales by Date/Hour, Manual Ring-ups, Profit, Tax Sales Report, Z-Report.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/pos-reports</td><td>Load the current page data.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.daily-closing.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Backend: PosReportsController.</p>
+<p class="source">Frontend sources: Frontend/src/components/reports/pos-report/PosReportsHub.tsx.</p>
+<h2 class="">6.2 Net Worth</h2>
+<p class="">Preview/gated page; no connected workflow established.</p>
+<p class="">API methods: No connected page workflow confirmed. Do not substitute blocked generic CRUD endpoints.</p>
+<p class="source">Frontend sources: Frontend/src/components/reports/NetWorthPage.tsx.</p>
+<h2 class="">6.3 Expenses CPA</h2>
+<p class="">Preview/gated page; no connected workflow established.</p>
+<p class="">API methods: No connected page workflow confirmed. Do not substitute blocked generic CRUD endpoints.</p>
+<p class="source">Frontend sources: Frontend/src/components/reports/ExpensesCpaPage.tsx.</p>
+<h2 class="">6.4 Other Income CPA</h2>
+<p class="">Preview/gated page; no connected workflow established.</p>
+<p class="">API methods: No connected page workflow confirmed. Do not substitute blocked generic CRUD endpoints.</p>
+<p class="source">Frontend sources: Frontend/src/components/reports/OtherIncomeCpaPage.tsx.</p>
+<h1 class="">7. Tender Types</h1>
+<h2 class="">7.1 Credit Card / Dashboard / Payments / Batches / Settlement / Settings</h2>
+<p class="">Read card activity, create batches, update fees/status, and configure processors/settings.</p>
+<p class="">Related tab labels found in component tree: Credit Card Settlement, Settings, Update Batch Fee.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/credit-card</td><td>Load the current page data.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/credit-card/batches</td><td>Create a record from the submitted form.</td></tr><tr><td>PUT</td><td>/api/v1/access/stores/{store}/credit-card/batches/{id}/fee</td><td>Save or replace credit card: fee.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/credit-card/batches/{id}/transition</td><td>Create or execute credit card: transition.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/credit-card/payments</td><td>Read payment transactions.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/credit-card/processors</td><td>Create or execute credit card: add Processor.</td></tr><tr><td>PUT</td><td>/api/v1/access/stores/{store}/credit-card/processors/{id}</td><td>Save or replace credit card: edit Processor.</td></tr><tr><td>PUT</td><td>/api/v1/access/stores/{store}/credit-card/settings</td><td>Save or replace credit card: save Settings.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.tender.credit-card.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Backend: CreditCardController.</p>
+<p class="source">Frontend sources: Frontend/src/components/tender/credit-card/CreditCardPage.tsx.</p>
+<h2 class="">7.2 EBT / Foodstamps / Payments / Batches / Reconciliation</h2>
+<p class="">Read payments, create/view batches, reconcile and record settlement.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/ebt</td><td>Load the current page data.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/ebt/batches</td><td>Create a record from the submitted form.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/ebt/batches/{id}</td><td>Retrieve ebt: details.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/ebt/batches/{id}/reconcile</td><td>Save batch reconciliation.</td></tr><tr><td>PUT</td><td>/api/v1/access/stores/{store}/ebt/batches/{id}/settlement</td><td>Save or replace ebt: settle.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/ebt/payments</td><td>Retrieve ebt: available.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.tender.ebt.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Backend: EbtController.</p>
+<p class="source">Frontend sources: Frontend/src/components/tender/ebt/EbtFoodstampsPage.tsx.</p>
+<h2 class="">7.3 Fleet Cards / Payments / Batches / Reconciliation</h2>
+<p class="">Fleet activity, batch creation, reconciliation and settlement.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/fleet</td><td>Load the current page data.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/fleet/batches</td><td>Create a record from the submitted form.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/fleet/batches/{id}</td><td>Retrieve fleet: details.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/fleet/batches/{id}/reconcile</td><td>Save batch reconciliation.</td></tr><tr><td>PUT</td><td>/api/v1/access/stores/{store}/fleet/batches/{id}/settlement</td><td>Save or replace fleet: settle.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/fleet/payments</td><td>Retrieve fleet: available.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.tender.fleet.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Backend: FleetController.</p>
+<p class="source">Frontend sources: Frontend/src/components/tender/fleet-cards/FleetCardsPage.tsx.</p>
+<h2 class="">7.4 Reports / Balance Reports / Batch Logs</h2>
+<p class="">Report views share the tender-report endpoint and use filters.</p>
+<p class="">Related tab labels found in component tree: Credit Card Balance Report, Credit Card Batch Log, Tender Balance Report, Tender Batch Log.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/tender-reports</td><td>Load the current page data.</td></tr></table>
+<p class="">Feature conditions: name={&quot;app.tender.credit-card.enabled&quot;,&quot;app.tender.ebt.enabled&quot;,&quot;app.tender.fleet.enabled&quot;},havingValue=&quot;true&quot;</p>
+<p class="">Backend: TenderReportsController.</p>
+<p class="source">Frontend sources: Frontend/src/components/tender/reports/TenderReportsPage.tsx.</p>
+<h2 class="">7.5 Customer Accounts</h2>
+<p class="">Preview/gated page; no connected customer-account workflow established.</p>
+<p class="">Related tab labels found in component tree: Account Summary, Aging Report.</p>
+<p class="">API methods: No connected page workflow confirmed. Do not substitute blocked generic CRUD endpoints.</p>
+<p class="source">Frontend sources: Frontend/src/components/tender/customer-accounts/CustomerAccountsPage.tsx.</p>
+<h1 class="">8. Grocery</h1>
+<h2 class="">8.1 Dashboard / Day Sales</h2>
+<p class="">Read sales activity and transaction detail.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/live-activity</td><td>Load the current page data.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/live-activity/{id}</td><td>Retrieve live activity: detail.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.sales.activity.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Backend: LiveActivityController.</p>
+<p class="source">Frontend sources: Frontend/src/components/grocery/GroceryDaySales.tsx.</p>
+<h2 class="">8.2 Purchase Orders / Suggested Order Guide / Customized Order Guide / PO History</h2>
+<p class="">Catalog and permissions support creating purchase orders, adding lines and changing status.</p>
+<p class="">Related tab labels found in component tree: PO History, Suggested Order Guide.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/purchase-orders</td><td>List records for the selected store.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/purchase-orders</td><td>Create a record from the submitted form.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/purchase-orders/catalog</td><td>Retrieve store purchase order: catalog.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/purchase-orders/permissions</td><td>Retrieve store purchase order: permissions.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/purchase-orders/{id}/lines</td><td>Create or execute store purchase order: lines.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/purchase-orders/{id}/status</td><td>Create or execute store purchase order: status.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.pricebook.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Headers declared by this route family: Idempotency-Key, If-Match. Not every operation requires every header; inspect its Swagger definition.</p>
+<p class="">Backend: StorePurchaseOrderController.</p>
+<p class="source">Frontend sources: Frontend/src/components/grocery/PurchaseOrdersPage.tsx.</p>
+<h2 class="">8.3 Edit &amp; View Invoices / Edit Invoice / Add Invoice / Invoice Approvals / View Invoice</h2>
+<p class="">Load invoice entry data, create/edit a draft and approve it; pending POS items support review.</p>
+<p class="">Related tab labels found in component tree: Edit Invoice, Invoice Approvals, View Invoice.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/invoice-entry</td><td>List records for the selected store.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/invoice-entry</td><td>Save the submitted settings or workflow data.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/invoice-entry/pending-pos</td><td>Retrieve store invoice entry: pending Orders.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/invoice-entry/{id}</td><td>Retrieve store invoice entry: detail.</td></tr><tr><td>PUT</td><td>/api/v1/access/stores/{store}/invoice-entry/{id}</td><td>Save or replace store invoice entry: edit.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/invoice-entry/{id}/approve</td><td>Create or execute store invoice entry: approve.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.pricebook.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Headers declared by this route family: If-Match. Not every operation requires every header; inspect its Swagger definition.</p>
+<p class="">Backend: StoreInvoiceEntryController.</p>
+<p class="source">Frontend sources: Frontend/src/components/grocery/EditViewInvoicesPage.tsx.</p>
+<h2 class="">8.4 Inventory Adjustment / New Adjustment / Approvals</h2>
+<p class="">Reduction requests, batch submission and approval decisions.</p>
+<p class="">Related tab labels found in component tree: All, Approvals, Expired &amp; Expiring Items, History &amp; Audit, Inventory Adjustment, Inventory Shrinkage &amp; Waste, Reduce Inventory (Returnable), Store to Store Transfers.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/reductions</td><td>List records for the selected store.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/reductions</td><td>Create or execute store reduction: submit.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/reductions/batch</td><td>Create or execute store reduction: batch.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/reductions/return-slips</td><td>Retrieve store reduction: slips.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/reductions/return-slips</td><td>Create or execute store reduction: create Slip.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/reductions/return-slips/{id}/status</td><td>Create or execute store reduction: return State.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/reductions/transfers</td><td>Retrieve store reduction: transfers.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/reductions/transfers/{id}/receive</td><td>Create or execute store reduction: receive Transfer.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/reductions/{id}/decision</td><td>Create or execute store reduction: decide.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.pricebook.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Headers declared by this route family: Idempotency-Key. Not every operation requires every header; inspect its Swagger definition.</p>
+<p class="">Backend: StoreReductionController.</p>
+<p class="source">Frontend sources: Frontend/src/components/grocery/InventoryManagementPage.tsx.</p>
+<h2 class="">8.5 Inventory / Expired &amp; Expiring / Returnable / Non-returnable / Shrinkage</h2>
+<p class="">Stock lookup and reduction workflows; these panels share APIs rather than having one controller each.</p>
+<p class="">Related tab labels found in component tree: All, Approvals, Expired &amp; Expiring Items, History &amp; Audit, Inventory Adjustment, Inventory Shrinkage &amp; Waste, Reduce Inventory (Returnable), Store to Store Transfers.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/current-stock</td><td>List records for the selected store.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/current-stock/{id}/movements</td><td>Retrieve store stock: movements.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/reductions</td><td>List records for the selected store.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/reductions</td><td>Create or execute store reduction: submit.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/reductions/batch</td><td>Create or execute store reduction: batch.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/reductions/return-slips</td><td>Retrieve store reduction: slips.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/reductions/return-slips</td><td>Create or execute store reduction: create Slip.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/reductions/return-slips/{id}/status</td><td>Create or execute store reduction: return State.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/reductions/transfers</td><td>Retrieve store reduction: transfers.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/reductions/transfers/{id}/receive</td><td>Create or execute store reduction: receive Transfer.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/reductions/{id}/decision</td><td>Create or execute store reduction: decide.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.pricebook.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Headers declared by this route family: Idempotency-Key. Not every operation requires every header; inspect its Swagger definition.</p>
+<p class="">Backend: StoreReductionController, StoreStockController.</p>
+<p class="source">Frontend sources: Frontend/src/components/grocery/InventoryManagementPage.tsx.</p>
+<h2 class="">8.6 Inventory / Return Slips / Store Transfers / Receive Transfer</h2>
+<p class="">Return-slip creation/status and incoming transfer receipt.</p>
+<p class="">Related tab labels found in component tree: All, Approvals, Expired &amp; Expiring Items, History &amp; Audit, Inventory Adjustment, Inventory Shrinkage &amp; Waste, Reduce Inventory (Returnable), Store to Store Transfers.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/reductions</td><td>List records for the selected store.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/reductions</td><td>Create or execute store reduction: submit.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/reductions/batch</td><td>Create or execute store reduction: batch.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/reductions/return-slips</td><td>Retrieve store reduction: slips.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/reductions/return-slips</td><td>Create or execute store reduction: create Slip.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/reductions/return-slips/{id}/status</td><td>Create or execute store reduction: return State.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/reductions/transfers</td><td>Retrieve store reduction: transfers.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/reductions/transfers/{id}/receive</td><td>Create or execute store reduction: receive Transfer.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/reductions/{id}/decision</td><td>Create or execute store reduction: decide.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.pricebook.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Headers declared by this route family: Idempotency-Key. Not every operation requires every header; inspect its Swagger definition.</p>
+<p class="">Backend: StoreReductionController.</p>
+<p class="source">Frontend sources: Frontend/src/components/grocery/InventoryManagementPage.tsx.</p>
+<h2 class="">8.7 Reports / Sales</h2>
+<p class="">Sales-report views use the sales route.</p>
+<p class="">Related tab labels found in component tree: All, All Items, At Cost – By Category, At Cost – By Date, At Retail – By Category, At Retail – By Date, Bottom 20, By Brand, Cigarette Inventory, Deli Sales, Inventory Valuation, Key Ratio, Profit, Purchase Invoice Summary, Sales, Single Item Purchase History, Summary, Top 20.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/grocery-reports/sales</td><td>Retrieve grocery reports: sales.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.pricebook.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Backend: GroceryReportsController.</p>
+<p class="source">Frontend sources: Frontend/src/components/grocery/GroceryReports.tsx.</p>
+<h2 class="">8.8 Reports / Purchases</h2>
+<p class="">Purchase-report views use the purchases route.</p>
+<p class="">Related tab labels found in component tree: All, All Items, At Cost – By Category, At Cost – By Date, At Retail – By Category, At Retail – By Date, Bottom 20, By Brand, Cigarette Inventory, Deli Sales, Inventory Valuation, Key Ratio, Profit, Purchase Invoice Summary, Sales, Single Item Purchase History, Summary, Top 20.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/grocery-reports/purchases</td><td>Retrieve grocery reports: purchases.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.pricebook.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Backend: GroceryReportsController.</p>
+<p class="source">Frontend sources: Frontend/src/components/grocery/GroceryReports.tsx.</p>
+<h2 class="">8.9 Reports / Stock / Inventory Valuation</h2>
+<p class="">Stock and valuation views use the stock route.</p>
+<p class="">Related tab labels found in component tree: All, All Items, At Cost – By Category, At Cost – By Date, At Retail – By Category, At Retail – By Date, Bottom 20, By Brand, Cigarette Inventory, Deli Sales, Inventory Valuation, Key Ratio, Profit, Purchase Invoice Summary, Sales, Single Item Purchase History, Summary, Top 20.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/grocery-reports/stock</td><td>Retrieve grocery reports: stock.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.pricebook.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Backend: GroceryReportsController.</p>
+<p class="source">Frontend sources: Frontend/src/components/grocery/GroceryReports.tsx.</p>
+<h2 class="">8.10 Settings / Defaults / Save</h2>
+<p class="">Store grocery configuration and default options.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/grocery-settings</td><td>Load the current page data.</td></tr><tr><td>PUT</td><td>/api/v1/access/stores/{store}/grocery-settings</td><td>Save the submitted settings or workflow data.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/grocery-settings/defaults</td><td>Retrieve grocery settings: defaults.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.pricebook.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Backend: GrocerySettingsController.</p>
+<p class="source">Frontend sources: Frontend/src/components/grocery/GrocerySettings.tsx.</p>
+<h2 class="">8.11 Non-scanned Items</h2>
+<p class="">Preview/gated page; no connected workflow established.</p>
+<p class="">API methods: No connected page workflow confirmed. Do not substitute blocked generic CRUD endpoints.</p>
+<p class="source">Frontend sources: Frontend/src/components/grocery/NonScannedItemPage.tsx.</p>
+<h1 class="">9. Gas</h1>
+<h2 class="">9.1 Dashboard</h2>
+<p class="">Dashboard reads current gas-price summary; other price actions belong to Gas Price.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/gas-prices/dashboard</td><td>Retrieve store gas price: dashboard.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.gas.price.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Backend: StoreGasPriceController.</p>
+<p class="source">Frontend sources: Frontend/src/components/gas/GasDashboard.tsx.</p>
+<h2 class="">9.2 Gas Statistics</h2>
+<p class="">Preview/gated page; no connected workflow established.</p>
+<p class="">API methods: No connected page workflow confirmed. Do not substitute blocked generic CRUD endpoints.</p>
+<p class="source">Frontend sources: Frontend/src/components/gas/GasStatisticsPage.tsx.</p>
+<h2 class="">9.3 Delivery / Add Delivery / View / Edit / Receive</h2>
+<p class="">Load entry options, create/edit a delivery and confirm receipt.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/gas-deliveries</td><td>List records for the selected store.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/gas-deliveries</td><td>Create a record from the submitted form.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/gas-deliveries/options</td><td>Load choices needed by the entry form.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/gas-deliveries/{deliveryId}</td><td>Load the current page data.</td></tr><tr><td>PUT</td><td>/api/v1/access/stores/{store}/gas-deliveries/{deliveryId}</td><td>Save edits to an existing record.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/gas-deliveries/{deliveryId}/receive</td><td>Confirm receipt and apply the receipt workflow.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.gas.delivery.enabled&quot;, havingValue=&quot;true&quot;</p>
+<p class="">Headers declared by this route family: Idempotency-Key. Not every operation requires every header; inspect its Swagger definition.</p>
+<p class="">Backend: GasDeliveryController.</p>
+<p class="source">Frontend sources: Frontend/src/components/gas/delivery/GasDeliveryPage.tsx.</p>
+<h2 class="">9.4 Gas Invoices &amp; Payments</h2>
+<p class="">Navigation marks this page as unconnected; no working invoice/payment workflow is claimed.</p>
+<p class="">API methods: No connected page workflow confirmed. Do not substitute blocked generic CRUD endpoints.</p>
+<p class="source">Frontend sources: Frontend/src/components/gas/payment/GasPaymentPage.tsx.</p>
+<h2 class="">9.5 Inventory Adjustment / Initial Reading / Approvals</h2>
+<p class="">Create/edit tank adjustments, establish an initial reading and approve/reject requests.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/gas-adjustments</td><td>List records for the selected store.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/gas-adjustments</td><td>Create a record from the submitted form.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/gas-adjustments/tanks/{tankId}/initial-reading</td><td>Create or execute gas adjustment: initial Reading.</td></tr><tr><td>PUT</td><td>/api/v1/access/stores/{store}/gas-adjustments/{id}</td><td>Save edits to an existing record.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/gas-adjustments/{id}/{action:approve|reject}</td><td>Create or execute gas adjustment: decide.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.gas.adjustments.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Headers declared by this route family: Idempotency-Key, If-Match. Not every operation requires every header; inspect its Swagger definition.</p>
+<p class="">Backend: GasAdjustmentController.</p>
+<p class="source">Frontend sources: Frontend/src/components/gas/inventory/GasInventoryAdjustmentPage.tsx.</p>
+<h2 class="">9.6 Tank Report</h2>
+<p class="">Read tank balances/report data.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/gas-tank-report</td><td>Retrieve tank report: report.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.gas.tank-report.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Backend: TankReportController.</p>
+<p class="source">Frontend sources: Frontend/src/components/gas/tank-report/TankReportPage.tsx.</p>
+<h2 class="">9.7 Gas Price / Schedule / Cancel</h2>
+<p class="">Read prices, create a price change and cancel a change.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/gas-prices</td><td>Load the current page data.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/gas-prices</td><td>Save the submitted settings or workflow data.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/gas-prices/{priceId}/cancel</td><td>Cancel the selected record.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.gas.price.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Headers declared by this route family: Idempotency-Key. Not every operation requires every header; inspect its Swagger definition.</p>
+<p class="">Backend: StoreGasPriceController.</p>
+<p class="source">Frontend sources: Frontend/src/components/gas/price/GasPricePage.tsx.</p>
+<h2 class="">9.8 Settings / Grades / Audit</h2>
+<p class="">Store gas setup, grade creation and configuration history.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/gas-settings</td><td>Load the current page data.</td></tr><tr><td>PUT</td><td>/api/v1/access/stores/{store}/gas-settings</td><td>Save the submitted settings or workflow data.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/gas-settings/audit</td><td>Read recorded history.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/gas-settings/grades</td><td>Create or execute gas settings: add Grade.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.gas.settings.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Backend: GasSettingsController.</p>
+<p class="source">Frontend sources: Frontend/src/components/gas/settings/GasSettingsPage.tsx.</p>
+<h2 class="">9.9 Reports</h2>
+<p class="">Preview/gated page; no connected workflow established.</p>
+<p class="">Related tab labels found in component tree: Cash Card Balance, Cash Card Log, Gas Profit, Gas Profit by VAT, Gas Sales, Gas Tax Report, Inventory at Cost Log, Jobber Log, Purchase Log, Sales Log by VAT.</p>
+<p class="">API methods: No connected page workflow confirmed. Do not substitute blocked generic CRUD endpoints.</p>
+<p class="source">Frontend sources: Frontend/src/components/gas/reports/GasReportsPage.tsx.</p>
+<h2 class="">9.10 Fuel Expenses</h2>
+<p class="">Preview/gated page; no connected workflow established.</p>
+<p class="">API methods: No connected page workflow confirmed. Do not substitute blocked generic CRUD endpoints.</p>
+<p class="source">Frontend sources: Frontend/src/components/gas/FuelExpensesPage.tsx.</p>
+<h1 class="">10. Lottery</h1>
+<h2 class="">10.1 Dashboard</h2>
+<p class="">Preview/gated page; no connected workflow established.</p>
+<p class="">API methods: No connected page workflow confirmed. Do not substitute blocked generic CRUD endpoints.</p>
+<p class="source">Frontend sources: Frontend/src/components/lottery/LotteryDashboard.tsx.</p>
+<h2 class="">10.2 Received &amp; Confirm Delivery / Add Received Receipt / Confirm / Reject</h2>
+<p class="">Save received packs and decide pending receipt confirmation.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/lottery-deliveries</td><td>Load the current page data.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/lottery-deliveries</td><td>Confirm receipt and apply the receipt workflow.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/lottery-deliveries/decision</td><td>Create or execute lottery delivery: decide.</td></tr></table>
+<p class="">Headers declared by this route family: Idempotency-Key. Not every operation requires every header; inspect its Swagger definition.</p>
+<p class="">Backend: LotteryDeliveryController.</p>
+<p class="source">Frontend sources: Frontend/src/components/lottery/ReceivedDelivery.tsx.</p>
+<h2 class="">10.3 Verify &amp; Activate Packs / Verify / Activate</h2>
+<p class="">Read pending packs, record verification decisions and activate verified packs.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/lottery-verification</td><td>Load the current page data.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/lottery-verification/activation</td><td>Create or execute lottery verification: activation.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/lottery-verification/decision</td><td>Record an approval/rejection decision.</td></tr></table>
+<p class="">Backend: LotteryVerificationController.</p>
+<p class="source">Frontend sources: Frontend/src/components/lottery/VerifyActivatePacks.tsx.</p>
+<h2 class="">10.4 Day / Shift Closing / Open / Save Draft / Close</h2>
+<p class="">Opening, drafts and closing share one controller; saving/closing uses the PUT closing operation with body fields.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/lottery-closing</td><td>Load the current page data.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/lottery-closing/open</td><td>Create or execute lottery closing: open.</td></tr><tr><td>PUT</td><td>/api/v1/access/stores/{store}/lottery-closing/{id}</td><td>Save the submitted settings or workflow data.</td></tr></table>
+<p class="">Backend: LotteryClosingController.</p>
+<p class="source">Frontend sources: Frontend/src/components/lottery/DayShiftClosing.tsx.</p>
+<h2 class="">10.5 Day / Shift Closing / Sales Reconciliation</h2>
+<p class="">Read/save sales attribution and unlink an incorrectly linked sale item.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/lottery-closing/{id}/sales</td><td>Retrieve lottery closing: sales.</td></tr><tr><td>PUT</td><td>/api/v1/access/stores/{store}/lottery-closing/{id}/sales</td><td>Save or replace lottery closing: link.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/lottery-closing/{id}/sales/{item}/unlink</td><td>Create or execute lottery closing: unlink.</td></tr></table>
+<p class="">Backend: LotteryClosingController.</p>
+<p class="source">Frontend sources: Frontend/src/components/lottery/DayShiftClosing.tsx.</p>
+<h2 class="">10.6 Settle &amp; Return Packs / Settle / Return</h2>
+<p class="">Load eligible packs and submit settlement/return disposition.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/lottery-dispositions</td><td>Load the current page data.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/lottery-dispositions</td><td>Apply the billing action submitted in the request body.</td></tr></table>
+<p class="">Backend: LotteryDispositionController.</p>
+<p class="source">Frontend sources: Frontend/src/components/lottery/SettleReturnPacks.tsx.</p>
+<h2 class="">10.7 Games / Add / Edit</h2>
+<p class="">Maintain lottery game definitions.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/lottery-games</td><td>Load the current page data.</td></tr><tr><td>POST</td><td>/api/v1/access/stores/{store}/lottery-games</td><td>Create a record from the submitted form.</td></tr><tr><td>PUT</td><td>/api/v1/access/stores/{store}/lottery-games/{id}</td><td>Save edits to an existing record.</td></tr></table>
+<p class="">Backend: LotteryCatalogController.</p>
+<p class="source">Frontend sources: Frontend/src/components/lottery/LotteryGames.tsx.</p>
+<h2 class="">10.8 Pack History</h2>
+<p class="">Read pack lifecycle history.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/lottery-pack-history</td><td>Load the current page data.</td></tr></table>
+<p class="">Backend: LotteryHistoryController.</p>
+<p class="source">Frontend sources: Frontend/src/components/lottery/PackHistory.tsx.</p>
+<h2 class="">10.9 Lottery Settlement</h2>
+<p class="">Separate settlement dashboard remains preview/gated; do not confuse with Settle &amp; Return Packs.</p>
+<p class="">API methods: No connected page workflow confirmed. Do not substitute blocked generic CRUD endpoints.</p>
+<p class="source">Frontend sources: Frontend/src/components/lottery/LotterySettlement.tsx.</p>
+<h2 class="">10.10 Settings / Separate Lottery Counter</h2>
+<p class="">Read/save the separate-counter toggle; other settings on the page may remain local or deferred.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/lottery-closing/settings</td><td>Load saved settings.</td></tr><tr><td>PUT</td><td>/api/v1/access/stores/{store}/lottery-closing/settings</td><td>Save or replace lottery closing: setting.</td></tr></table>
+<p class="">Backend: LotteryClosingController.</p>
+<p class="source">Frontend sources: Frontend/src/components/lottery/LotteryCounterSetting.tsx; Frontend/src/components/lottery/LotterySettings.tsx.</p>
+<h1 class="">11. Everyday Closing Reports</h1>
+<h2 class="">11.1 Dashboard / Store / Calendar / Open Day</h2>
+<p class="">Read date setup, closing records and one selected day. Dashboard and Store mount the same component.</p>
+<p class="">Related tab labels found in component tree: Daily Report, Not Needed for Daily Report.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/daily-closing</td><td>List records for the selected store.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/daily-closing/meta</td><td>Load business-date and timezone setup.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/daily-closing/{day}</td><td>Retrieve store closing: day.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.daily-closing.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Backend: StoreClosingController.</p>
+<p class="source">Frontend sources: Frontend/src/components/closing/StoreClosingPage.tsx.</p>
+<h2 class="">11.2 Store / Edit Day / Cash / Tenders / Deposits / Expenses / Save / Close</h2>
+<p class="">One day PUT persists the closing and related reconciliation data. Requires version/source consistency; closed days cannot be edited.</p>
+<p class="">Related tab labels found in component tree: Daily Report, Not Needed for Daily Report.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/daily-closing</td><td>List records for the selected store.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/daily-closing/meta</td><td>Load business-date and timezone setup.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/daily-closing/{day}</td><td>Retrieve store closing: day.</td></tr><tr><td>PUT</td><td>/api/v1/access/stores/{store}/daily-closing/{day}</td><td>Save the submitted settings or workflow data.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.daily-closing.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Backend: StoreClosingController.</p>
+<p class="source">Frontend sources: Frontend/src/components/closing/store-edit/StoreEditDayPage.tsx.</p>
+<h2 class="">11.3 Reports / Daily Summary / Monthly Totals</h2>
+<p class="">Read day-range closing records for reports; export/print are frontend actions.</p>
+<p class="">Related tab labels found in component tree: Check Cashing Summary, Daily Deli Summary, Daily Summary, Deli Monthly Totals, Monthly Totals.</p>
+<table><tr><th>Method</th><th>API endpoint</th><th>Purpose / use</th></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/daily-closing</td><td>List records for the selected store.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/daily-closing/meta</td><td>Load business-date and timezone setup.</td></tr><tr><td>GET</td><td>/api/v1/access/stores/{store}/daily-closing/{day}</td><td>Retrieve store closing: day.</td></tr></table>
+<p class="">Feature conditions: name=&quot;app.daily-closing.enabled&quot;,havingValue=&quot;true&quot;</p>
+<p class="">Backend: StoreClosingController.</p>
+<p class="source">Frontend sources: Frontend/src/components/closing/ClosingReportsPage.tsx.</p>
+<h2 class="">11.4 Deli / Check Cashing / Deli and Check-Cashing Reports</h2>
+<p class="">Dedicated workflows remain preview/unconnected; shared report shell does not imply persistence for these sections.</p>
+<p class="">Related tab labels found in component tree: Daily Report, Not Needed for Daily Report.</p>
+<p class="">API methods: No connected page workflow confirmed. Do not substitute blocked generic CRUD endpoints.</p>
+<p class="source">Frontend sources: Frontend/src/components/closing/check-cashing/CheckCashingClosingPage.tsx; Frontend/src/components/closing/deli/DeliClosingPage.tsx.</p>
+<h1 class="">API-only and deferred boundaries</h1>
+<p class="">Connector POST /api/v1/pos/sales, POST /api/v1/pos/heartbeat and GET /api/v1/pos/configuration are used by the separate connector application, not direct page buttons. POS Settings manages its credentials/configuration through the admin routes above.</p>
+<p class="">Signup/login are outside the 11 requested modules: POST /api/v1/signup-requests submits review; POST /api/v1/client-handling/activate completes setup; POST /api/v1/access/session signs in. The staff portal and its database are separate services.</p>
+<p class="">Generic routes gated by AccessPolicy.check remain blocked. For example, /billing-invoices, /store-subscriptions, /daily-expenses and /departments are not replacements for the connected store-scoped UI workflows.</p>
+<p class="">Shared support APIs may load catalog/options data in child dialogs. Source paths are supplied for those component trees; this document is a page-to-workflow reference, not an assertion that every associated endpoint is invoked on initial page load.</p>

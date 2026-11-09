@@ -1,3 +1,7 @@
+/**
+ * Formats sales summary and comparison values supplied by the caller. This component performs no
+ * independent database/API lookup.
+ */
 import { Card, CardContent } from "@/components/ui/card";
 import { Package, DollarSign, Tag, Zap } from "lucide-react";
 

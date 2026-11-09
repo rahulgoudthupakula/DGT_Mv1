@@ -9,8 +9,10 @@ import java.time.*;
 @Entity
 @Table(name = "stores")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+// JPA mapping for stores; related record IDs are scalar fields rather than entity associations.
 public class Store {
 
+    // Store DGT identifier is the assigned string primary key.
     @Id
     @Column(name = "dgt_id")
     private String dgtId;
@@ -37,10 +39,12 @@ public class Store {
     private Long companyId;
 
     @Column(name = "created_at", updatable = false)
+    // Hibernate populates this timestamp when the entity is first persisted.
     @CreationTimestamp
     private OffsetDateTime createdAt;
 
     @Column(name = "updated_at")
+    // Hibernate refreshes this timestamp when the entity is updated.
     @UpdateTimestamp
     private OffsetDateTime updatedAt;
 }

@@ -1,3 +1,7 @@
+/**
+ * Loads approved purchase invoice summaries through usePurchaseReports and totals them for
+ * display. Unknown paid/pending amounts must not be shown as confirmed zero balances.
+ */
 import {usePurchaseReports} from './usePurchaseReports';
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -34,16 +38,8 @@ export const PurchaseInvoiceReport = ({storeId}:{storeId:string}) => {
   const query=usePurchaseReports(storeId,startDate,endDate);
   const mockData=query.data?.invoices??[];
 
-  const totals = mockData.reduce(
-    (acc, row) => ({
-      netPurchase: acc.netPurchase + row.netPurchase,
-      rebateAmount: acc.rebateAmount + (row.rebateAmount??0),
-      pendingAmount: acc.pendingAmount + (row.pendingAmount??0),
-    }),
-    { netPurchase: 0, rebateAmount: 0, pendingAmount: 0 }
-  );
-
-  const totalAfterAdj = totals.netPurchase + mockAdjustment;
+  const totals=query.data?.invoiceTotals??{};
+  const totalAfterAdj=null;
 
   return (
     <div className="space-y-5">
@@ -112,7 +108,7 @@ export const PurchaseInvoiceReport = ({storeId}:{storeId:string}) => {
       {/* Summary Table */}
       <Card>
         <CardContent className="pt-5">
-          <PurchaseInvoiceSummaryTable data={mockData} />
+          <PurchaseInvoiceSummaryTable data={mockData} totals={totals} />
         </CardContent>
       </Card>
 
@@ -139,7 +135,7 @@ export const PurchaseInvoiceReport = ({storeId}:{storeId:string}) => {
         <Separator orientation="vertical" className="h-8" />
         <div>
           <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Total Pending</p>
-          <p className="text-sm font-bold text-[hsl(var(--warning))]">{mockData.some(r=>r.pendingAmount===null)?'—':fmt(totals.pendingAmount)}</p>
+          <p className="text-sm font-bold text-[hsl(var(--warning))]">{totals.pendingAmount==null?'—':fmt(totals.pendingAmount)}</p>
         </div>
       </div>
     </div>

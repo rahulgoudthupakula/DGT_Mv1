@@ -2,6 +2,11 @@ package com.dgt.backend.identity.dto;
 
 import jakarta.validation.constraints.Size;
 
+/**
+ * Creation payload for User.
+ * Bean Validation annotations declare field requirements for the generic API.
+ */
+
 public record CreateUserRequest(
         @Size(max = 50) String dgtId,
         @Size(max = 50) String employeeId,

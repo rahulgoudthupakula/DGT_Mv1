@@ -1,3 +1,7 @@
+/**
+ * Displays the selected item details supplied by SalesTable. Opening the drawer does not fetch a
+ * separate transaction history.
+ */
 import {
   Sheet,
   SheetContent,

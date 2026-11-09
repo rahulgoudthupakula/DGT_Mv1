@@ -6,6 +6,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
+/**
+ * Response DTO for stored LotterySettlement fields.
+ */
+
 public record LotterySettlementResponse(
         Long lotterySettlementId,
         String dgtId,
@@ -22,6 +26,7 @@ public record LotterySettlementResponse(
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
 ) {
+    /** Copy entity fields to the response without changing the stored record. */
     public static LotterySettlementResponse from(LotterySettlement e) {
         return new LotterySettlementResponse(
                 e.getLotterySettlementId(), e.getDgtId(), e.getVendorId(),

@@ -1,3 +1,7 @@
+/**
+ * Controlled sales-report search, grouping and date controls. The parent applies the selected
+ * filters to report queries and views.
+ */
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {

@@ -1,0 +1,11 @@
+BEGIN;
+DO $$ BEGIN IF current_database()<>'dgt' THEN RAISE EXCEPTION 'Production dgt database required'; END IF; END $$;
+ALTER TABLE price_groups ADD CONSTRAINT price_group_store_key UNIQUE(price_group_id,dgt_id);
+ALTER TABLE price_groups ADD COLUMN creation_key uuid, ADD COLUMN creation_payload jsonb;
+ALTER TABLE price_groups ADD CONSTRAINT price_group_create_key UNIQUE(dgt_id,creation_key);
+ALTER TABLE product_price_groups ADD COLUMN dgt_id varchar(50), ADD COLUMN is_active boolean NOT NULL DEFAULT true;
+UPDATE product_price_groups l SET dgt_id=g.dgt_id,is_active=g.is_active FROM price_groups g WHERE g.price_group_id=l.price_group_id;
+ALTER TABLE product_price_groups ALTER COLUMN dgt_id SET NOT NULL;
+ALTER TABLE product_price_groups ADD CONSTRAINT price_group_link_store FOREIGN KEY(price_group_id,dgt_id) REFERENCES price_groups(price_group_id,dgt_id), ADD CONSTRAINT price_group_product_store FOREIGN KEY(product_id,dgt_id) REFERENCES products(product_id,dgt_id);
+CREATE UNIQUE INDEX one_active_price_group_per_product ON product_price_groups(dgt_id,product_id) WHERE is_active;
+COMMIT;

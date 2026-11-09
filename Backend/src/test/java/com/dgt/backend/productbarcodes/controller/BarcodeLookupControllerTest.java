@@ -1,6 +1,6 @@
 package com.dgt.backend.productbarcodes.controller;
 
-import com.dgt.backend.access.PagePermissions;
+import com.dgt.backend.access.security.PagePermissions;
 import com.dgt.backend.productbarcodes.service.BarcodeLookupService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

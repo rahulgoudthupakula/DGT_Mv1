@@ -14,12 +14,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * JPA CRUD operations for Department.
+ * The caller is responsible for authorization and workflow validation; these queries add no store predicate.
+ */
+
 @Slf4j
 @Service
 public class DepartmentService {
     private final DepartmentRepository repository;
     public DepartmentService(DepartmentRepository repository) { this.repository = repository; }
 
+    /** Load a page sorted by primary key and map its records to response DTOs. */
     public PageResponse<DepartmentResponse> list(int page, int size) {
         log.debug("Listing department page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("departmentId")));
@@ -27,6 +33,7 @@ public class DepartmentService {
         return new PageResponse<>(p.getContent().stream().map(DepartmentResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    /** Load a record by ID or return HTTP 404. */
     public DepartmentResponse get(Long id) {
         log.debug("Fetching department id={}", id);
         return DepartmentResponse.from(repository.findById(id)
@@ -37,6 +44,7 @@ public class DepartmentService {
     
     }
 
+    /** Persist the supplied fields in one transaction and return the saved values. */
     @Transactional
     public DepartmentResponse create(CreateDepartmentRequest req) {
         log.info("Creating department");
@@ -49,6 +57,7 @@ public class DepartmentService {
         return DepartmentResponse.from(saved);
     }
 
+    /** Apply only non-null fields in one transaction, leaving omitted fields unchanged. */
     @Transactional
     public DepartmentResponse update(Long id, UpdateDepartmentRequest req) {
         log.info("Updating department id={}", id);

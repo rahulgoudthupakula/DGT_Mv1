@@ -1,6 +1,6 @@
 package com.dgt.backend.dailyclosing.controller;
 
-import com.dgt.backend.access.PagePermissions;
+import com.dgt.backend.access.security.PagePermissions;
 import com.dgt.backend.dailyclosing.dto.*;
 import com.dgt.backend.dailyclosing.service.DailyClosingTenderService;
 import com.dgt.backend.common.dto.PageResponse;

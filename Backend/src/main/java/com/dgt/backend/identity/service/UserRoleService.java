@@ -14,12 +14,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * JPA CRUD operations for UserRole.
+ * The caller is responsible for authorization and workflow validation; these queries add no store predicate.
+ */
+
 @Slf4j
 @Service
 public class UserRoleService {
     private final UserRoleRepository repository;
     public UserRoleService(UserRoleRepository repository) { this.repository = repository; }
 
+    /** Load a page sorted by primary key and map its records to response DTOs. */
     public PageResponse<UserRoleResponse> list(int page, int size) {
         log.debug("Listing user role page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("userRoleId")));
@@ -27,6 +33,7 @@ public class UserRoleService {
         return new PageResponse<>(p.getContent().stream().map(UserRoleResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    /** Load a record by ID or return HTTP 404. */
     public UserRoleResponse get(Long id) {
         log.debug("Fetching user role id={}", id);
         return UserRoleResponse.from(repository.findById(id)
@@ -37,6 +44,7 @@ public class UserRoleService {
     
     }
 
+    /** Persist the supplied fields in one transaction and return the saved values. */
     @Transactional
     public UserRoleResponse create(CreateUserRoleRequest req) {
         log.info("Creating user role");
@@ -51,6 +59,7 @@ public class UserRoleService {
         return UserRoleResponse.from(saved);
     }
 
+    /** Apply only non-null fields in one transaction, leaving omitted fields unchanged. */
     @Transactional
     public UserRoleResponse update(Long id, UpdateUserRoleRequest req) {
         log.info("Updating user role id={}", id);

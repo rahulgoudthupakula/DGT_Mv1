@@ -1,3 +1,7 @@
+/**
+ * Store-scoped query and mutation helper for rebate definitions and product links. Existing
+ * records use PUT with If-Match; new records use POST.
+ */
 import {useQuery,useQueryClient} from '@tanstack/react-query';
 import {request} from '@/lib/backend';
 import type {RebateProgram} from './rebateTypes';
@@ -7,6 +11,7 @@ export type RebateData={productVendorLinks:{productId:string;vendorId:string}[];
 export function useRebates(storeId:string){
  const path=`/access/stores/${encodeURIComponent(storeId)}/rebates`,client=useQueryClient();
  const query=useQuery({queryKey:['rebates',storeId],queryFn:()=>request<RebateData>(path),enabled:!!storeId});
+ // After saving, refresh the shared definitions so program and eligibility tabs use the same records.
  async function save(kind:'programs'|'items',body:unknown,existing?:{id:string;version?:string}|null){
   const result=await request(existing?`${path}/${kind}/${existing.id}`:`${path}/${kind}`,{method:existing?'PUT':'POST',headers:existing?{'If-Match':existing.version??''}:{},body:JSON.stringify(body)});
   await client.invalidateQueries({queryKey:['rebates',storeId]});await client.invalidateQueries({queryKey:['rebate-eligible',storeId]});return result;

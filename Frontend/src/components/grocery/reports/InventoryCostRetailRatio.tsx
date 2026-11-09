@@ -1,4 +1,8 @@
-import {useStockReports,stockCategories} from './useStockReports';
+/**
+ * Compares current stock cost and retail valuation by category. Missing source values make the
+ * ratio unavailable rather than implying zero value.
+ */
+import {useReportSummary} from './useReportSummary';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -12,13 +16,13 @@ import {
 import { Progress } from "@/components/ui/progress";
 
 export const InventoryCostRetailRatio = ({storeId}:{storeId:string}) => {
- const query=useStockReports(storeId);const mockCategories=stockCategories(query.data?.items??[]).map(g=>({category:g.category,cost:g.inventoryValue,retail:g.inventoryValueRetail,ratio:g.inventoryValue==null||!g.inventoryValueRetail?null:g.inventoryValue/g.inventoryValueRetail}));
-  const totalCost = mockCategories.reduce((sum, c) => sum + c.cost, 0);
-  const totalRetail = mockCategories.reduce((sum, c) => sum + c.retail, 0);
-  const totalRatio = totalRetail > 0 ? totalCost / totalRetail : 0;
-
-  const unknown=mockCategories.some(c=>c.cost==null||c.retail==null);
- const mockData={ratio:unknown||!totalRetail?null:totalRatio,inventoryAtCost:unknown?null:totalCost,inventoryAtRetail:unknown?null:totalRetail};
+ const query=useReportSummary(storeId,'stock-summary');
+ const mockCategories=(query.data?.categories??[]).map(g=>({category:g.category,cost:g.inventoryValue,retail:g.inventoryValueRetail,ratio:g.ratio,capitalWeight:g.pctOfTotal}));
+ const totalCost=query.data?.summary.totalValue??null;
+ const totalRetail=query.data?.summary.totalRetailValue??null;
+ const totalRatio=query.data?.summary.ratio??null;
+ const unknown=totalCost==null||totalRetail==null;
+ const mockData={ratio:totalRatio,inventoryAtCost:totalCost,inventoryAtRetail:totalRetail};
  if(query.isPending)return <p>Loading stock ratios…</p>;if(query.error)return <p role="alert">{String(query.error)}</p>;
   return (
     <div className="space-y-5">
@@ -86,7 +90,7 @@ export const InventoryCostRetailRatio = ({storeId}:{storeId:string}) => {
             </TableHeader>
             <TableBody>
               {mockCategories.map((cat) => {
-                const capitalWeight = unknown || totalCost <= 0 || cat.cost == null ? null : cat.cost / totalCost * 100;
+                const capitalWeight = cat.capitalWeight;
                 return (
                   <TableRow key={cat.category}>
                     <TableCell className="font-medium">

@@ -1,3 +1,7 @@
+/**
+ * Formats caller-provided profit metrics and comparisons. Data loading and profit calculations
+ * belong to the parent report.
+ */
 import { Card, CardContent } from "@/components/ui/card";
 import { DollarSign, TrendingUp, TrendingDown, Percent, ArrowUp, ArrowDown } from "lucide-react";
 

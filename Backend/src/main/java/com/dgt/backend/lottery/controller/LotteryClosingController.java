@@ -1,5 +1,5 @@
 package com.dgt.backend.lottery.controller;
-import com.dgt.backend.access.ScopedAccess;
+import com.dgt.backend.access.security.ScopedAccess;
 import com.dgt.backend.common.entity.Rows;
 import java.math.*;
 import java.util.*;
@@ -10,6 +10,11 @@ import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * Opens and closes store lottery day/shift records with pack price and commission snapshots.
+ * Reconciles ticket positions against explicitly linked sale items before locking a closing.
+ */
+
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/access/stores/{store}/lottery-closing")
@@ -19,11 +24,16 @@ public class LotteryClosingController {
  private void access(String store,String code){if(!permissions.allowed(store,code))throw a.denied();}
  private ResponseStatusException bad(String m){return new ResponseStatusException(HttpStatus.BAD_REQUEST,m);}
  private ResponseStatusException conflict(String m){return new ResponseStatusException(HttpStatus.CONFLICT,m);}
+ // Lock store settings to serialize closing and related pack operations.
  private Map<String,Object> lock(String store){return a.db.queryForMap("SELECT *,xmin::text AS version FROM stores WHERE dgt_id=? FOR UPDATE",store);}
+ // Read counter configuration and its optimistic edit version.
  @GetMapping("/settings") public Object settings(@PathVariable String store){access(store,"LOTTERY_SETTINGS");return a.db.queryForMap("SELECT lottery_separate_counter AS \"separateCounter\",xmin::text AS version FROM stores WHERE dgt_id=?",store);}
+ // Shared/separate counter choice and the version last read.
  public record Setting(Boolean separateCounter,String version){}
+ // Reject stale settings changes, persist the counter mode, and audit the update.
  @PutMapping("/settings") @Transactional public Object setting(@PathVariable String store,@RequestBody Setting in){access(store,"LOTTERY_SETTINGS");var old=lock(store);if(in.separateCounter()==null)throw bad("Choose shared or separate counter");if(!Objects.equals(old.get("version"),in.version()))throw conflict("Settings changed; refresh before saving");
   a.db.update("UPDATE stores SET lottery_separate_counter=? WHERE dgt_id=?",in.separateCounter(),store);a.audit(store,"LOTTERY_COUNTER_SETTING",store,json.writeValueAsString(Map.of("separateCounter",in.separateCounter())));return settings(store);}
+ // Find verified, activated, unsettled packs with tickets remaining after closed shifts.
  private List<Map<String,Object>> eligible(String store){return a.db.queryForList("""
  SELECT p.lottery_pack_id AS id,g.game_name AS "gameName",p.pack_number AS "packNumber",p.start_ticket_number AS "startTicket",p.end_ticket_number AS "endTicket",
  greatest(p.start_ticket_number,coalesce(prev.last_sold+1,p.start_ticket_number)) AS opening,p.received_ticket_price AS price,CASE WHEN g.commission_effective_date<=(SELECT (CURRENT_TIMESTAMP AT TIME ZONE timezone)::date FROM stores WHERE dgt_id=p.dgt_id) THEN g.scheduled_commission_percent ELSE g.commission_percent END AS rate
@@ -32,6 +42,7 @@ public class LotteryClosingController {
  WHERE p.dgt_id=? AND p.activation_reference IS NOT NULL AND p.verification_status='VERIFIED' AND p.return_date IS NULL AND p.return_status IS NULL AND p.pack_settlement_reference IS NULL
  AND greatest(p.start_ticket_number,coalesce(prev.last_sold+1,p.start_ticket_number))<=p.end_ticket_number ORDER BY p.lottery_pack_id
  """,store);}
+ // Assemble the selected/open closing, pack snapshots, recorded ticket counts, and recent history.
  private Object data(String store,Long closingId){
   var out=new LinkedHashMap<String,Object>();var storeData=a.db.queryForMap("SELECT store_name AS name,timezone,lottery_separate_counter AS \"separateCounter\",(CURRENT_TIMESTAMP AT TIME ZONE timezone)::date::text AS today FROM stores WHERE dgt_id=?",store);out.put("store",storeData);
   var headers=a.db.queryForList("SELECT c.*,c.xmin::text AS version,concat_ws(' ',u.first_name,u.last_name) AS \"openedBy\",concat_ws(' ',v.first_name,v.last_name) AS \"closedBy\" FROM lottery_pack_inventory c JOIN users u ON u.user_id=c.shift_opened_by LEFT JOIN users v ON v.user_id=c.shift_closed_by WHERE c.dgt_id=? AND c.business_date IS NOT NULL "+(closingId==null?"AND c.shift_closed_at IS NULL":"AND c.lottery_pack_inventory_id=?")+" ORDER BY c.lottery_pack_inventory_id DESC",closingId==null?new Object[]{store}:new Object[]{store,closingId});
@@ -40,8 +51,11 @@ public class LotteryClosingController {
   if(headers.isEmpty())out.put("packs",eligible(store).stream().map(Rows::normalize).toList());else out.put("packs",a.db.queryForList("SELECT i.pack_id AS id,g.game_name AS \"gameName\",p.pack_number AS \"packNumber\",p.start_ticket_number AS \"startTicket\",i.open_ticket_number AS opening,i.end_ticket_snapshot AS \"endTicket\",i.last_sold_ticket_number AS \"lastSold\",i.ticket_price_snapshot AS price,i.commission_percent_snapshot AS rate,i.expected_cash AS sales,i.commission_amount AS commission,coalesce(i.recorded_sales_snapshot,(SELECT coalesce(sum(si.quantity),0)::integer FROM lottery_sales_links l JOIN sales_items si USING(sales_item_id) JOIN sales sale ON sale.sale_id=si.sale_id WHERE l.active AND l.lottery_pack_inventory_id=i.lottery_pack_inventory_id AND l.pack_id=i.pack_id AND sale.store_id=p.dgt_id AND sale.transaction_type='SALE' AND sale.sale_status='COMPLETED')) AS \"recordedTickets\" FROM lottery_pack_inventory_items i JOIN lottery_packs p ON p.lottery_pack_id=i.pack_id JOIN lottery_games g ON g.lottery_game_id=p.lottery_game_id WHERE i.lottery_pack_inventory_id=? AND p.dgt_id=? ORDER BY i.pack_id",headers.getFirst().get("lottery_pack_inventory_id"),store).stream().map(Rows::normalize).toList());
   out.put("history",a.db.queryForList("SELECT lottery_pack_inventory_id AS id,business_date::text AS date,closing_type AS type FROM lottery_pack_inventory WHERE dgt_id=? AND business_date IS NOT NULL AND shift_closed_at IS NOT NULL ORDER BY lottery_pack_inventory_id DESC LIMIT 100",store));return out;
  }
+ // Read closing data only with the lottery closing permission.
  @GetMapping @Transactional(readOnly=true) public Object get(@PathVariable String store,@RequestParam(required=false) Long closingId){access(store,"LOTTERY_CLOSE_SHIFT");return data(store,closingId);}
+ // Select whether the new closing represents a DAY or SHIFT.
  public record Open(String type){}
+ // Require counter setup and no open closing, then snapshot eligible packs and commission rates.
  @PostMapping("/open") @Transactional public Object open(@PathVariable String store,@RequestBody Open in){access(store,"LOTTERY_CLOSE_SHIFT");var settings=lock(store);
   if(settings.get("lottery_separate_counter")==null)throw bad("Choose shared or separate counter in Lottery Settings first");if(!Set.of("DAY","SHIFT").contains(Objects.toString(in.type(),"")))throw bad("Choose day or shift");
   if(!a.db.queryForList("SELECT lottery_pack_inventory_id FROM lottery_pack_inventory WHERE dgt_id=? AND shift_closed_at IS NULL",store).isEmpty())throw conflict("An open closing already exists; refresh or review the legacy closing");
@@ -52,7 +66,9 @@ public class LotteryClosingController {
    a.db.update("INSERT INTO lottery_pack_inventory_items(lottery_pack_inventory_id,pack_id,open_ticket_number,end_ticket_snapshot,physical_quantity,ticket_price_snapshot,commission_percent_snapshot) VALUES (?,?,?,?,?,?,?)",id,p.get("id"),p.get("opening"),p.get("endTicket"),((Number)p.get("endTicket")).intValue()-((Number)p.get("opening")).intValue()+1,p.get("price"),p.get("rate"));}
   a.audit(store,"LOTTERY_CLOSING_OPENED",Long.toString(id),json.writeValueAsString(Map.of("type",in.type(),"separateCounter",settings.get("lottery_separate_counter"))));return data(store,id);
  }
+ // Explicit association between one existing sale item and a pack in the closing.
  public record Link(Long salesItemId,Long packId){}
+ // Show existing links and completed whole-ticket receipt lines available for manual linking.
  @GetMapping("/{id}/sales") public Object sales(@PathVariable String store,@PathVariable long id,@RequestParam(defaultValue="") String receipt){
   access(store,"LOTTERY_CLOSE_SHIFT");
   if(a.db.queryForObject("SELECT count(*) FROM lottery_pack_inventory WHERE lottery_pack_inventory_id=? AND dgt_id=?",Integer.class,id,store)!=1)throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Closing not found");
@@ -68,6 +84,7 @@ public class LotteryClosingController {
    ORDER BY s.sale_datetime,si.sales_item_id LIMIT 200
    """,store,id,receipt,receipt).stream().map(Rows::normalize).toList();
  }
+ // Validate the sale period and pack membership before linking and resetting sales review.
  @PutMapping("/{id}/sales") @Transactional public Object link(@PathVariable String store,@PathVariable long id,@RequestBody Link in){
   access(store,"LOTTERY_CLOSE_SHIFT");lock(store);
   var h=a.db.queryForList("SELECT * FROM lottery_pack_inventory WHERE lottery_pack_inventory_id=? AND dgt_id=? AND shift_closed_at IS NULL FOR UPDATE",id,store);
@@ -89,6 +106,7 @@ public class LotteryClosingController {
   a.audit(store,"LOTTERY_SALE_LINKED",Long.toString(id),json.writeValueAsString(Map.of("salesItemId",in.salesItemId(),"packId",in.packId())));
   return data(store,id);
  }
+ // Deactivate the link without deleting its record and require sales review again.
  @PostMapping("/{id}/sales/{item}/unlink") @Transactional public Object unlink(@PathVariable String store,@PathVariable long id,@PathVariable long item){
   access(store,"LOTTERY_CLOSE_SHIFT");lock(store);
   if(a.db.queryForObject("SELECT count(*) FROM lottery_pack_inventory WHERE lottery_pack_inventory_id=? AND dgt_id=? AND shift_closed_at IS NULL",Integer.class,id,store)!=1)throw conflict("Closing not found or already closed");
@@ -97,13 +115,17 @@ public class LotteryClosingController {
   a.audit(store,"LOTTERY_SALE_UNLINKED",Long.toString(id),json.writeValueAsString(Map.of("salesItemId",item)));
   return data(store,id);
  }
+ // Last ticket sold plus the recorded ticket count the user reviewed for a pack.
  public record Line(Long id,Integer lastSold,Integer recordedTickets){}
+ // Draft/close request includes the closing version, cash count, pack positions, and review confirmation.
  public record Save(String version,Boolean close,BigDecimal cashCounted,String varianceNote,List<Line> packs,Boolean salesReviewed){}
+ // Save every pack atomically; closed or concurrently changed records cannot be edited.
  @PutMapping("/{id}") @Transactional public Object save(@PathVariable String store,@PathVariable long id,@RequestBody Save in){access(store,"LOTTERY_CLOSE_SHIFT");lock(store);
   var headers=a.db.queryForList("SELECT *,xmin::text AS version FROM lottery_pack_inventory WHERE lottery_pack_inventory_id=? AND dgt_id=? AND business_date IS NOT NULL FOR UPDATE",id,store);
   if(headers.size()!=1)throw conflict("Closing not found");var h=headers.getFirst();if(h.get("shift_closed_at")!=null||!Objects.equals(h.get("version"),in.version()))throw conflict("Closing changed or is already locked; refresh");
   boolean close=Boolean.TRUE.equals(in.close()),separate=Boolean.TRUE.equals(h.get("counter_separate"));var lines=a.db.queryForList("SELECT * FROM lottery_pack_inventory_items WHERE lottery_pack_inventory_id=? ORDER BY pack_id FOR UPDATE",id);
   if(in.packs()==null||in.packs().size()!=lines.size())throw bad("Submit every pack in this closing");Map<Long,Integer> values=new HashMap<>();for(Line line:in.packs()){if(line==null||line.id()==null||values.containsKey(line.id()))throw bad("Invalid or duplicate pack");values.put(line.id(),line.lastSold());}
+  // Revalidate linked sales under shared locks before finalizing the closing.
   if(close){
    var linked=a.db.queryForList("SELECT si.quantity,s.sale_status,s.transaction_type,s.sale_datetime FROM lottery_sales_links l JOIN sales_items si USING(sales_item_id) JOIN sales s USING(sale_id) WHERE l.active AND l.lottery_pack_inventory_id=? FOR SHARE OF si,s",id);
    for(var sale:linked){BigDecimal q=(BigDecimal)sale.get("quantity");
@@ -112,6 +134,7 @@ public class LotteryClosingController {
     if(h.get("sales_period_started_at")==null||date.isBefore(((java.sql.Timestamp)h.get("sales_period_started_at")).toInstant())||date.isAfter(java.time.Instant.now()))throw conflict("A linked sale is outside this closing period");
    }
   }
+  // Derive tickets sold from inclusive positions and calculate sales/commission from opening snapshots.
   boolean ticketVariance=false;BigDecimal gross=BigDecimal.ZERO;for(var line:lines){Long pid=((Number)line.get("pack_id")).longValue();if(!values.containsKey(pid))throw bad("Pack does not belong to this closing");Integer last=values.get(pid);int opening=((Number)line.get("open_ticket_number")).intValue(),end=((Number)line.get("end_ticket_snapshot")).intValue();
    if((close&&last==null)||(last!=null&&(last<opening-1||last>end)))throw bad("Enter last sold between opening minus one (no sales) and the pack end");
    int recorded=a.db.queryForObject("SELECT coalesce(sum(si.quantity),0)::integer FROM lottery_sales_links l JOIN sales_items si USING(sales_item_id) JOIN sales sale USING(sale_id) WHERE l.active AND l.lottery_pack_inventory_id=? AND l.pack_id=? AND sale.store_id=? AND sale.transaction_type='SALE' AND sale.sale_status='COMPLETED'",Integer.class,id,pid,store);
@@ -119,6 +142,7 @@ public class LotteryClosingController {
    int sold=last==null?0:last-opening+1;ticketVariance|=sold!=recorded;
    if(close)a.db.update("UPDATE lottery_pack_inventory_items SET recorded_sales_snapshot=? WHERE lottery_pack_inventory_item_id=?",recorded,line.get("lottery_pack_inventory_item_id"));BigDecimal sales=((BigDecimal)line.get("ticket_price_snapshot")).multiply(BigDecimal.valueOf(sold)).setScale(2,RoundingMode.HALF_UP);BigDecimal commission=sales.multiply((BigDecimal)line.get("commission_percent_snapshot")).divide(BigDecimal.valueOf(100),2,RoundingMode.HALF_UP);gross=gross.add(sales);
    a.db.update("UPDATE lottery_pack_inventory_items SET last_sold_ticket_number=?,physical_quantity=?,expected_cash=?,commission_amount=?,updated_at=CURRENT_TIMESTAMP WHERE lottery_pack_inventory_item_id=?",last,end-opening+1-sold,sales,commission,line.get("lottery_pack_inventory_item_id"));}
+  // Only separate counters retain counted cash; ticket or cash variances require explanations on close.
   BigDecimal cash=separate?in.cashCounted():null;String note=in.varianceNote()!=null?in.varianceNote().trim():null;
   if(cash!=null&&(cash.signum()<0||cash.stripTrailingZeros().scale()>2||cash.compareTo(new BigDecimal("9999999999.99"))>0))throw bad("Enter a nonnegative cash count with up to two decimals");
   if(note!=null&&note.length()>2000)throw bad("Variance note must be at most 2,000 characters");

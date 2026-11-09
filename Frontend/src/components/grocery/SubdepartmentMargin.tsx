@@ -1,3 +1,7 @@
+/**
+ * Edits margin values supplied by GrocerySettings. The parent saves the rows and their versions;
+ * this table does not independently persist or recalculate product prices.
+ */
 import { useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";

@@ -14,12 +14,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * JPA record operations for DailyExpense.
+ * Copies supplied values; store authorization and closing reconciliation are not performed here.
+ */
+
 @Slf4j
 @Service
 public class DailyExpenseService {
     private final DailyExpenseRepository repository;
     public DailyExpenseService(DailyExpenseRepository repository) { this.repository = repository; }
 
+    /** Read records ordered by primary key and map the page to response DTOs. */
     public PageResponse<DailyExpenseResponse> list(int page, int size) {
         log.debug("Listing daily expense page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("expensesId")));
@@ -27,6 +33,7 @@ public class DailyExpenseService {
         return new PageResponse<>(p.getContent().stream().map(DailyExpenseResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    /** Load one record, or fail with HTTP 404 when it does not exist. */
     public DailyExpenseResponse get(Long id) {
         log.debug("Fetching daily expense id={}", id);
         return DailyExpenseResponse.from(repository.findById(id)
@@ -37,6 +44,7 @@ public class DailyExpenseService {
     
     }
 
+    /** Save the supplied record fields atomically; no derived closing totals are calculated. */
     @Transactional
     public DailyExpenseResponse create(CreateDailyExpenseRequest req) {
         log.info("Creating daily expense");
@@ -54,6 +62,7 @@ public class DailyExpenseService {
         return DailyExpenseResponse.from(saved);
     }
 
+    /** Apply only non-null fields in one transaction, preserving omitted values. */
     @Transactional
     public DailyExpenseResponse update(Long id, UpdateDailyExpenseRequest req) {
         log.info("Updating daily expense id={}", id);

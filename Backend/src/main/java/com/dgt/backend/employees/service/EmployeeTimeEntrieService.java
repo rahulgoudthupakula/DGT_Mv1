@@ -14,12 +14,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * JPA CRUD operations for EmployeeTimeEntrie.
+ * The caller is responsible for authorization and workflow validation; these queries add no store predicate.
+ */
+
 @Slf4j
 @Service
 public class EmployeeTimeEntrieService {
     private final EmployeeTimeEntryRepository repository;
     public EmployeeTimeEntrieService(EmployeeTimeEntryRepository repository) { this.repository = repository; }
 
+    /** Load a page sorted by primary key and map its records to response DTOs. */
     public PageResponse<EmployeeTimeEntryResponse> list(int page, int size) {
         log.debug("Listing employee time entrie page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("timeEntryId")));
@@ -27,6 +33,7 @@ public class EmployeeTimeEntrieService {
         return new PageResponse<>(p.getContent().stream().map(EmployeeTimeEntryResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    /** Load a record by ID or return HTTP 404. */
     public EmployeeTimeEntryResponse get(Long id) {
         log.debug("Fetching employee time entrie id={}", id);
         return EmployeeTimeEntryResponse.from(repository.findById(id)
@@ -37,6 +44,7 @@ public class EmployeeTimeEntrieService {
     
     }
 
+    /** Persist the supplied fields in one transaction and return the saved values. */
     @Transactional
     public EmployeeTimeEntryResponse create(CreateEmployeeTimeEntryRequest req) {
         log.info("Creating employee time entrie");
@@ -54,6 +62,7 @@ public class EmployeeTimeEntrieService {
         return EmployeeTimeEntryResponse.from(saved);
     }
 
+    /** Apply only non-null fields in one transaction, leaving omitted fields unchanged. */
     @Transactional
     public EmployeeTimeEntryResponse update(Long id, UpdateEmployeeTimeEntryRequest req) {
         log.info("Updating employee time entrie id={}", id);

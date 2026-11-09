@@ -5,6 +5,11 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
+/**
+ * Response snapshot of a BillingInvoice entity for the generic API.
+ * Contains stored values rather than computed billing-page summaries.
+ */
+
 public record BillingInvoiceResponse(
         Long invoiceId,
         String storeId,
@@ -21,6 +26,7 @@ public record BillingInvoiceResponse(
         String invoiceDocumentUrl,
         OffsetDateTime createdAt
 ) {
+    /** Copy persisted entity fields into the API response without recalculating amounts. */
     public static BillingInvoiceResponse from(BillingInvoice e) {
         return new BillingInvoiceResponse(
                 e.getInvoiceId(), e.getStoreId(), e.getSubscriptionPlanId(),

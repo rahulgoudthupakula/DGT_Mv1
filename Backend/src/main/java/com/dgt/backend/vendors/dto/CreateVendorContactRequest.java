@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+// Creation payload for the generic vendor contract/contact record API; declared constraints run when validated by the controller.
 public record CreateVendorContactRequest(
         @NotNull Long vendorId,
         @Size(max = 50) String dgtId,

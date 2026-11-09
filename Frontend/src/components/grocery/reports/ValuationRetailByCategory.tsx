@@ -1,4 +1,8 @@
-import {useStockReports,stockCategories} from './useStockReports';
+/**
+ * Values current stock at retail by category. Missing quantity or retail price remains unknown; no
+ * historical price reconstruction occurs here.
+ */
+import {useReportSummary} from './useReportSummary';
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow,
@@ -23,11 +27,12 @@ interface CategoryRow {
 
 
 export const ValuationRetailByCategory = ({storeId}:{storeId:string}) => {
- const query=useStockReports(storeId);const mockRows=stockCategories(query.data?.items??[]);
-  const totalQty = mockRows.some(r=>r.onHandQty==null)?null:mockRows.reduce((s, r) => s + r.onHandQty, 0);
-  const totalRetailValue = mockRows.reduce((s, r) => s + (r.inventoryValueRetail??0), 0);
-  const totalActual = mockRows.reduce((s, r) => s + (r.actualInventory??0), 0);
-  const totalVar = mockRows.reduce((s, r) => s + (r.variation??0), 0);
+ const query=useReportSummary(storeId,'stock-summary');const mockRows=query.data?.categories??[];
+ const totalQty=query.data?.summary.totalQty??null;
+ const totalValue=query.data?.summary.totalValue??null;
+ const totalRetailValue=query.data?.summary.totalRetailValue??null;
+ const totalActual=query.data?.summary.totalActual??null;
+ const totalVar=query.data?.summary.totalVar??null;
 
   if(query.isPending)return <p>Loading stock…</p>;if(query.error)return <p role="alert">{String(query.error)}</p>;
   return (
@@ -75,7 +80,7 @@ export const ValuationRetailByCategory = ({storeId}:{storeId:string}) => {
                     <TableCell className="text-xs text-right font-bold">${mockRows.some(r=>r.missingRetail)?'—':fmt(totalRetailValue)}</TableCell>
                     <TableCell className="text-xs text-right font-bold">$—</TableCell>
                     <TableCell className={`text-xs text-right font-bold ${totalVar < 0 ? "text-destructive" : totalVar > 0 ? "text-[hsl(var(--success))]" : ""}`}>
-                      {totalVar !== 0 ? `$$—` : "—"}
+                      {fmt(totalVar)}
                     </TableCell>
                     <TableCell className="text-xs" />
                   </TableRow>

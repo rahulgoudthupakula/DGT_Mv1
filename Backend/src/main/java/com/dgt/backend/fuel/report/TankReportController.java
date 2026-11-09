@@ -1,6 +1,6 @@
 package com.dgt.backend.fuel.report;
 
-import com.dgt.backend.access.ScopedAccess;
+import com.dgt.backend.access.security.ScopedAccess;
 import com.dgt.backend.common.entity.Rows;
 import java.math.BigDecimal;
 import java.time.*;
@@ -13,6 +13,11 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * Read-only store tank report, gated by app.gas.tank-report.enabled.
+ * Combines dated readings and recorded movements without inventing unavailable sales observations.
+ */
+
 @Slf4j
 @RestController
 @ConditionalOnProperty(name="app.gas.tank-report.enabled",havingValue="true")
@@ -20,6 +25,7 @@ import lombok.extern.slf4j.Slf4j;
 public class TankReportController {
  private final ScopedAccess a;
  public TankReportController(ScopedAccess a){this.a=a;}
+ // Allow company admins or supported store roles with one of the report-related gas permissions.
  private void access(String store){
   if(a.admin(a.user(),a.company(store)))return;
   boolean allowed=Boolean.TRUE.equals(a.db.queryForObject("""
@@ -33,6 +39,7 @@ public class TankReportController {
   if(!allowed)throw a.denied();
  }
  private ResponseStatusException bad(String s){return new ResponseStatusException(HttpStatus.BAD_REQUEST,s);}
+ // Read daily rows and per-tank summaries from a consistent repeatable-read snapshot.
  @GetMapping @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
  public Object report(@PathVariable String store,@RequestParam(required=false) LocalDate start,@RequestParam(required=false) LocalDate end,@RequestParam(required=false) Long grade){
   access(store);ZoneId zone;try{zone=ZoneId.of(a.db.queryForObject("SELECT timezone FROM stores WHERE dgt_id=?",String.class,store));}catch(Exception ex){throw bad("Configure the store timezone first");}
@@ -44,6 +51,7 @@ public class TankReportController {
    WHERE t.dgt_id=? ORDER BY name,id
    """,store);
   if(grade!=null&&grades.stream().noneMatch(g->g.get("id").equals(grade.toString())))throw bad("Fuel grade is not assigned to a tank in this store");
+  // Build store-local daily boundaries; cap the current day at the report timestamp.
   var rows=a.db.queryForList("""
    WITH days AS (SELECT (?::date+i)::date AS day FROM generate_series(0,?::date-?::date) i),
    periods AS (SELECT day,day::timestamp AT TIME ZONE ? AS begins,
@@ -79,6 +87,7 @@ public class TankReportController {
    """,start,end,start,zone.getId(),zone.getId(),java.sql.Timestamp.from(now),store,grade,grade);
   // Unsupported observations remain null, including sales (not an assumed zero).
   for(var r:rows){r.put("sold",null);r.put("stInches",null);r.put("os",null);}
+  // Keep the first opening and last closing, sum deliveries/adjustments, and retain the latest measurement.
   var summaries=new LinkedHashMap<String,Map<String,Object>>();
   for(var row:rows){String id=(String)row.get("tankId");var s=summaries.get(id);if(s==null){s=new LinkedHashMap<>();s.put("tankId",id);s.put("tank",row.get("tank"));s.put("open",row.get("open"));s.put("purchase",BigDecimal.ZERO);s.put("adjustments",BigDecimal.ZERO);s.put("sold",null);s.put("os",null);s.put("stVol",null);s.put("measuredAt",null);s.put("gradeName",row.get("gradeName"));summaries.put(id,s);}if(!Objects.equals(s.get("gradeName"),row.get("gradeName")))s.put("gradeName","Multiple grades in period");s.put("close",row.get("close"));s.put("purchase",((BigDecimal)s.get("purchase")).add((BigDecimal)row.get("purchase")));s.put("adjustments",((BigDecimal)s.get("adjustments")).add((BigDecimal)row.get("adjustments")));if(row.get("stVol")!=null){s.put("stVol",row.get("stVol"));s.put("measuredAt",row.get("measuredAt"));}}
   return Map.of("start",start.toString(),"end",end.toString(),"today",today.toString(),"timezone",zone.getId(),"asOf",now.toString(),"grades",grades,"rows",rows.stream().map(Rows::normalize).toList(),"summary",summaries.values().stream().map(Rows::normalize).toList());

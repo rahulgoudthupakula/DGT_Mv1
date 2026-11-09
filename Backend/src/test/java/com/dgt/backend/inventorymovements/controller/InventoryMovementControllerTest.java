@@ -1,6 +1,6 @@
 package com.dgt.backend.inventorymovements.controller;
 
-import com.dgt.backend.access.PagePermissions;
+import com.dgt.backend.access.security.PagePermissions;
 import com.dgt.backend.inventorymovements.dto.*;
 import com.dgt.backend.inventorymovements.service.InventoryMovementService;
 import com.dgt.backend.common.dto.PageResponse;

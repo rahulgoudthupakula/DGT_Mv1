@@ -7,10 +7,15 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * Legacy workflow placeholders, blocked by AccessPolicy; these handlers never modify records.
+ */
+
 @Slf4j
 @RestController
 @RequestMapping("/api/v1")
 public class DeferredWorkflowController {
+    // If invoked past security, respond with 501 rather than attempting the legacy operation.
     @PostMapping({"/inventory/adjustments","/billing-invoices/{id}/record-payment","/auth/change-password"})
     @PreAuthorize("@accessPolicy.check(authentication, 'workflow', 'WRITE')")
     public void unavailable(@RequestBody Map<String,Object> request) {

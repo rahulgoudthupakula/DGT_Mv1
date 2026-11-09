@@ -14,12 +14,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * JPA CRUD operations for FuelTankGradeAssignment.
+ * The caller is responsible for authorization and workflow validation; these queries add no store predicate.
+ */
+
 @Slf4j
 @Service
 public class FuelTankGradeAssignmentService {
     private final FuelTankGradeAssignmentRepository repository;
     public FuelTankGradeAssignmentService(FuelTankGradeAssignmentRepository repository) { this.repository = repository; }
 
+    /** Load a page sorted by primary key and map its records to response DTOs. */
     public PageResponse<FuelTankGradeAssignmentResponse> list(int page, int size) {
         log.debug("Listing fuel tank grade assignment page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("assignmentId")));
@@ -27,6 +33,7 @@ public class FuelTankGradeAssignmentService {
         return new PageResponse<>(p.getContent().stream().map(FuelTankGradeAssignmentResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    /** Load a record by ID or return HTTP 404. */
     public FuelTankGradeAssignmentResponse get(Long id) {
         log.debug("Fetching fuel tank grade assignment id={}", id);
         return FuelTankGradeAssignmentResponse.from(repository.findById(id)
@@ -37,6 +44,7 @@ public class FuelTankGradeAssignmentService {
     
     }
 
+    /** Persist the supplied fields in one transaction and return the saved values. */
     @Transactional
     public FuelTankGradeAssignmentResponse create(CreateFuelTankGradeAssignmentRequest req) {
         log.info("Creating fuel tank grade assignment");
@@ -51,6 +59,7 @@ public class FuelTankGradeAssignmentService {
         return FuelTankGradeAssignmentResponse.from(saved);
     }
 
+    /** Apply only non-null fields in one transaction, leaving omitted fields unchanged. */
     @Transactional
     public FuelTankGradeAssignmentResponse update(Long id, UpdateFuelTankGradeAssignmentRequest req) {
         log.info("Updating fuel tank grade assignment id={}", id);

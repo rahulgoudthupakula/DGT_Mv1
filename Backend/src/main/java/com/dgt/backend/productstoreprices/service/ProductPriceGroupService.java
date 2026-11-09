@@ -16,10 +16,12 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
+// Coordinate product price-group link persistence and response mapping; caller authorization is handled at the controller.
 public class ProductPriceGroupService {
     private final ProductPriceGroupRepository repository;
     public ProductPriceGroupService(ProductPriceGroupRepository repository) { this.repository = repository; }
 
+    // Read a page sorted by primary key and include the total record count.
     public PageResponse<ProductPriceGroupResponse> list(int page, int size) {
         log.debug("Listing product price group page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("productPriceGroupId")));
@@ -27,6 +29,7 @@ public class ProductPriceGroupService {
         return new PageResponse<>(p.getContent().stream().map(ProductPriceGroupResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    // Map the stored record to the API response, or return HTTP 404 when absent.
     public ProductPriceGroupResponse get(Long id) {
         log.debug("Fetching product price group id={}", id);
         return ProductPriceGroupResponse.from(repository.findById(id)
@@ -38,6 +41,7 @@ public class ProductPriceGroupService {
     }
 
     @Transactional
+    // Build and save a record from the submitted create fields inside the transaction.
     public ProductPriceGroupResponse create(CreateProductPriceGroupRequest req) {
         log.info("Creating product price group");
         var entity = ProductPriceGroup.builder()
@@ -50,6 +54,7 @@ public class ProductPriceGroupService {
     }
 
     @Transactional
+    // Load the existing record and apply only non-null fields; null does not clear a stored value.
     public ProductPriceGroupResponse update(Long id, UpdateProductPriceGroupRequest req) {
         log.info("Updating product price group id={}", id);
         var entity = repository.findById(id)

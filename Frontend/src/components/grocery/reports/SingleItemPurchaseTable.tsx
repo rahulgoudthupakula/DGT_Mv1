@@ -1,3 +1,7 @@
+/**
+ * Renders purchase lines and computes display flags for cost changes. A flag highlights a
+ * comparison; it does not approve a cost or modify an invoice.
+ */
 import {
   Table,
   TableBody,
@@ -38,13 +42,14 @@ export interface ItemPurchaseRow {
   paymentStatus: "Paid" | "Partial" | "Unpaid" | "Unknown";
   /** Previous purchase's unit cost — for spike detection */
   prevUnitCost: number|null;
+  costChangePercent?:number|null;
   /** Previous purchase's vendor — for vendor-change detection */
   prevVendor: string;
   /** Whether this receipt has been invoiced */
   invoiced: boolean;
 }
 
-const fmt = (n: number|null) => n===null?"—":
+const fmt = (n: number|null) => n==null?"—":
   `$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 
 const statusVariant = (s: ItemPurchaseRow["paymentStatus"]) => {
@@ -61,22 +66,14 @@ const statusVariant = (s: ItemPurchaseRow["paymentStatus"]) => {
 
 interface Props {
   data: ItemPurchaseRow[];
+  totals: {receivedQty?:number|null;extendedCost?:number|null;rebate?:number|null;netCost?:number|null};
   costSpikeThreshold: number; // percentage
 }
 
 export const SingleItemPurchaseTable = ({
   data,
-  costSpikeThreshold,
+  costSpikeThreshold, totals,
 }: Props) => {
-  const totals = data.reduce(
-    (acc, r) => ({
-      receivedQty: acc.receivedQty + r.receivedQty,
-      extendedCost: acc.extendedCost + r.extendedCost,
-      rebate: acc.rebate + (r.rebate??0),
-      netCost: acc.netCost + r.netCost,
-    }),
-    { receivedQty: 0, extendedCost: 0, rebate: 0, netCost: 0 }
-  );
 
   return (
     <TooltipProvider>
@@ -230,7 +227,7 @@ function getFlags(row: ItemPurchaseRow, threshold: number): Flag[] {
   // Cost spike
   if (row.prevUnitCost!==null && row.prevUnitCost > 0) {
     const pctChange =
-      ((row.unitCost - row.prevUnitCost) / row.prevUnitCost) * 100;
+      row.costChangePercent??0;
     if (pctChange > threshold) {
       flags.push({
         type: "cost-spike",

@@ -4,6 +4,10 @@ import com.dgt.backend.lottery.entity.LotteryGame;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
+/**
+ * Response DTO for stored LotteryGame fields.
+ */
+
 public record LotteryGameResponse(
         Long lotteryGameId,
         String dgtId,
@@ -19,6 +23,7 @@ public record LotteryGameResponse(
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
 ) {
+    /** Copy entity fields to the response without changing the stored record. */
     public static LotteryGameResponse from(LotteryGame e) {
         return new LotteryGameResponse(
                 e.getLotteryGameId(), e.getDgtId(), e.getGameCode(),

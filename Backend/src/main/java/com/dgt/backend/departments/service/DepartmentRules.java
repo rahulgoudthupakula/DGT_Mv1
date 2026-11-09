@@ -6,11 +6,17 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import com.dgt.backend.departments.repository.DepartmentRulesRepository;
 
+/**
+ * Validates department source and ownership rules for callers using the store mutation workflow.
+ * These checks do not themselves authorize the user or persist the submitted values.
+ */
+
 /** Store APIs cannot mutate the global/default definitions or reclassify existing rows. */
 @Component
 public class DepartmentRules {
     private final DepartmentRulesRepository repository;
     public DepartmentRules(DepartmentRulesRepository repository) { this.repository=repository; }
+    // Default missing source values to CUSTOM and validate links to global definitions.
     public void create(String table,Map<String,Object> values) {
         if(table.equals("departments")) throw forbidden("Global department definitions are read-only through store APIs");
         if(table.equals("store_departments")) {
@@ -32,6 +38,7 @@ public class DepartmentRules {
             values.put("source_type","CUSTOM");
         }
     }
+    // Lock the existing row and reject changes to default definitions, ownership, or source classification.
     public void update(String table,Object id,Map<String,Object> values) {
         if(table.equals("departments")) throw forbidden("Global department definitions are read-only through store APIs");
         if(!Set.of("store_departments","store_sub_departments").contains(table)) return;

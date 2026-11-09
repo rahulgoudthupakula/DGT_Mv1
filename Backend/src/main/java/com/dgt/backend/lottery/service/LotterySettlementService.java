@@ -14,12 +14,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * JPA CRUD operations for LotterySettlement.
+ * The caller is responsible for authorization and workflow validation; these queries add no store predicate.
+ */
+
 @Slf4j
 @Service
 public class LotterySettlementService {
     private final LotterySettlementRepository repository;
     public LotterySettlementService(LotterySettlementRepository repository) { this.repository = repository; }
 
+    /** Load a page sorted by primary key and map its records to response DTOs. */
     public PageResponse<LotterySettlementResponse> list(int page, int size) {
         log.debug("Listing lottery settlement page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("lotterySettlementId")));
@@ -27,6 +33,7 @@ public class LotterySettlementService {
         return new PageResponse<>(p.getContent().stream().map(LotterySettlementResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    /** Load a record by ID or return HTTP 404. */
     public LotterySettlementResponse get(Long id) {
         log.debug("Fetching lottery settlement id={}", id);
         return LotterySettlementResponse.from(repository.findById(id)
@@ -37,6 +44,7 @@ public class LotterySettlementService {
     
     }
 
+    /** Persist the supplied fields in one transaction and return the saved values. */
     @Transactional
     public LotterySettlementResponse create(CreateLotterySettlementRequest req) {
         log.info("Creating lottery settlement");
@@ -58,6 +66,7 @@ public class LotterySettlementService {
         return LotterySettlementResponse.from(saved);
     }
 
+    /** Apply only non-null fields in one transaction, leaving omitted fields unchanged. */
     @Transactional
     public LotterySettlementResponse update(Long id, UpdateLotterySettlementRequest req) {
         log.info("Updating lottery settlement id={}", id);

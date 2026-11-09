@@ -5,6 +5,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
+/**
+ * API representation of stored DailyExpense values, without recalculating closing totals.
+ */
+
 public record DailyExpenseResponse(
         Long expensesId,
         Long everydayClosingId,
@@ -18,6 +22,7 @@ public record DailyExpenseResponse(
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
 ) {
+    /** Copy entity values into the response without additional database queries. */
     public static DailyExpenseResponse from(DailyExpense e) {
         return new DailyExpenseResponse(
                 e.getExpensesId(), e.getEverydayClosingId(), e.getExpensesDate(),

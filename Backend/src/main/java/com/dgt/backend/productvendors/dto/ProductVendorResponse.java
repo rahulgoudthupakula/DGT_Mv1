@@ -4,6 +4,7 @@ import com.dgt.backend.productvendors.entity.ProductVendor;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
+// Response projection for the product vendor link record, including database identity and lifecycle timestamps.
 public record ProductVendorResponse(
         Long productVendorId,
         Long productId,
@@ -17,6 +18,7 @@ public record ProductVendorResponse(
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
 ) {
+    // Copy entity fields into the response without exposing the persistence object itself.
     public static ProductVendorResponse from(ProductVendor e) {
         return new ProductVendorResponse(
                 e.getProductVendorId(), e.getProductId(), e.getVendorId(),

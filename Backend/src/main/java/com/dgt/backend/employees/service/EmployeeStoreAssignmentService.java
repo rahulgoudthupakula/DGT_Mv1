@@ -14,12 +14,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * JPA CRUD operations for EmployeeStoreAssignment.
+ * The caller is responsible for authorization and workflow validation; these queries add no store predicate.
+ */
+
 @Slf4j
 @Service
 public class EmployeeStoreAssignmentService {
     private final EmployeeStoreAssignmentRepository repository;
     public EmployeeStoreAssignmentService(EmployeeStoreAssignmentRepository repository) { this.repository = repository; }
 
+    /** Load a page sorted by primary key and map its records to response DTOs. */
     public PageResponse<EmployeeStoreAssignmentResponse> list(int page, int size) {
         log.debug("Listing employee store assignment page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("employeeStoreAssignmentId")));
@@ -27,6 +33,7 @@ public class EmployeeStoreAssignmentService {
         return new PageResponse<>(p.getContent().stream().map(EmployeeStoreAssignmentResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    /** Load a record by ID or return HTTP 404. */
     public EmployeeStoreAssignmentResponse get(Long id) {
         log.debug("Fetching employee store assignment id={}", id);
         return EmployeeStoreAssignmentResponse.from(repository.findById(id)
@@ -37,6 +44,7 @@ public class EmployeeStoreAssignmentService {
     
     }
 
+    /** Persist the supplied fields in one transaction and return the saved values. */
     @Transactional
     public EmployeeStoreAssignmentResponse create(CreateEmployeeStoreAssignmentRequest req) {
         log.info("Creating employee store assignment");
@@ -53,6 +61,7 @@ public class EmployeeStoreAssignmentService {
         return EmployeeStoreAssignmentResponse.from(saved);
     }
 
+    /** Apply only non-null fields in one transaction, leaving omitted fields unchanged. */
     @Transactional
     public EmployeeStoreAssignmentResponse update(Long id, UpdateEmployeeStoreAssignmentRequest req) {
         log.info("Updating employee store assignment id={}", id);

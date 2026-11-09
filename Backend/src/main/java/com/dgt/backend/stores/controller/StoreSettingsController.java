@@ -1,7 +1,7 @@
 package com.dgt.backend.stores.controller;
 
 import java.util.*;
-import com.dgt.backend.access.ApprovalService;
+import com.dgt.backend.access.service.ApprovalService;
 import com.dgt.backend.stores.service.StoreHoursService;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,6 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/stores/{dgtId}/settings")
+// Combine store identity, contact information and weekly hours in the settings workflow.
 public class StoreSettingsController {
     private final ApprovalService approvals;
     private final StoreHoursService hours;
@@ -32,11 +33,13 @@ public class StoreSettingsController {
         this.hours=hours;
         this.db=db; this.stores=stores; this.contacts=contacts;
     }
+    // Detect duplicate contact rows rather than silently choosing one for editing.
     private StoreContactInfoResponse contact(String id) {
         var ids=db.queryForList("SELECT contact_info_id FROM store_contact_info WHERE dgt_id=? ORDER BY contact_info_id LIMIT 2",Long.class,id);
         if(ids.size()>1) throw new ResponseStatusException(HttpStatus.CONFLICT,"Multiple contact records exist for this store; resolve duplicates before editing");
         return ids.isEmpty()?null:contacts.get(ids.getFirst());
     }
+    // Load the store, optional contact and current business-hour versions for the settings form.
     @GetMapping
     @PreAuthorize("@scopedAccess.can(authentication,#dgtId,'STORE_SETTINGS',false)")
     public Map<String,Object> get(@PathVariable String dgtId) {
@@ -50,13 +53,16 @@ public class StoreSettingsController {
         if(!xv.isEmpty())storeMap.put("_version",xv.getFirst().get("v"));
         result.put("store",storeMap);result.put("contact",contact(dgtId));result.put("hours",hours.get(dgtId));return result;
     }
+    // Carry optional settings sections and concurrency metadata through the approval request.
     public record Update(Map<String,Object> store, Map<String,Object> contact, String contactVersion, List<StoreHoursService.Day> hours, Map<String,String> hoursVersions) {}
+    // Submit the change with its version and idempotency key through the approval service.
     @PatchMapping
     @Transactional
     @PreAuthorize("@scopedAccess.can(authentication,#dgtId,'STORE_SETTINGS',true)")
     public Object update(@PathVariable String dgtId, @RequestHeader("If-Match") String version, @RequestHeader("Idempotency-Key") String key, @RequestBody Update body) {
         return approvals.submit(dgtId,"STORE_SETTINGS",null,version,body,key);
     }
+    // Apply dispatched settings under a store row lock; this method relies on the caller transaction.
     public Map<String,Object> apply(String dgtId,String version,Update body) {
         if(body.store()!=null && !Set.of("store_id","store_name","legal_business_name","tax_id","license_number","timezone").containsAll(body.store().keySet())) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Unsupported store field");
         var lock=db.queryForList("SELECT xmin::text AS v FROM stores WHERE dgt_id=? FOR UPDATE",dgtId);
@@ -84,6 +90,7 @@ public class StoreSettingsController {
                 ));
             }
         }
+        // Delegate weekly schedule validation and version checking to the hours service.
         if(body.hours()!=null) hours.save(dgtId,body.hours(),body.hoursVersions());
         if(body.store()!=null && !body.store().isEmpty()) {
             if(body.store().containsKey("timezone")){try{java.time.ZoneId.of((String)body.store().get("timezone"));}catch(java.time.DateTimeException e){throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid timezone: use a valid IANA timezone identifier");}}

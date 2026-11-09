@@ -14,12 +14,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * JPA CRUD operations for FuelInvoiceDetail.
+ * The caller is responsible for authorization and workflow validation; these queries add no store predicate.
+ */
+
 @Slf4j
 @Service
 public class FuelInvoiceDetailService {
     private final FuelInvoiceDetailRepository repository;
     public FuelInvoiceDetailService(FuelInvoiceDetailRepository repository) { this.repository = repository; }
 
+    /** Load a page sorted by primary key and map its records to response DTOs. */
     public PageResponse<FuelInvoiceDetailResponse> list(int page, int size) {
         log.debug("Listing fuel invoice detail page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("fuelInvoiceDetailsId")));
@@ -27,6 +33,7 @@ public class FuelInvoiceDetailService {
         return new PageResponse<>(p.getContent().stream().map(FuelInvoiceDetailResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    /** Load a record by ID or return HTTP 404. */
     public FuelInvoiceDetailResponse get(Long id) {
         log.debug("Fetching fuel invoice detail id={}", id);
         return FuelInvoiceDetailResponse.from(repository.findById(id)
@@ -37,6 +44,7 @@ public class FuelInvoiceDetailService {
     
     }
 
+    /** Persist the supplied fields in one transaction and return the saved values. */
     @Transactional
     public FuelInvoiceDetailResponse create(CreateFuelInvoiceDetailRequest req) {
         log.info("Creating fuel invoice detail");
@@ -55,6 +63,7 @@ public class FuelInvoiceDetailService {
         return FuelInvoiceDetailResponse.from(saved);
     }
 
+    /** Apply only non-null fields in one transaction, leaving omitted fields unchanged. */
     @Transactional
     public FuelInvoiceDetailResponse update(Long id, UpdateFuelInvoiceDetailRequest req) {
         log.info("Updating fuel invoice detail id={}", id);

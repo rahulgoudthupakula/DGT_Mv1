@@ -14,12 +14,19 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * JPA CRUD operations for StoreSubscription records.
+ * Authorization is applied by the controller; these repository calls do not add store filtering.
+ * Renewal and plan-change calculations belong to StoreBilling.
+ */
+
 @Slf4j
 @Service
 public class StoreSubscriptionService {
     private final StoreSubscriptionRepository repository;
     public StoreSubscriptionService(StoreSubscriptionRepository repository) { this.repository = repository; }
 
+    /** Read a page sorted by the primary key and map entities to response DTOs. */
     public PageResponse<StoreSubscriptionResponse> list(int page, int size) {
         log.debug("Listing store subscription page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("subscriptionId")));
@@ -27,6 +34,7 @@ public class StoreSubscriptionService {
         return new PageResponse<>(p.getContent().stream().map(StoreSubscriptionResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    /** Load one record or return HTTP 404 when the identifier is unknown. */
     public StoreSubscriptionResponse get(Long id) {
         log.debug("Fetching store subscription id={}", id);
         return StoreSubscriptionResponse.from(repository.findById(id)
@@ -37,6 +45,7 @@ public class StoreSubscriptionService {
     
     }
 
+    /** Persist the supplied fields in one transaction and return the saved values. */
     @Transactional
     public StoreSubscriptionResponse create(CreateStoreSubscriptionRequest req) {
         log.info("Creating store subscription");
@@ -56,6 +65,7 @@ public class StoreSubscriptionService {
         return StoreSubscriptionResponse.from(saved);
     }
 
+    /** Update only non-null request fields in one transaction; omitted fields stay unchanged. */
     @Transactional
     public StoreSubscriptionResponse update(Long id, UpdateStoreSubscriptionRequest req) {
         log.info("Updating store subscription id={}", id);

@@ -14,12 +14,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * JPA CRUD operations for InventoryMovement.
+ * The caller is responsible for authorization and workflow validation; these queries add no store predicate.
+ */
+
 @Slf4j
 @Service
 public class InventoryMovementService {
     private final InventoryMovementRepository repository;
     public InventoryMovementService(InventoryMovementRepository repository) { this.repository = repository; }
 
+    /** Load a page sorted by primary key and map its records to response DTOs. */
     public PageResponse<InventoryMovementResponse> list(int page, int size) {
         log.debug("Listing inventory movement page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("movementId")));
@@ -27,6 +33,7 @@ public class InventoryMovementService {
         return new PageResponse<>(p.getContent().stream().map(InventoryMovementResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    /** Load a record by ID or return HTTP 404. */
     public InventoryMovementResponse get(Long id) {
         log.debug("Fetching inventory movement id={}", id);
         return InventoryMovementResponse.from(repository.findById(id)
@@ -37,9 +44,11 @@ public class InventoryMovementService {
     
     }
 
+    /** Persist the supplied fields in one transaction and return the saved values. */
     @Transactional
     public InventoryMovementResponse create(CreateInventoryMovementRequest req) {
         log.info("Creating inventory movement");
+        // Save a movement record; this Java method does not also update the inventory balance.
         var entity = InventoryMovement.builder()
                 .dgtId(req.dgtId())
                 .productId(req.productId())
@@ -53,6 +62,7 @@ public class InventoryMovementService {
         return InventoryMovementResponse.from(saved);
     }
 
+    /** Apply only non-null fields in one transaction, leaving omitted fields unchanged. */
     @Transactional
     public InventoryMovementResponse update(Long id, UpdateInventoryMovementRequest req) {
         log.info("Updating inventory movement id={}", id);
@@ -64,6 +74,7 @@ public class InventoryMovementService {
         if (req.dgtId() != null) entity.setDgtId(req.dgtId());
         if (req.productId() != null) entity.setProductId(req.productId());
         if (req.movementType() != null) entity.setMovementType(req.movementType());
+        // Replace the recorded delta; this generic update does not create a compensating movement.
         if (req.qtyChanged() != null) entity.setQtyChanged(req.qtyChanged());
         if (req.unitCost() != null) entity.setUnitCost(req.unitCost());
         if (req.referenceId() != null) entity.setReferenceId(req.referenceId());

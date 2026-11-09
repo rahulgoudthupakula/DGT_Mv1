@@ -6,11 +6,17 @@ import org.hibernate.annotations.CreationTimestamp;
 import java.math.BigDecimal;
 import java.time.*;
 
+/**
+ * JPA mapping of inventory_return_items.
+ * Stores record fields and scalar relationship identifiers; workflow rules live outside this entity.
+ */
+
 @Entity
 @Table(name = "inventory_return_items")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class InventoryReturnItem {
 
+    // Database-generated primary key.
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "return_item_id")
@@ -32,6 +38,7 @@ public class InventoryReturnItem {
     private String reason;
 
     @Column(name = "created_at", updatable = false)
+    // Hibernate supplies this timestamp when inserting the record.
     @CreationTimestamp
     private OffsetDateTime createdAt;
 }

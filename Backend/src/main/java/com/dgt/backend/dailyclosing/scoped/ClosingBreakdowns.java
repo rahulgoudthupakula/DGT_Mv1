@@ -1,11 +1,15 @@
 package com.dgt.backend.dailyclosing.scoped;
 
-import com.dgt.backend.access.ScopedAccess;
+import com.dgt.backend.access.security.ScopedAccess;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.*;
 import java.util.*;
 import org.springframework.stereotype.Component;
+
+/**
+ * Builds department, selling-unit, fuel-grade, and tender breakdowns for a store business day.
+ */
 
 /** Closing-specific breakdowns. Values are frozen with the closing sales snapshot. */
 @Component
@@ -14,6 +18,7 @@ public class ClosingBreakdowns {
  public ClosingBreakdowns(ScopedAccess access) { this.access=access; }
  private BigDecimal number(Object value) { return value==null?BigDecimal.ZERO:new BigDecimal(value.toString()); }
  private void add(Map<String,Object> fields,String key,Object value) { fields.put(key,number(fields.get(key)).add(number(value))); }
+ // Use store-local midnight boundaries, including daylight-saving changes.
  public Map<String,Object> read(String store,LocalDate day,ZoneId zone) {
   var start=Timestamp.from(day.atStartOfDay(zone).toInstant());
   var end=Timestamp.from(day.plusDays(1).atStartOfDay(zone).toInstant());
@@ -21,6 +26,7 @@ public class ClosingBreakdowns {
   for(String key:List.of("Grocery – Tax","Grocery – NonTax","Cigarette Pack","Cigarette Carton","Cigarette Pack Count","Cigarette Carton Count","Scratch-off Sales","EBT/Foodstamp Batch","Fleet Card Amount Sold","Fleet Card Volume Sold")) fields.put(key,BigDecimal.ZERO);
   for(String grade:List.of("Regular","Plus","Super","Diesel")) {fields.put(grade+" Volume",BigDecimal.ZERO);fields.put(grade+" Amount Sold",BigDecimal.ZERO);}
   var warnings=new LinkedHashSet<String>();
+  // Aggregate completed sales positively and completed/refunded returns negatively; exclude voids.
   var lines=access.db.queryForList("""
    SELECT lower(trim(coalesce(d.store_department_name,''))) department,
     lower(trim(coalesce(p.unit_of_measure,''))) unit, lower(trim(p.product_name)) name,
@@ -36,6 +42,7 @@ public class ClosingBreakdowns {
    LEFT JOIN store_departments d ON d.store_department_id=sub.store_department_id AND d.dgt_id=s.store_id
    GROUP BY d.store_department_name,p.unit_of_measure,p.product_name ORDER BY 1,2,3
    """,store,start,end);
+  // Classify current product metadata; unsupported cigarette units or fuel grades produce warnings.
   for(var line:lines) {
    String department=line.get("department").toString(),unit=line.get("unit").toString(),name=line.get("name").toString();
    BigDecimal net=number(line.get("net")),taxable=number(line.get("taxable"));
@@ -54,6 +61,7 @@ public class ClosingBreakdowns {
     else {add(fields,grade+" Volume",line.get("quantity"));add(fields,grade+" Amount Sold",net);}
    }
   }
+  // Sum accepted payment records independently of item lines to avoid multiplying split tenders.
   var tenders=access.db.queryForList("""
    SELECT upper(t.tender_code) code,
     sum(CASE WHEN s.transaction_type='SALE' THEN abs(p.payment_amount) ELSE -abs(p.payment_amount) END) amount
@@ -87,6 +95,7 @@ public class ClosingBreakdowns {
    WHERE e.has_fleet AND lower(trim(d.store_department_name)) IN ('fuel','gas')
     AND lower(trim(p.unit_of_measure)) IN ('gal','gallon','gallons')
    """,store,start,end,store);
+  // Omit fleet volume when mixed tenders make gallon attribution ambiguous.
   if(Boolean.TRUE.equals(fleet.get("ambiguous"))) {fields.remove("Fleet Card Volume Sold");warnings.add("Fleet gallons need POS line-level tender allocation for mixed-payment fuel receipts.");}
   else fields.put("Fleet Card Volume Sold",fleet.get("gallons"));
   return Map.of("fields",fields,"warnings",List.copyOf(warnings));

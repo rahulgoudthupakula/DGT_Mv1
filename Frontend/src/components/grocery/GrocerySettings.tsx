@@ -1,3 +1,7 @@
+/**
+ * Loads store grocery-settings and edits a local draft. PUT includes If-Match plus per-margin
+ * versions so concurrent edits cannot silently overwrite saved settings.
+ */
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -58,6 +62,7 @@ export const GrocerySettings = ({storeId}:{storeId:string}) => {
     setMarginRows((data?.margins??[]).map(m=>({...m,margin:m.margin==null?'':String(m.margin)})));
   };
   useEffect(()=>{if(!editing)hydrate();},[query.data]);
+  // Keep unsaved form edits local until the version-checked settings/margin update succeeds.
   const handleSaveSettings=async(marginsOnly=false)=>{
     setError('');
     const actualDays=alertDays==='custom'?customAlertDays:alertDays;

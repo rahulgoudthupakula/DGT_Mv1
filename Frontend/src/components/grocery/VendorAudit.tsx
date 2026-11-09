@@ -1,3 +1,7 @@
+/**
+ * Loads store vendor audit events and supports CSV export. CSV cells escape quotes and formula
+ * prefixes so spreadsheet software treats exported details as text.
+ */
 import {useQuery} from '@tanstack/react-query';
 import {request} from '@/lib/backend';
 import {Card,CardHeader,CardTitle} from '@/components/ui/card';

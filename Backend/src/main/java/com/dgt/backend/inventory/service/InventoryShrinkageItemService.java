@@ -14,12 +14,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * JPA CRUD operations for InventoryShrinkageItem.
+ * The caller is responsible for authorization and workflow validation; these queries add no store predicate.
+ */
+
 @Slf4j
 @Service
 public class InventoryShrinkageItemService {
     private final InventoryShrinkageItemRepository repository;
     public InventoryShrinkageItemService(InventoryShrinkageItemRepository repository) { this.repository = repository; }
 
+    /** Load a page sorted by primary key and map its records to response DTOs. */
     public PageResponse<InventoryShrinkageItemResponse> list(int page, int size) {
         log.debug("Listing inventory shrinkage item page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("shrinkageItemId")));
@@ -27,6 +33,7 @@ public class InventoryShrinkageItemService {
         return new PageResponse<>(p.getContent().stream().map(InventoryShrinkageItemResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    /** Load a record by ID or return HTTP 404. */
     public InventoryShrinkageItemResponse get(Long id) {
         log.debug("Fetching inventory shrinkage item id={}", id);
         return InventoryShrinkageItemResponse.from(repository.findById(id)
@@ -37,9 +44,11 @@ public class InventoryShrinkageItemService {
     
     }
 
+    /** Persist the supplied fields in one transaction and return the saved values. */
     @Transactional
     public InventoryShrinkageItemResponse create(CreateInventoryShrinkageItemRequest req) {
         log.info("Creating inventory shrinkage item");
+        // Quantity, unit cost, and loss amount are copied as supplied; loss is not calculated here.
         var entity = InventoryShrinkageItem.builder()
                 .shrinkageId(req.shrinkageId())
                 .productId(req.productId())
@@ -53,6 +62,7 @@ public class InventoryShrinkageItemService {
         return InventoryShrinkageItemResponse.from(saved);
     }
 
+    /** Apply only non-null fields in one transaction, leaving omitted fields unchanged. */
     @Transactional
     public InventoryShrinkageItemResponse update(Long id, UpdateInventoryShrinkageItemRequest req) {
         log.info("Updating inventory shrinkage item id={}", id);

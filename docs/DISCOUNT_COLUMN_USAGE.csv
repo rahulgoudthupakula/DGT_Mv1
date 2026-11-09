@@ -1,0 +1,301 @@
+Table,Column,Page / workflow,Description,Connection evidence
+everyday_closing,everyday_closing_id,Daily Closing → Business Date Details,Record identifier or relation key supporting this table.,Workflow reference
+everyday_closing,dgt_id,Daily Closing → Business Date Details,Store scope; keeps this record associated with its store.,Workflow reference
+everyday_closing,opening_datetime,Daily Closing → Business Date Details,Opening date/time on the closing record.,Workflow reference
+everyday_closing,closing_datetime,Daily Closing → Business Date Details,Closing date/time.,Workflow reference
+everyday_closing,total_gross_sales,Daily Closing → Business Date Details,Daily recorded gross sales total.,Workflow reference
+everyday_closing,total_discounts,Daily Closing → Business Date Details,Daily discount total derived from recorded sales.,Workflow reference
+everyday_closing,total_tax,Daily Closing → Business Date Details,Daily recorded tax total.,Workflow reference
+everyday_closing,total_net_sales,Daily Closing → Business Date Details,Daily recorded net sales total.,Workflow reference
+everyday_closing,total_refunds,Daily Closing → Business Date Details,Daily recorded refund total.,Workflow reference
+everyday_closing,expected_cash,Daily Closing → Business Date Details,Calculated expected cash for reconciliation.,Workflow reference
+everyday_closing,actual_cash,Daily Closing → Business Date Details,Counted closing cash.,Workflow reference
+everyday_closing,cash_variance,Daily Closing → Business Date Details,Difference between counted and expected cash.,Workflow reference
+everyday_closing,total_deposits,Daily Closing → Business Date Details,Deposit total on the closing record.,Workflow reference
+everyday_closing,closed_by,Daily Closing → Business Date Details,User who closed the day.,Workflow reference
+everyday_closing,updated_at,Daily Closing → Business Date Details,Last update timestamp.,Workflow reference
+everyday_closing,business_date,Daily Closing → Business Date Details,Store business date represented by this record.,Workflow reference
+everyday_closing,closing_status,Daily Closing → Business Date Details,Draft/closed state.,Workflow reference
+everyday_closing,opening_cash,Daily Closing → Business Date Details,Opening cash for this business day.,Workflow reference
+everyday_closing,cash_added,Daily Closing → Business Date Details,Cash additions recorded for the day.,Workflow reference
+everyday_closing,cash_drops,Daily Closing → Business Date Details,Cash removed/dropped during the day.,Workflow reference
+everyday_closing,notes,Daily Closing → Business Date Details,Saved explanatory notes.,Workflow reference
+everyday_closing,is_sample,Daily Closing → Business Date Details,Marks sample/test closing data.,Workflow reference
+everyday_closing,sales_snapshot,Daily Closing → Business Date Details,Saved sales detail/totals snapshot for a closing.,Workflow reference
+everyday_closing,opening_checks,Daily Closing → Business Date Details,Checks carried into the day.,Workflow reference
+everyday_closing,closing_checks,Daily Closing → Business Date Details,Checks remaining at closing.,Workflow reference
+everyday_closing,card_jobber_settlement,Daily Closing → Business Date Details,Card settlement credited through the jobber invoice.,Workflow reference
+everyday_closing,card_bank_settlement,Daily Closing → Business Date Details,Card settlement credited to the bank.,Workflow reference
+everyday_closing,lottery_online_sales,Daily Closing → Business Date Details,Saved daily-closing lottery online sales reading; this does not connect the separate lottery pack-management tables.,Workflow reference
+everyday_closing,lottery_online_cash,Daily Closing → Business Date Details,Saved daily-closing lottery online cash reading; this does not connect the separate lottery pack-management tables.,Workflow reference
+everyday_closing,lottery_scratch_cash,Daily Closing → Business Date Details,Saved daily-closing lottery scratch cash reading; this does not connect the separate lottery pack-management tables.,Workflow reference
+everyday_closing,lottery_settlement,Daily Closing → Business Date Details,Saved daily-closing lottery settlement reading; this does not connect the separate lottery pack-management tables.,Workflow reference
+everyday_closing,lottery_adjustment,Daily Closing → Business Date Details,Saved daily-closing lottery adjustment reading; this does not connect the separate lottery pack-management tables.,Workflow reference
+everyday_closing,lottery_online_credit,Daily Closing → Business Date Details,Saved daily-closing lottery online credit reading; this does not connect the separate lottery pack-management tables.,Workflow reference
+everyday_closing,lottery_scratch_credit,Daily Closing → Business Date Details,Saved daily-closing lottery scratch credit reading; this does not connect the separate lottery pack-management tables.,Workflow reference
+everyday_closing,lottery_commission,Daily Closing → Business Date Details,Saved daily-closing lottery commission reading; this does not connect the separate lottery pack-management tables.,Workflow reference
+everyday_closing,lottery_balance,Daily Closing → Business Date Details,Saved daily-closing lottery balance reading; this does not connect the separate lottery pack-management tables.,Workflow reference
+fleet_batches,batch_id,Tender Types → Fleet Cards,Record identifier or relation key supporting this table.,Workflow reference
+fleet_batches,dgt_id,Tender Types → Fleet Cards,Store scope; keeps this record associated with its store.,Workflow reference
+fleet_batches,provider_name,Tender Types → Fleet Cards,Fleet provider display name.,Workflow reference
+fleet_batches,batch_reference,Tender Types → Fleet Cards,Batch reference shown in settlement history.,Workflow reference
+fleet_batches,business_date,Tender Types → Fleet Cards,Store business date represented by this record.,Workflow reference
+fleet_batches,source_kind,Tender Types → Fleet Cards,"Origin of the batch, such as recorded payments/manual entry.",No explicit reference found; not confirmed connected
+fleet_batches,status,Tender Types → Fleet Cards,Stored workflow status; interpretation depends on the table.,Workflow reference
+fleet_batches,fleet_sales,Tender Types → Fleet Cards,Fleet payment sales total in the batch.,Workflow reference
+fleet_batches,gallons_sold,Tender Types → Fleet Cards,Recorded fuel volume for the batch.,Workflow reference
+fleet_batches,fuel_sales,Tender Types → Fleet Cards,Fuel sales amount associated with the fleet batch.,Workflow reference
+fleet_batches,volume_note,Tender Types → Fleet Cards,Explanation of fleet fuel volume.,Workflow reference
+fleet_batches,transaction_count,Tender Types → Fleet Cards,Number of transactions in the batch.,Workflow reference
+fleet_batches,statement_discount,Tender Types → Fleet Cards,Fleet-provider statement deduction used during settlement reconciliation.,Workflow reference
+fleet_batches,processor_fee,Tender Types → Fleet Cards,Fleet-provider processing fee deduction.,Workflow reference
+fleet_batches,actual_deposit,Tender Types → Fleet Cards,Actual received settlement deposit.,Workflow reference
+fleet_batches,settlement_date,Tender Types → Fleet Cards,Date settlement was received.,Workflow reference
+fleet_batches,settlement_reference,Tender Types → Fleet Cards,Settlement reference for matching.,Workflow reference
+fleet_batches,variance_review_note,Tender Types → Fleet Cards,Explanation of a settlement discrepancy.,Workflow reference
+fleet_batches,notes,Tender Types → Fleet Cards,Saved explanatory notes.,Workflow reference
+fleet_batches,created_by,Tender Types → Fleet Cards,User who performed the created action.,Workflow reference
+fleet_batches,settled_by,Tender Types → Fleet Cards,User who performed the settled action.,Workflow reference
+fleet_batches,reconciled_by,Tender Types → Fleet Cards,User who performed the reconciled action.,Workflow reference
+fleet_batches,request_key,Tender Types → Fleet Cards,Request retry/idempotency key.,Workflow reference
+fleet_batches,created_at,Tender Types → Fleet Cards,Record creation timestamp.,Workflow reference
+fleet_batches,updated_at,Tender Types → Fleet Cards,Last update timestamp.,Workflow reference
+grocery_invoice_items,grocery_invoice_item_id,Grocery → Edit & View Invoices; New Arrivals,Record identifier or relation key supporting this table.,Workflow reference
+grocery_invoice_items,invoice_id,Grocery → Edit & View Invoices; New Arrivals,Links to the invoice header.,Workflow reference
+grocery_invoice_items,product_id,Grocery → Edit & View Invoices; New Arrivals,Links to the item record.,Workflow reference
+grocery_invoice_items,vendor_item_code,Grocery → Edit & View Invoices; New Arrivals,Vendor reference/code for the invoice item.,Workflow reference
+grocery_invoice_items,quantity,Grocery → Edit & View Invoices; New Arrivals,Recorded item quantity.,Workflow reference
+grocery_invoice_items,unit_type,Grocery → Edit & View Invoices; New Arrivals,"Unit used for purchasing/invoicing, such as item or case.",Workflow reference
+grocery_invoice_items,case_pack_quantity,Grocery → Edit & View Invoices; New Arrivals,Individual units per invoice/vendor case.,Workflow reference
+grocery_invoice_items,unit_cost,Grocery → Edit & View Invoices; New Arrivals,Purchase cost per specified unit.,Workflow reference
+grocery_invoice_items,item_line_discount,Grocery → Edit & View Invoices; New Arrivals,Existing line-discount column; current invoice discount is saved at invoice_charges.discounted_amount.,Not connected in current invoice workflow
+grocery_invoice_items,item_line_total,Grocery → Edit & View Invoices; New Arrivals,Saved invoice line amount.,Workflow reference
+grocery_invoice_items,is_product_new,Grocery → Edit & View Invoices; New Arrivals,Identifies an invoice line containing a new product for New Arrivals.,Workflow reference
+grocery_invoice_items,created_at,Grocery → Edit & View Invoices; New Arrivals,Record creation timestamp.,Workflow reference
+grocery_invoice_items,updated_at,Grocery → Edit & View Invoices; New Arrivals,Last update timestamp.,Workflow reference
+grocery_invoice_items,msrp,Grocery → Edit & View Invoices; New Arrivals,Invoice suggested retail used for a new item until its selling price is assigned.,Workflow reference
+grocery_invoice_items,received_quantity,Grocery → Edit & View Invoices; New Arrivals,Quantity actually received; distinct from invoiced quantity.,Workflow reference
+grocery_invoice_items,line_tax,Grocery → Edit & View Invoices; New Arrivals,Tax recorded for this invoice line.,Workflow reference
+invoice_charges,invoice_charge_id,Invoice → Additional Charges and Summary,Record identifier or relation key supporting this table.,Workflow reference
+invoice_charges,invoice_id,Invoice → Additional Charges and Summary,Links to the invoice header.,Workflow reference
+invoice_charges,charge_type,Invoice → Additional Charges and Summary,Schema field for charge type. Current user-facing behavior is not established by its name alone.,Workflow reference
+invoice_charges,sub_total,Invoice → Additional Charges and Summary,Saved invoice subtotal.,Workflow reference
+invoice_charges,discounted_amount,Invoice → Additional Charges and Summary,Invoice-level discount entered under Additional Charges.,Workflow reference
+invoice_charges,other_charges,Invoice → Additional Charges and Summary,Other/combined invoice charge amount; retained by the invoice charge model.,Workflow reference
+invoice_charges,total_amount,Invoice → Additional Charges and Summary,Saved final amount for the receipt/invoice charges.,Workflow reference
+invoice_charges,status_id,Invoice → Additional Charges and Summary,Record identifier or relation key supporting this table.,Workflow reference
+invoice_charges,payment_status,Invoice → Additional Charges and Summary,Stored payment state.,Workflow reference
+invoice_charges,created_at,Invoice → Additional Charges and Summary,Record creation timestamp.,No explicit reference found; not confirmed connected
+invoice_charges,updated_at,Invoice → Additional Charges and Summary,Last update timestamp.,Workflow reference
+invoice_charges,freight_amount,Invoice → Additional Charges and Summary,Invoice freight charge.,Workflow reference
+invoice_charges,fuel_surcharge,Invoice → Additional Charges and Summary,Invoice fuel surcharge.,Workflow reference
+invoice_charges,handling_fee,Invoice → Additional Charges and Summary,Invoice handling charge.,Workflow reference
+price_groups,price_group_id,Price Book → Price Groups,Links to / identifies the shared-price group.,Workflow reference
+price_groups,price_group_name,Price Book → Price Groups,Displayed group name.,Workflow reference
+price_groups,description,Price Book → Price Groups,Saved group description.,Workflow reference
+price_groups,is_active,Price Book → Price Groups,Whether this record or membership is active.,Workflow reference
+price_groups,created_at,Price Book → Price Groups,Record creation timestamp.,No explicit reference found; not confirmed connected
+price_groups,updated_at,Price Book → Price Groups,Last update timestamp.,Workflow reference
+price_groups,group_price,Price Book → Price Groups,Shared selling price applied to active members of this group.,Workflow reference
+price_groups,dgt_id,Price Book → Price Groups,Store scope; keeps this record associated with its store.,Workflow reference
+price_groups,creation_key,Price Book → Price Groups,Creation retry/idempotency key.,Workflow reference
+price_groups,creation_payload,Price Book → Price Groups,Saved creation payload used to validate repeated creation requests.,Workflow reference
+product_price_groups,product_price_group_id,Price Groups; Items; Bulk Update,Record identifier or relation key supporting this table.,Workflow reference
+product_price_groups,price_group_id,Price Groups; Items; Bulk Update,Links to / identifies the shared-price group.,Workflow reference
+product_price_groups,product_id,Price Groups; Items; Bulk Update,Links to the item record.,Workflow reference
+product_price_groups,created_at,Price Groups; Items; Bulk Update,Record creation timestamp.,No explicit reference found; not confirmed connected
+product_price_groups,updated_at,Price Groups; Items; Bulk Update,Last update timestamp.,Workflow reference
+product_price_groups,dgt_id,Price Groups; Items; Bulk Update,Store scope; keeps this record associated with its store.,Workflow reference
+product_price_groups,is_active,Price Groups; Items; Bulk Update,Whether this record or membership is active.,Workflow reference
+product_store_prices,store_price_id,Price Book → Items / Bulk Update,Record identifier or relation key supporting this table.,No explicit reference found; not confirmed connected
+product_store_prices,dgt_id,Price Book → Items / Bulk Update,Store scope; keeps this record associated with its store.,Workflow reference
+product_store_prices,product_id,Price Book → Items / Bulk Update,Links to the item record.,Workflow reference
+product_store_prices,retail_price,Price Book → Items / Bulk Update,Saved individual selling price; retained while a group price applies.,Workflow reference
+product_store_prices,is_active,Price Book → Items / Bulk Update,Whether this record or membership is active.,Workflow reference
+product_store_prices,rebate_id,Price Book → Items / Bulk Update,Nullable rebate reference; no foreign key or implemented rebate ledger was found.,Not connected
+product_store_prices,created_at,Price Book → Items / Bulk Update,Record creation timestamp.,No explicit reference found; not confirmed connected
+product_store_prices,updated_at,Price Book → Items / Bulk Update,Last update timestamp.,Workflow reference
+products,product_id,Price Book → Add/Edit Item / Bulk Update,Links to the item record.,Workflow reference
+products,store_sub_department_id,Price Book → Add/Edit Item / Bulk Update,Item sub-department assignment.,Workflow reference
+products,product_name,Price Book → Add/Edit Item / Bulk Update,Item display name.,Workflow reference
+products,product_sku,Price Book → Add/Edit Item / Bulk Update,Store item SKU.,Workflow reference
+products,is_returnable,Price Book → Add/Edit Item / Bulk Update,Whether the item can be returned.,Workflow reference
+products,brand_id,Price Book → Add/Edit Item / Bulk Update,Optional link to brands; the current brand table is empty and has no connected workflow found.,Reference only / no connected brand workflow
+products,unit_of_measure,Price Book → Add/Edit Item / Bulk Update,Stored item/purchasing unit.,Workflow reference
+products,is_active,Price Book → Add/Edit Item / Bulk Update,Whether this record or membership is active.,Workflow reference
+products,created_at,Price Book → Add/Edit Item / Bulk Update,Record creation timestamp.,Workflow reference
+products,updated_at,Price Book → Add/Edit Item / Bulk Update,Last update timestamp.,Workflow reference
+products,is_taxable,Price Book → Add/Edit Item / Bulk Update,Item taxable flag.,Workflow reference
+products,is_ebt,Price Book → Add/Edit Item / Bulk Update,Item EBT eligibility flag.,Workflow reference
+products,dgt_id,Price Book → Add/Edit Item / Bulk Update,Store scope; keeps this record associated with its store.,Workflow reference
+products,is_age_restricted,Price Book → Add/Edit Item / Bulk Update,Item age-restriction flag.,Workflow reference
+products,reorder_level,Price Book → Add/Edit Item / Bulk Update,Item reorder stock threshold.,Workflow reference
+products,purchase_unit,Price Book → Add/Edit Item / Bulk Update,"Purchase cost unit, such as item or case.",Workflow reference
+products,units_per_case,Price Book → Add/Edit Item / Bulk Update,Number of individual units in one case.,Workflow reference
+products,purchase_gross_cost,Price Book → Add/Edit Item / Bulk Update,"Gross purchase cost for the selected purchase unit, before purchase discount.",Workflow reference
+products,purchase_discount,Price Book → Add/Edit Item / Bulk Update,"Purchase cost discount entered in the item cost breakdown; affects net cost, not a receipt discount.",Workflow reference
+promotion_products,promotion_product_id,Price Book → Promotions / Bulk Update promotion assignment,Record identifier or relation key supporting this table.,Workflow reference
+promotion_products,promotion_id,Price Book → Promotions / Bulk Update promotion assignment,Links to / identifies the promotion.,Workflow reference
+promotion_products,product_id,Price Book → Promotions / Bulk Update promotion assignment,Links to the item record.,Workflow reference
+promotion_products,created_at,Price Book → Promotions / Bulk Update promotion assignment,Record creation timestamp.,Workflow reference
+promotion_products,updated_at,Price Book → Promotions / Bulk Update promotion assignment,Last update timestamp.,Workflow reference
+promotion_products,dgt_id,Price Book → Promotions / Bulk Update promotion assignment,Store scope; keeps this record associated with its store.,Workflow reference
+promotion_products,required_quantity,Price Book → Promotions / Bulk Update promotion assignment,Required quantity of this selected product for the promotion/bundle.,Workflow reference
+promotions,promotion_id,Price Book → Promotions,Links to / identifies the promotion.,Workflow reference
+promotions,dgt_id,Price Book → Promotions,Store scope; keeps this record associated with its store.,Workflow reference
+promotions,promotion_name,Price Book → Promotions,Displayed promotion name.,Workflow reference
+promotions,promotion_type,Price Book → Promotions,"Promotion rule type, such as discount, buy/get or bundle.",Workflow reference
+promotions,start_date,Price Book → Promotions,Start date of the promotion or contract.,Workflow reference
+promotions,end_date,Price Book → Promotions,End date of the promotion or contract.,Workflow reference
+promotions,status,Price Book → Promotions,Stored workflow status; interpretation depends on the table.,Workflow reference
+promotions,created_at,Price Book → Promotions,Record creation timestamp.,Workflow reference
+promotions,updated_at,Price Book → Promotions,Last update timestamp.,Workflow reference
+promotions,discount_value,Price Book → Promotions,Value interpreted according to the promotion type.,Workflow reference
+promotions,buy_quantity,Price Book → Promotions,Qualifying purchase quantity for a buy/get rule.,Workflow reference
+promotions,free_quantity,Price Book → Promotions,Reward quantity for a buy/get rule.,Workflow reference
+promotions,is_active,Price Book → Promotions,Whether this record or membership is active.,Workflow reference
+promotions,creation_key,Price Book → Promotions,Creation retry/idempotency key.,Workflow reference
+promotions,creation_payload,Price Book → Promotions,Saved creation payload used to validate repeated creation requests.,Workflow reference
+sales,sale_id,Live Activity; Daily Closing; tender summaries,Links to the sale receipt.,Workflow reference
+sales,store_id,Live Activity; Daily Closing; tender summaries,Store that owns the sale.,Workflow reference
+sales,cashier_id,Live Activity; Daily Closing; tender summaries,Cashier associated with the sale.,Workflow reference
+sales,terminal_id,Live Activity; Daily Closing; tender summaries,POS/register associated with the sale.,Workflow reference
+sales,receipt_no,Live Activity; Daily Closing; tender summaries,Displayed receipt number.,Workflow reference
+sales,transaction_id,Live Activity; Daily Closing; tender summaries,External/import transaction reference.,Workflow reference
+sales,transaction_type,Live Activity; Daily Closing; tender summaries,Recorded transaction category.,Workflow reference
+sales,sale_status,Live Activity; Daily Closing; tender summaries,Recorded receipt state.,Workflow reference
+sales,sale_datetime,Live Activity; Daily Closing; tender summaries,Original sale date and time.,Workflow reference
+sales,subtotal,Live Activity; Daily Closing; tender summaries,Receipt subtotal.,Workflow reference
+sales,taxable_amount,Live Activity; Daily Closing; tender summaries,Amount subject to tax.,Workflow reference
+sales,tax_amount,Live Activity; Daily Closing; tender summaries,Recorded tax amount.,Workflow reference
+sales,discount_amount,Live Activity; Daily Closing; tender summaries,Recorded discount for this receipt or line; not a new discount setting.,Workflow reference
+sales,total_amount,Live Activity; Daily Closing; tender summaries,Saved final amount for the receipt/invoice charges.,Workflow reference
+sales,total_items,Live Activity; Daily Closing; tender summaries,Receipt item count.,Workflow reference
+sales,created_at,Live Activity; Daily Closing; tender summaries,Record creation timestamp.,Workflow reference
+sales,updated_at,Live Activity; Daily Closing; tender summaries,Last update timestamp.,Workflow reference
+sales_items,sales_item_id,Live Activity → expanded receipt / top-selling items,Record identifier or relation key supporting this table.,Workflow reference
+sales_items,sale_id,Live Activity → expanded receipt / top-selling items,Links to the sale receipt.,Workflow reference
+sales_items,product_id,Live Activity → expanded receipt / top-selling items,Links to the item record.,Workflow reference
+sales_items,quantity,Live Activity → expanded receipt / top-selling items,Recorded item quantity.,Workflow reference
+sales_items,catalog_price,Live Activity → expanded receipt / top-selling items,Catalog/reference selling price saved on the sale line.,Workflow reference
+sales_items,unit_price,Live Activity → expanded receipt / top-selling items,Actual recorded unit selling price.,Workflow reference
+sales_items,gross_amount,Live Activity → expanded receipt / top-selling items,Line gross amount before deductions.,Workflow reference
+sales_items,discount_amount,Live Activity → expanded receipt / top-selling items,Recorded discount for this receipt or line; not a new discount setting.,Workflow reference
+sales_items,taxable_amount,Live Activity → expanded receipt / top-selling items,Amount subject to tax.,Workflow reference
+sales_items,tax_amount,Live Activity → expanded receipt / top-selling items,Recorded tax amount.,Workflow reference
+sales_items,line_total,Live Activity → expanded receipt / top-selling items,Final recorded sale-line amount.,Workflow reference
+sales_items,created_at,Live Activity → expanded receipt / top-selling items,Record creation timestamp.,Workflow reference
+vendor_contacts,contact_id,Vendor Management → Contracts → Add/Edit Contract,Record identifier or relation key supporting this table.,Workflow reference
+vendor_contacts,vendor_id,Vendor Management → Contracts → Add/Edit Contract,Links to the vendor record.,Workflow reference
+vendor_contacts,dgt_id,Vendor Management → Contracts → Add/Edit Contract,Store scope; keeps this record associated with its store.,Workflow reference
+vendor_contacts,contract_number,Vendor Management → Contracts → Add/Edit Contract,Optional contract number retained in backend storage; removed from the current Add Contract form.,Backend field; no current form input
+vendor_contacts,start_date,Vendor Management → Contracts → Add/Edit Contract,Start date of the promotion or contract.,Workflow reference
+vendor_contacts,end_date,Vendor Management → Contracts → Add/Edit Contract,End date of the promotion or contract.,Workflow reference
+vendor_contacts,volume_threshold,Vendor Management → Contracts → Add/Edit Contract,Optional threshold retained in backend storage; removed from the current Add Contract form.,Backend field; no current form input
+vendor_contacts,volume_discount_value,Vendor Management → Contracts → Add/Edit Contract,Contract volume-discount amount or percentage.,Workflow reference
+vendor_contacts,volume_discount_type,Vendor Management → Contracts → Add/Edit Contract,Whether contract volume discount is an amount or percentage.,Workflow reference
+vendor_contacts,return_window_days,Vendor Management → Contracts → Add/Edit Contract,Allowed return window in days.,Workflow reference
+vendor_contacts,status,Vendor Management → Contracts → Add/Edit Contract,Stored workflow status; interpretation depends on the table.,Workflow reference
+vendor_contacts,document_url,Vendor Management → Contracts → Add/Edit Contract,Reserved contract document link; document upload/view remains disabled.,Not connected
+vendor_contacts,created_at,Vendor Management → Contracts → Add/Edit Contract,Record creation timestamp.,Workflow reference
+vendor_contacts,updated_at,Vendor Management → Contracts → Add/Edit Contract,Last update timestamp.,Workflow reference
+vendor_contacts,force_end_date,Vendor Management → Contracts → Add/Edit Contract,Stored legacy/optional end-date control; not found in the connected contract workflow.,No current usage found
+vendor_contacts,contract_type,Vendor Management → Contracts → Add/Edit Contract,Selected contract category.,Workflow reference
+vendor_contacts,return_policy,Vendor Management → Contracts → Add/Edit Contract,"Return policy text/type, displayed with the return window.",Workflow reference
+invoices,invoice_id,Grocery → Edit & View Invoices / View Invoice,Links to the invoice header.,Workflow reference
+invoices,dgt_id,Grocery → Edit & View Invoices / View Invoice,Store scope; keeps this record associated with its store.,Workflow reference
+invoices,vendor_id,Grocery → Edit & View Invoices / View Invoice,Links to the vendor record.,Workflow reference
+invoices,invoice_number,Grocery → Edit & View Invoices / View Invoice,Vendor invoice reference.,Workflow reference
+invoices,invoice_type,Grocery → Edit & View Invoices / View Invoice,Invoice category.,Workflow reference
+invoices,invoice_date,Grocery → Edit & View Invoices / View Invoice,Invoice issue date.,Workflow reference
+invoices,received_date,Grocery → Edit & View Invoices / View Invoice,Delivery/receipt date.,Workflow reference
+invoices,due_date,Grocery → Edit & View Invoices / View Invoice,Invoice payment due date.,Workflow reference
+invoices,received_by,Grocery → Edit & View Invoices / View Invoice,User who recorded receipt.,Workflow reference
+invoices,approved_by,Grocery → Edit & View Invoices / View Invoice,User who approved the invoice.,Workflow reference
+invoices,approved_at,Grocery → Edit & View Invoices / View Invoice,Approval timestamp; current invoice edits are limited to before approval.,Workflow reference
+invoices,purchase_order_id,Grocery → Edit & View Invoices / View Invoice,"Selected purchase order link, used to load ordered items.",Workflow reference
+invoices,delivery_time,Grocery → Edit & View Invoices / View Invoice,Entered delivery time.,Workflow reference
+invoices,driver_name,Grocery → Edit & View Invoices / View Invoice,Delivery driver name.,Workflow reference
+invoices,driver_number,Grocery → Edit & View Invoices / View Invoice,Delivery driver reference/number.,Workflow reference
+invoices,route_id,Grocery → Edit & View Invoices / View Invoice,Delivery route reference.,Workflow reference
+invoices,payment_terms,Grocery → Edit & View Invoices / View Invoice,Saved invoice payment terms.,Workflow reference
+invoices,notes,Grocery → Edit & View Invoices / View Invoice,Saved explanatory notes.,Workflow reference
+invoice_adjustments,invoice_adjustment_id,No current connected page found,Record identifier or relation key supporting this table.,No current connected workflow
+invoice_adjustments,invoice_id,No current connected page found,Links to the invoice header.,No current connected workflow
+invoice_adjustments,adjustment_type,No current connected page found,Proposed/legacy adjustment category.,No current connected workflow
+invoice_adjustments,adjusted_amount,No current connected page found,Proposed/legacy invoice adjustment amount.,No current connected workflow
+invoice_adjustments,reason,No current connected page found,Proposed/legacy adjustment reason.,No current connected workflow
+invoice_adjustments,created_at,No current connected page found,Record creation timestamp.,No current connected workflow
+invoice_adjustments,updated_at,No current connected page found,Last update timestamp.,No current connected workflow
+sale_payments,sale_payment_id,Live Activity → tenders; Credit Card / EBT / Fleet,Record identifier or relation key supporting this table.,Workflow reference
+sale_payments,sale_id,Live Activity → tenders; Credit Card / EBT / Fleet,Links to the sale receipt.,Workflow reference
+sale_payments,tender_type_id,Live Activity → tenders; Credit Card / EBT / Fleet,Identifies/links the payment method.,Workflow reference
+sale_payments,payment_amount,Live Activity → tenders; Credit Card / EBT / Fleet,Amount paid through this tender.,Workflow reference
+sale_payments,payment_status,Live Activity → tenders; Credit Card / EBT / Fleet,Stored payment state.,Workflow reference
+sale_payments,card_brand,Live Activity → tenders; Credit Card / EBT / Fleet,Recorded card brand.,Workflow reference
+sale_payments,card_last4,Live Activity → tenders; Credit Card / EBT / Fleet,Recorded last four card digits.,Workflow reference
+sale_payments,processor_reference,Live Activity → tenders; Credit Card / EBT / Fleet,Processor payment reference.,No explicit reference found; not confirmed connected
+sale_payments,authorization_code,Live Activity → tenders; Credit Card / EBT / Fleet,Recorded authorization reference.,No explicit reference found; not confirmed connected
+sale_payments,payment_datetime,Live Activity → tenders; Credit Card / EBT / Fleet,Payment date/time.,Workflow reference
+sale_payments,created_at,Live Activity → tenders; Credit Card / EBT / Fleet,Record creation timestamp.,Workflow reference
+sale_payments,updated_at,Live Activity → tenders; Credit Card / EBT / Fleet,Last update timestamp.,Workflow reference
+tender_types,tender_type_id,Live Activity and tender settlement classification,Identifies/links the payment method.,Workflow reference
+tender_types,tender_code,Live Activity and tender settlement classification,Stable payment-method code used for classification.,Workflow reference
+tender_types,tender_name,Live Activity and tender settlement classification,Payment-method display name.,Workflow reference
+tender_types,is_active,Live Activity and tender settlement classification,Whether this record or membership is active.,Workflow reference
+tender_types,created_at,Live Activity and tender settlement classification,Record creation timestamp.,Workflow reference
+tender_types,updated_at,Live Activity and tender settlement classification,Last update timestamp.,Workflow reference
+fleet_batch_payments,batch_id,Fleet Cards → batch payments,Record identifier or relation key supporting this table.,Workflow reference
+fleet_batch_payments,sale_payment_id,Fleet Cards → batch payments,Record identifier or relation key supporting this table.,Workflow reference
+fleet_batch_payments,payment_amount_snapshot,Fleet Cards → batch payments,Amount captured when matching the payment to the fleet batch.,Workflow reference
+product_vendors,product_vendor_id,Vendor Management → View Items / Link Item / Edit Item; Items vendor display,Record identifier or relation key supporting this table.,Workflow reference
+product_vendors,product_id,Vendor Management → View Items / Link Item / Edit Item; Items vendor display,Links to the item record.,Workflow reference
+product_vendors,vendor_id,Vendor Management → View Items / Link Item / Edit Item; Items vendor display,Links to the vendor record.,Workflow reference
+product_vendors,vendor_sku,Vendor Management → View Items / Link Item / Edit Item; Items vendor display,Vendor-specific item code.,Workflow reference
+product_vendors,unit_type,Vendor Management → View Items / Link Item / Edit Item; Items vendor display,"Unit used for purchasing/invoicing, such as item or case.",Workflow reference
+product_vendors,unit_of_measure,Vendor Management → View Items / Link Item / Edit Item; Items vendor display,Stored item/purchasing unit.,No explicit reference found; not confirmed connected
+product_vendors,unit_cost,Vendor Management → View Items / Link Item / Edit Item; Items vendor display,Purchase cost per specified unit.,Workflow reference
+product_vendors,is_primary,Vendor Management → View Items / Link Item / Edit Item; Items vendor display,Marks a preferred/primary vendor link; does not imply order-guide auto-pick is implemented.,Workflow reference
+product_vendors,created_at,Vendor Management → View Items / Link Item / Edit Item; Items vendor display,Record creation timestamp.,Workflow reference
+product_vendors,updated_at,Vendor Management → View Items / Link Item / Edit Item; Items vendor display,Last update timestamp.,Workflow reference
+product_vendors,dgt_id,Vendor Management → View Items / Link Item / Edit Item; Items vendor display,Store scope; keeps this record associated with its store.,Workflow reference
+product_vendors,case_pack_quantity,Vendor Management → View Items / Link Item / Edit Item; Items vendor display,Individual units per invoice/vendor case.,Workflow reference
+product_vendors,minimum_order_quantity,Vendor Management → View Items / Link Item / Edit Item; Items vendor display,Minimum quantity for ordering this linked vendor item.,Workflow reference
+vendor_item_cost_history,cost_history_id,Vendor Management → Pricing → Cost Change History,Identifies/links the cost change history record.,Workflow reference
+vendor_item_cost_history,product_id,Vendor Management → Pricing → Cost Change History,Links to the item record.,Workflow reference
+vendor_item_cost_history,vendor_id,Vendor Management → Pricing → Cost Change History,Links to the vendor record.,Workflow reference
+vendor_item_cost_history,old_cost,Vendor Management → Pricing → Cost Change History,Cost before the recorded change.,Workflow reference
+vendor_item_cost_history,new_cost,Vendor Management → Pricing → Cost Change History,Cost after the recorded change.,Workflow reference
+vendor_item_cost_history,change_percentage,Vendor Management → Pricing → Cost Change History,Percentage difference between old and new costs.,Workflow reference
+vendor_item_cost_history,effective_date,Vendor Management → Pricing → Cost Change History,Date the cost change applies.,Workflow reference
+vendor_item_cost_history,change_source,Vendor Management → Pricing → Cost Change History,"Origin of the cost change, such as manual or invoice.",Workflow reference
+vendor_item_cost_history,changed_by,Vendor Management → Pricing → Cost Change History,User responsible for the change.,Workflow reference
+vendor_item_cost_history,created_date,Vendor Management → Pricing → Cost Change History,History creation timestamp.,Workflow reference
+vendor_item_cost_history,updated_date,Vendor Management → Pricing → Cost Change History,History update timestamp.,No explicit reference found; not confirmed connected
+vendor_audit_log,audit_id,Vendor Management → Audit Log,Record identifier or relation key supporting this table.,Workflow reference
+vendor_audit_log,vendor_id,Vendor Management → Audit Log,Links to the vendor record.,Workflow reference
+vendor_audit_log,product_id,Vendor Management → Audit Log,Links to the item record.,Workflow reference
+vendor_audit_log,dgt_id,Vendor Management → Audit Log,Store scope; keeps this record associated with its store.,Workflow reference
+vendor_audit_log,action_type,Vendor Management → Audit Log,Vendor audit action category.,Workflow reference
+vendor_audit_log,details,Vendor Management → Audit Log,Recorded vendor action details.,Workflow reference
+vendor_audit_log,cost_history_id,Vendor Management → Audit Log,Identifies/links the cost change history record.,Workflow reference
+vendor_audit_log,created_at,Vendor Management → Audit Log,Record creation timestamp.,Workflow reference
+access_audit_events,event_id,"Application audit services, including invoice and pricing changes",Record identifier or relation key supporting this table.,Workflow reference
+access_audit_events,company_id,"Application audit services, including invoice and pricing changes",Company scope for the audit event.,Workflow reference
+access_audit_events,dgt_id,"Application audit services, including invoice and pricing changes",Store scope; keeps this record associated with its store.,Workflow reference
+access_audit_events,actor_user_id,"Application audit services, including invoice and pricing changes",User who performed the audited action.,Workflow reference
+access_audit_events,event_type,"Application audit services, including invoice and pricing changes",Application audit event category.,Workflow reference
+access_audit_events,target_type,"Application audit services, including invoice and pricing changes",Type of record changed.,Workflow reference
+access_audit_events,target_id,"Application audit services, including invoice and pricing changes",Identifier of the record changed.,Workflow reference
+access_audit_events,changes,"Application audit services, including invoice and pricing changes",Saved audit change details.,Workflow reference
+access_audit_events,created_at,"Application audit services, including invoice and pricing changes",Record creation timestamp.,Workflow reference
+fuel_prices,fuel_price_id,Gas → Price Changes / Schedule,Record identifier or relation key supporting this table.,Workflow reference
+fuel_prices,dgt_id,Gas → Price Changes / Schedule,Store scope; keeps this record associated with its store.,Workflow reference
+fuel_prices,fuel_grade_id,Gas → Price Changes / Schedule,Fuel grade whose price changes.,Workflow reference
+fuel_prices,cash_price,Gas → Price Changes / Schedule,Manually assigned cash selling price per gallon.,Workflow reference
+fuel_prices,credit_price,Gas → Price Changes / Schedule,Manually assigned credit selling price per gallon.,Workflow reference
+fuel_prices,effective_from,Gas → Price Changes / Schedule,When this price begins applying.,Workflow reference
+fuel_prices,effective_to,Gas → Price Changes / Schedule,When this price stops applying.,Workflow reference
+fuel_prices,changed_by,Gas → Price Changes / Schedule,User responsible for the change.,Workflow reference
+fuel_prices,created_at,Gas → Price Changes / Schedule,Record creation timestamp.,No explicit reference found; not confirmed connected
+fuel_prices,updated_at,Gas → Price Changes / Schedule,Last update timestamp.,Workflow reference

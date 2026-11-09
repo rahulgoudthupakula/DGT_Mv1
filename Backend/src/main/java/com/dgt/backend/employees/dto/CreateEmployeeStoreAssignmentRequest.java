@@ -5,6 +5,11 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 
+/**
+ * Creation payload for EmployeeStoreAssignment.
+ * Bean Validation annotations declare field requirements for the generic API.
+ */
+
 public record CreateEmployeeStoreAssignmentRequest(
         @NotNull Long employeeId,
         @NotBlank @Size(max = 50) String dgtId,

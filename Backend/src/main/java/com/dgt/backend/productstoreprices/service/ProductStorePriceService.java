@@ -16,10 +16,12 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
+// Coordinate product store price persistence and response mapping; caller authorization is handled at the controller.
 public class ProductStorePriceService {
     private final ProductStorePriceRepository repository;
     public ProductStorePriceService(ProductStorePriceRepository repository) { this.repository = repository; }
 
+    // Read a page sorted by primary key and include the total record count.
     public PageResponse<ProductStorePriceResponse> list(int page, int size) {
         log.debug("Listing product store price page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("storePriceId")));
@@ -27,6 +29,7 @@ public class ProductStorePriceService {
         return new PageResponse<>(p.getContent().stream().map(ProductStorePriceResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    // Map the stored record to the API response, or return HTTP 404 when absent.
     public ProductStorePriceResponse get(Long id) {
         log.debug("Fetching product store price id={}", id);
         return ProductStorePriceResponse.from(repository.findById(id)
@@ -38,6 +41,7 @@ public class ProductStorePriceService {
     }
 
     @Transactional
+    // Build and save a record from the submitted create fields inside the transaction.
     public ProductStorePriceResponse create(CreateProductStorePriceRequest req) {
         log.info("Creating product store price");
         var entity = ProductStorePrice.builder()
@@ -53,6 +57,7 @@ public class ProductStorePriceService {
     }
 
     @Transactional
+    // Load the existing record and apply only non-null fields; null does not clear a stored value.
     public ProductStorePriceResponse update(Long id, UpdateProductStorePriceRequest req) {
         log.info("Updating product store price id={}", id);
         var entity = repository.findById(id)

@@ -14,12 +14,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * JPA CRUD operations for Employee.
+ * The caller is responsible for authorization and workflow validation; these queries add no store predicate.
+ */
+
 @Slf4j
 @Service
 public class EmployeeService {
     private final EmployeeRepository repository;
     public EmployeeService(EmployeeRepository repository) { this.repository = repository; }
 
+    /** Load a page sorted by primary key and map its records to response DTOs. */
     public PageResponse<EmployeeResponse> list(int page, int size) {
         log.debug("Listing employee page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("employeeId")));
@@ -27,6 +33,7 @@ public class EmployeeService {
         return new PageResponse<>(p.getContent().stream().map(EmployeeResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    /** Load a record by ID or return HTTP 404. */
     public EmployeeResponse get(Long id) {
         log.debug("Fetching employee id={}", id);
         return EmployeeResponse.from(repository.findById(id)
@@ -37,6 +44,7 @@ public class EmployeeService {
     
     }
 
+    /** Persist the supplied fields in one transaction and return the saved values. */
     @Transactional
     public EmployeeResponse create(CreateEmployeeRequest req) {
         log.info("Creating employee");
@@ -51,6 +59,7 @@ public class EmployeeService {
         return EmployeeResponse.from(saved);
     }
 
+    /** Apply only non-null fields in one transaction, leaving omitted fields unchanged. */
     @Transactional
     public EmployeeResponse update(Long id, UpdateEmployeeRequest req) {
         log.info("Updating employee id={}", id);

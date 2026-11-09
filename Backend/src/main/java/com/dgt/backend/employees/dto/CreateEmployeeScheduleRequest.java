@@ -6,6 +6,11 @@ import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
+/**
+ * Creation payload for EmployeeSchedule.
+ * Bean Validation annotations declare field requirements for the generic API.
+ */
+
 public record CreateEmployeeScheduleRequest(
         @NotNull Long employeeId,
         @NotBlank @Size(max = 50) String dgtId,

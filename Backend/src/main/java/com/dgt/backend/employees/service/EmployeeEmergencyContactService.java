@@ -14,12 +14,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * JPA CRUD operations for EmployeeEmergencyContact.
+ * The caller is responsible for authorization and workflow validation; these queries add no store predicate.
+ */
+
 @Slf4j
 @Service
 public class EmployeeEmergencyContactService {
     private final EmployeeEmergencyContactRepository repository;
     public EmployeeEmergencyContactService(EmployeeEmergencyContactRepository repository) { this.repository = repository; }
 
+    /** Load a page sorted by primary key and map its records to response DTOs. */
     public PageResponse<EmployeeEmergencyContactResponse> list(int page, int size) {
         log.debug("Listing employee emergency contact page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("emergencyContactId")));
@@ -27,6 +33,7 @@ public class EmployeeEmergencyContactService {
         return new PageResponse<>(p.getContent().stream().map(EmployeeEmergencyContactResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    /** Load a record by ID or return HTTP 404. */
     public EmployeeEmergencyContactResponse get(Long id) {
         log.debug("Fetching employee emergency contact id={}", id);
         return EmployeeEmergencyContactResponse.from(repository.findById(id)
@@ -37,6 +44,7 @@ public class EmployeeEmergencyContactService {
     
     }
 
+    /** Persist the supplied fields in one transaction and return the saved values. */
     @Transactional
     public EmployeeEmergencyContactResponse create(CreateEmployeeEmergencyContactRequest req) {
         log.info("Creating employee emergency contact");
@@ -51,6 +59,7 @@ public class EmployeeEmergencyContactService {
         return EmployeeEmergencyContactResponse.from(saved);
     }
 
+    /** Apply only non-null fields in one transaction, leaving omitted fields unchanged. */
     @Transactional
     public EmployeeEmergencyContactResponse update(Long id, UpdateEmployeeEmergencyContactRequest req) {
         log.info("Updating employee emergency contact id={}", id);

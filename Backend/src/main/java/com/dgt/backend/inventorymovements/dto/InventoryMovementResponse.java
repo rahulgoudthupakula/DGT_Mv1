@@ -4,6 +4,10 @@ import com.dgt.backend.inventorymovements.entity.InventoryMovement;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
+/**
+ * Response DTO for stored InventoryMovement fields.
+ */
+
 public record InventoryMovementResponse(
         Long movementId,
         String dgtId,
@@ -15,6 +19,7 @@ public record InventoryMovementResponse(
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
 ) {
+    /** Copy entity fields to the response without changing the stored record. */
     public static InventoryMovementResponse from(InventoryMovement e) {
         return new InventoryMovementResponse(
                 e.getMovementId(), e.getDgtId(), e.getProductId(),

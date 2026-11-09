@@ -1,3 +1,7 @@
+/**
+ * Loads vendor contact details from the store vendors API. Local invoice/payment datasets below
+ * are separate from that live vendor lookup.
+ */
 import { useQuery } from "@tanstack/react-query";
 import { request } from "@/lib/backend";
 import { useState } from "react";

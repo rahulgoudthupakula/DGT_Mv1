@@ -1,0 +1,54 @@
+import { useState } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Pencil, Eye, CheckCircle2 } from "lucide-react";
+import { OrdersInvoices } from "./OrdersInvoices";
+import { ViewInvoice } from "./ViewInvoice";
+import { InvoiceApprovals } from "./InvoiceApprovals";
+
+type InvoiceTab = "edit" | "approvals" | "view";
+
+export const EditViewInvoicesPage = () => {
+  const [activeTab, setActiveTab] = useState<InvoiceTab>("edit");
+
+  const tabs = [
+    { id: "edit", label: "Edit Invoice", icon: Pencil },
+    { id: "approvals", label: "Invoice Approvals", icon: CheckCircle2 },
+    { id: "view", label: "View Invoice", icon: Eye },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">Edit &amp; View Invoices</h1>
+        <p className="text-sm text-muted-foreground">Manage and review purchase invoices</p>
+      </div>
+
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as InvoiceTab)}>
+        <TabsList className="flex flex-wrap h-auto gap-1 bg-muted p-1">
+          {tabs.map((tab) => (
+            <TabsTrigger
+              key={tab.id}
+              value={tab.id}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5"
+            >
+              <tab.icon className="h-3.5 w-3.5" />
+              {tab.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+
+        <TabsContent value="edit" className="mt-6">
+          <OrdersInvoices />
+        </TabsContent>
+
+        <TabsContent value="approvals" className="mt-6">
+          <InvoiceApprovals />
+        </TabsContent>
+
+        <TabsContent value="view" className="mt-6">
+          <ViewInvoice />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+};

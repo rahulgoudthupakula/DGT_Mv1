@@ -14,12 +14,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * JPA CRUD operations for EmployeeTimeOffRequest.
+ * The caller is responsible for authorization and workflow validation; these queries add no store predicate.
+ */
+
 @Slf4j
 @Service
 public class EmployeeTimeOffRequestService {
     private final EmployeeTimeOffRequestRepository repository;
     public EmployeeTimeOffRequestService(EmployeeTimeOffRequestRepository repository) { this.repository = repository; }
 
+    /** Load a page sorted by primary key and map its records to response DTOs. */
     public PageResponse<EmployeeTimeOffRequestResponse> list(int page, int size) {
         log.debug("Listing employee time off request page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("timeOffRequestId")));
@@ -27,6 +33,7 @@ public class EmployeeTimeOffRequestService {
         return new PageResponse<>(p.getContent().stream().map(EmployeeTimeOffRequestResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    /** Load a record by ID or return HTTP 404. */
     public EmployeeTimeOffRequestResponse get(Long id) {
         log.debug("Fetching employee time off request id={}", id);
         return EmployeeTimeOffRequestResponse.from(repository.findById(id)
@@ -37,6 +44,7 @@ public class EmployeeTimeOffRequestService {
     
     }
 
+    /** Persist the supplied fields in one transaction and return the saved values. */
     @Transactional
     public EmployeeTimeOffRequestResponse create(CreateEmployeeTimeOffRequestRequest req) {
         log.info("Creating employee time off request");
@@ -58,6 +66,7 @@ public class EmployeeTimeOffRequestService {
         return EmployeeTimeOffRequestResponse.from(saved);
     }
 
+    /** Apply only non-null fields in one transaction, leaving omitted fields unchanged. */
     @Transactional
     public EmployeeTimeOffRequestResponse update(Long id, UpdateEmployeeTimeOffRequestRequest req) {
         log.info("Updating employee time off request id={}", id);

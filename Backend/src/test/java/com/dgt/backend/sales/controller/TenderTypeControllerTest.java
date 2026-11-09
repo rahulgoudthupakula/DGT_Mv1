@@ -1,6 +1,6 @@
 package com.dgt.backend.sales.controller;
 
-import com.dgt.backend.access.PagePermissions;
+import com.dgt.backend.access.security.PagePermissions;
 import com.dgt.backend.sales.dto.*;
 import com.dgt.backend.sales.service.TenderTypeService;
 import com.dgt.backend.common.dto.PageResponse;

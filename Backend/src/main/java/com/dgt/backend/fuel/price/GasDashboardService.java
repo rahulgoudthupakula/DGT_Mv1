@@ -1,10 +1,15 @@
 package com.dgt.backend.fuel.price;
 
-import com.dgt.backend.access.ScopedAccess;
+import com.dgt.backend.access.security.ScopedAccess;
 import com.dgt.backend.common.entity.Rows;
 import java.util.*;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
+
+/**
+ * Builds dashboard tank state from saved measurements and subsequent inventory movements.
+ * These values are recorded estimates, not live tank-sensor readings; the caller enforces access.
+ */
 
 /** Read-only recorded tank state. Authorization is enforced by the price controller. */
 @Slf4j
@@ -12,9 +17,11 @@ import lombok.extern.slf4j.Slf4j;
 public class GasDashboardService {
  private final ScopedAccess a;
  public GasDashboardService(ScopedAccess a){this.a=a;}
+ // Return store-local date and tank estimates as of the database transaction time.
  public Map<String,Object> tanks(String store){
   log.debug("Fetching gas dashboard tanks store={}", store);
   var context=a.db.queryForMap("SELECT timezone,(CURRENT_TIMESTAMP AT TIME ZONE timezone)::date AS today,CURRENT_TIMESTAMP AS \"asOf\" FROM stores WHERE dgt_id=?",store);
+  // Use the latest non-future reading plus later movements; missing readings remain unknown.
   var tanks=a.db.queryForList("""
    SELECT t.tank_id::text AS id,t.tank_number AS number,t.capacity_gallons AS capacity,
     t.low_level_percentage AS threshold,

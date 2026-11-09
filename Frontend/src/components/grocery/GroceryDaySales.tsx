@@ -1,3 +1,7 @@
+/**
+ * Grocery dashboard consumes backend summaries through useStatistics. Cards, daily/hourly charts
+ * and top items share the applied date range; receipt rows are not downloaded here.
+ */
 import {useStatistics} from "@/components/reports/statistics/useStatistics";
 import {change,dollars} from "@/components/reports/statistics/statisticsData";
 import { format } from "date-fns";

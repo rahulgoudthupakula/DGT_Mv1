@@ -1,6 +1,6 @@
 package com.dgt.backend.promotions.controller;
 
-import com.dgt.backend.access.PagePermissions;
+import com.dgt.backend.access.security.PagePermissions;
 import com.dgt.backend.promotions.dto.*;
 import com.dgt.backend.promotions.service.PromotionProductService;
 import com.dgt.backend.common.dto.PageResponse;

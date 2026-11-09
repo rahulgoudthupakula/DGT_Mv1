@@ -1,6 +1,6 @@
 package com.dgt.backend.fuel.settings;
 
-import com.dgt.backend.access.ScopedAccess;
+import com.dgt.backend.access.security.ScopedAccess;
 import com.dgt.backend.common.entity.Rows;
 import java.math.BigDecimal;
 import java.util.*;
@@ -12,6 +12,11 @@ import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * Store gas settings and tank configuration workflow.
+ * Validates complete settings, preserves tank history, and audits changes within a transaction.
+ */
+
 @Slf4j
 @RestController
 @ConditionalOnProperty(name="app.gas.settings.enabled",havingValue="true")
@@ -19,9 +24,11 @@ import lombok.extern.slf4j.Slf4j;
 public class GasSettingsController {
  private final ScopedAccess a;private final ObjectMapper json;
  public GasSettingsController(ScopedAccess a,ObjectMapper json){this.a=a;this.json=json;}
+ // Fixed allowlist of settings accepted by the full settings form.
  private static final List<String> FIELDS=List.of("plus_tank_type","blend_regular_percentage","sells_diesel","two_blended_grades","federal_multiplier","federal_tolerance_gallons","state_multiplier","state_tolerance_gallons","report_state","supplier_payment_method","gas_brand_type","card_settlement_method","allowed_variance_percentage","daily_loss_threshold_gallons","auto_flag_variance","variance_approval_required","low_tank_dashboard","low_tank_email","high_variance_dashboard","high_variance_email","repeated_loss_dashboard","repeated_loss_email","missing_reading_dashboard","missing_reading_email","lock_critical_after_delivery");
  private static final Set<String> BOOLS=Set.of("sells_diesel","two_blended_grades","auto_flag_variance","variance_approval_required","low_tank_dashboard","low_tank_email","high_variance_dashboard","high_variance_email","repeated_loss_dashboard","repeated_loss_email","missing_reading_dashboard","missing_reading_email","lock_critical_after_delivery");
  private static final Map<String,Set<String>> ENUMS=Map.of("plus_tank_type",Set.of("blended","separate"),"supplier_payment_method",Set.of("ach","check","wire","auto-debit"),"gas_brand_type",Set.of("branded","unbranded"),"card_settlement_method",Set.of("direct","jobber"));
+ // Allow company admins or active managers with explicit GAS_SETTINGS access.
  private void access(String store){if(a.admin(a.user(),a.company(store)))return;if(!Boolean.TRUE.equals(a.db.queryForObject("SELECT EXISTS(SELECT 1 FROM user_roles r JOIN role_types t USING(role_type_id) JOIN store_role_permissions p ON p.dgt_id=r.dgt_id AND p.role_type_id=r.role_type_id WHERE r.user_id=? AND r.dgt_id=? AND r.is_active AND t.is_active AND upper(t.role_type_name)='MANAGER' AND p.permission_code='GAS_SETTINGS' AND p.allowed)",Boolean.class,a.user(),store)))throw a.denied();}
  private ResponseStatusException bad(String m){return new ResponseStatusException(HttpStatus.BAD_REQUEST,m);}
  private ResponseStatusException conflict(String m){return new ResponseStatusException(HttpStatus.CONFLICT,m);}
@@ -29,6 +36,7 @@ public class GasSettingsController {
  private BigDecimal number(Object v,int scale,String max,boolean required,String label){if(v==null){if(required)throw bad(label+" is required");return null;}if(!(v instanceof Number))throw bad("Enter a number for "+label);BigDecimal n;try{n=new BigDecimal(v.toString());}catch(NumberFormatException e){throw bad("Invalid "+label);}if(n.signum()<0||n.compareTo(new BigDecimal(max))>0||n.stripTrailingZeros().scale()>scale)throw bad("Invalid "+label);return n;}
  private List<Map<String,Object>> grades(){return a.db.queryForList("SELECT fuel_grade_id::text AS id,fuel_type AS type,grade_name AS name,octane_rating AS octane FROM fuel_grades WHERE is_active ORDER BY grade_name,fuel_grade_id").stream().map(Rows::normalize).toList();}
  private Map<String,Object> stored(String store){var rows=a.db.queryForList("SELECT *,xmin::text AS version FROM gas_settings WHERE dgt_id=?",store);return rows.isEmpty()?null:rows.getFirst();}
+ // Return tank edit versions and history flags used to protect capacity and grade assignments.
  private List<Map<String,Object>> tanks(String store){return a.db.queryForList("""
  SELECT t.tank_id::text AS id,t.xmin::text AS version,t.tank_number AS number,t.tank_name AS name,t.capacity_gallons AS capacity,t.safe_fill_capacity AS "safeFill",t.capacity_locked AS "capacityLocked",t.low_level_percentage AS "lowLevel",t.prepaid_tax_per_gallon AS "prepaidTax",t.tax_rate_per_gallon AS "taxRate",t.ust_fee_per_gallon AS "ustFees",t.pos_mapping AS "posMapping",
  (SELECT x.fuel_grade_id::text FROM fuel_tank_grade_assignments x WHERE x.tank_id=t.tank_id AND x.effective_to IS NULL ORDER BY x.effective_from DESC,x.assignment_id DESC LIMIT 1) AS "gradeId",
@@ -37,18 +45,26 @@ public class GasSettingsController {
  FROM fuel_tanks t WHERE t.dgt_id=? ORDER BY t.tank_number,t.tank_id
  """,store).stream().map(Rows::normalize).toList();}
  private List<Map<String,Object>> audit(String store){return a.db.queryForList("SELECT e.event_id::text AS id,e.created_at AS timestamp,e.event_type AS event,COALESCE(u.first_name,'') || ' ' || COALESCE(u.last_name,'') AS actor,e.changes::text AS changes FROM access_audit_events e JOIN users u ON u.user_id=e.actor_user_id WHERE e.dgt_id=? AND e.event_type IN ('GAS_SETTINGS_CHANGED','GAS_GRADE_CREATED') ORDER BY e.event_id DESC",store).stream().map(Rows::normalize).toList();}
+ // Load settings, tanks, active grades, and the latest 100 audit entries consistently.
  @GetMapping @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ) public Object get(@PathVariable String store){access(store);var raw=stored(store);var prefs=new LinkedHashMap<String,Object>();if(raw!=null)for(String field:FIELDS)prefs.put(field,raw.get(field));var out=new LinkedHashMap<String,Object>();out.put("settings",raw==null?null:prefs);out.put("version",raw==null?"0":raw.get("version"));out.put("tanks",tanks(store));out.put("grades",grades());out.put("audit",audit(store).stream().limit(100).toList());return out;}
+ // Return the complete settings/grade audit history for this store.
  @GetMapping("/audit") public Object history(@PathVariable String store){access(store);return audit(store);}
+ // Shared grade definition requested through the authorized store settings workflow.
  public record Grade(String name,String type,BigDecimal octane){}
+ // Serialize matching grade names with an advisory lock; reuse only matching active definitions.
  @PostMapping("/grades") @Transactional public Object addGrade(@PathVariable String store,@RequestBody Grade grade){access(store);String name=text(grade.name(),100,"Grade name"),type=text(grade.type(),50,"Fuel type");var octane=number(grade.octane(),2,"999.99",true,"Octane (0 for not applicable)");a.db.queryForList("SELECT pg_advisory_xact_lock(hashtext(?))",("fuel-grade:"+type+":"+name).toLowerCase(Locale.ROOT));var old=a.db.queryForList("SELECT fuel_grade_id,octane_rating,is_active FROM fuel_grades WHERE lower(grade_name)=lower(?) AND lower(fuel_type)=lower(?)",name,type);if(!old.isEmpty()){if(old.size()!=1||!Boolean.TRUE.equals(old.getFirst().get("is_active"))||((BigDecimal)old.getFirst().get("octane_rating")).compareTo(octane)!=0)throw conflict("This grade name exists with different details");return grades();}Long id=a.db.queryForObject("INSERT INTO fuel_grades(fuel_type,grade_name,octane_rating) VALUES (?,?,?) RETURNING fuel_grade_id",Long.class,type,name,octane);a.audit(store,"GAS_GRADE_CREATED",id.toString(),json.writeValueAsString(List.of(change("Fuel grade",null,Map.of("name",name,"type",type,"octane",octane)))));return grades();}
+ // Tank form values plus the version last read by the client.
  public record Tank(String id,String version,String number,String name,String gradeId,BigDecimal capacity,BigDecimal safeFill,BigDecimal lowLevel,BigDecimal prepaidTax,BigDecimal taxRate,BigDecimal ustFees,String posMapping){}
+ // Complete settings and tank rows; saved tanks cannot be omitted as a deletion mechanism.
  public record Input(Map<String,Object> settings,List<Tank> tanks){}
+ // Lock the store, reject stale versions, validate all settings and tanks, then save and audit atomically.
  @PutMapping @Transactional public Object save(@PathVariable String store,@RequestHeader(value="If-Match",required=false) String version,@RequestBody Input input){
   access(store);a.db.queryForList("SELECT dgt_id FROM stores WHERE dgt_id=? FOR UPDATE",store);access(store);var old=stored(store);if(!Objects.equals(version,old==null?"0":old.get("version")))throw conflict("Gas settings changed; reload before saving");
   if(input==null||input.settings()==null||!input.settings().keySet().equals(new HashSet<>(FIELDS))||input.tanks()==null||input.tanks().size()>200)throw bad("Supply settings and tank rows");
   var prefs=new LinkedHashMap<String,Object>();for(String field:FIELDS){Object v=input.settings().get(field);if(BOOLS.contains(field)){if(!(v instanceof Boolean))throw bad("Invalid "+field);}else if(ENUMS.containsKey(field)){if(v!=null&&(!(v instanceof String)||!ENUMS.get(field).contains(v)))throw bad("Invalid "+field);}else if(field.equals("report_state")){if(v!=null)v=text(v.toString(),100,"State");}else{boolean percentage=field.endsWith("percentage"),multiplier=field.endsWith("multiplier");v=number(v,percentage?2:multiplier?6:3,percentage?"100":multiplier?"999999.999999":"999999999.999",false,field);}prefs.put(field,v);}
   if("blended".equals(prefs.get("plus_tank_type"))&&prefs.get("blend_regular_percentage")==null)throw bad("Enter the regular-fuel percentage for the blend");
   var changes=new ArrayList<Map<String,Object>>();for(String f:FIELDS)if(!equal(old==null?null:old.get(f),prefs.get(f)))changes.add(change(f,old==null?null:old.get(f),prefs.get(f)));
+  // Track tank IDs and numbers to reject duplicates and missing saved tanks.
   var existing=tanks(store);var ids=new HashSet<String>();var numbers=new HashSet<String>();
   for(var t:input.tanks()){
    if(t==null)throw bad("Invalid tank row");String tankNumber=text(t.number(),50,"Tank number"),name=text(t.name(),100,"Tank name");if(!numbers.add(tankNumber.toLowerCase(Locale.ROOT)))throw bad("Tank numbers must be unique within this store");
@@ -63,10 +79,13 @@ public class GasSettingsController {
    if(previous==null||previous.get("gradeId")==null){if(previous!=null&&Boolean.TRUE.equals(previous.get("gradeLocked")))throw conflict("Historical tank assignments require review");a.db.update("INSERT INTO fuel_tank_grade_assignments(tank_id,fuel_grade_id,effective_from) VALUES (?,?,(CURRENT_TIMESTAMP AT TIME ZONE (SELECT timezone FROM stores WHERE dgt_id=?))::date)",id,grade,store);}
    var after=new LinkedHashMap<String,Object>();after.put("number",tankNumber);after.put("name",name);after.put("gradeId",t.gradeId());after.put("capacity",t.capacity());after.put("safeFill",t.safeFill());after.put("lowLevel",t.lowLevel());after.put("prepaidTax",t.prepaidTax());after.put("taxRate",t.taxRate());after.put("ustFees",t.ustFees());after.put("posMapping",t.posMapping());for(var field:after.entrySet())if(!equal(previous==null?null:previous.get(field.getKey()),field.getValue()))changes.add(change("Tank "+tankNumber+": "+field.getKey(),previous==null?null:previous.get(field.getKey()),field.getValue()));
   }
+  // Omitting a saved tank is rejected rather than interpreted as a delete.
   if(existing.stream().anyMatch(t->!ids.contains(t.get("id").toString())))throw conflict("Saved tanks cannot be removed here; reload the complete tank list");
   var vals=new ArrayList<Object>();vals.add(store);for(String f:FIELDS)vals.add(prefs.get(f));vals.add(a.user());a.db.update("INSERT INTO gas_settings(dgt_id,"+String.join(",",FIELDS)+",updated_by) VALUES ("+String.join(",",Collections.nCopies(vals.size(),"?"))+") ON CONFLICT(dgt_id) DO UPDATE SET "+String.join(",",FIELDS.stream().map(f->f+"=EXCLUDED."+f).toList())+",updated_by=EXCLUDED.updated_by,updated_at=CURRENT_TIMESTAMP",vals.toArray());
   if(!changes.isEmpty())a.audit(store,"GAS_SETTINGS_CHANGED",store,json.writeValueAsString(changes));return Map.of("saved",true);
  }
+ // Compare numeric values by magnitude so differences in decimal scale do not create false changes.
  private boolean equal(Object a,Object b){if(a instanceof Number&&b instanceof Number)return new BigDecimal(a.toString()).compareTo(new BigDecimal(b.toString()))==0;return Objects.equals(a,b);}
+ // Build a field-level before/after audit entry, preserving null values.
  private Map<String,Object> change(String field,Object before,Object after){var c=new LinkedHashMap<String,Object>();c.put("field",field);c.put("from",before);c.put("to",after);return c;}
 }

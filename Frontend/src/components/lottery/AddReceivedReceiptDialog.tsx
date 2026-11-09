@@ -22,7 +22,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Loader2, Plus, Trash2, Upload, PencilLine, FileText } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { ApiError, request } from "@/lib/backend";
 
 export interface ReceiptItemDraft {
   key: string;
@@ -40,6 +40,7 @@ export interface ReceiptDraft {
 }
 
 interface Props {
+  storeId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   distributors: { id: string; name: string }[];
@@ -58,6 +59,7 @@ const newItem = (): ReceiptItemDraft => ({
 });
 
 export const AddReceivedReceiptDialog = ({
+  storeId,
   open,
   onOpenChange,
   distributors,
@@ -90,26 +92,17 @@ export const AddReceivedReceiptDialog = ({
   const handleFile = async (file: File) => {
     setStep("reading");
     try {
-      const base64: string = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
-        reader.onerror = () => reject(new Error("read failed"));
-        reader.readAsDataURL(file);
-      });
-
-      const { data, error } = await supabase.functions.invoke("parse-invoice", {
-        body: { fileData: base64, mimeType: file.type, fileName: file.name },
-      });
-      if (error || !data || (data as any).error) {
-        throw new Error((data as any)?.error ?? "Could not read the receipt");
-      }
-
-      const parsed = data as {
-        vendor?: string;
-        invoiceNumber?: string;
-        invoiceDate?: string;
-        lines?: { description: string; sku: string; quantity: number }[];
-      };
+      if (file.size > 5 * 1024 * 1024) throw new Error("Receipt must be 5 MB or smaller.");
+      if (!["application/pdf", "image/jpeg", "image/png"].includes(file.type))
+        throw new Error("Choose a PDF, JPG or PNG receipt.");
+      const body = new FormData();
+      body.append("file", file);
+      const parsed = await request<{
+        vendor: string;
+        invoiceNumber: string;
+        invoiceDate: string;
+        lines: { description: string; sku: string; quantity: number }[];
+      }>(`/access/stores/${encodeURIComponent(storeId)}/lottery-deliveries/parse-receipt`, { method: "POST", body });
 
       const matchedVendor = distributors.find((d) =>
         parsed.vendor ? d.name.toLowerCase().includes(parsed.vendor.toLowerCase().slice(0, 6)) : false
@@ -124,7 +117,7 @@ export const AddReceivedReceiptDialog = ({
           key: Math.random().toString(36).slice(2),
           gameId: game?.id ?? "",
           packNumber: (l.sku || "").trim(),
-          quantity: Math.max(1, l.quantity || 1),
+          quantity: l.quantity,
         };
       });
       setItems(mapped.length ? mapped : [newItem()]);
@@ -133,7 +126,9 @@ export const AddReceivedReceiptDialog = ({
     } catch (e: any) {
       toast({
         title: "Could not read the file",
-        description: e?.message ?? "Please enter the receipt manually.",
+        description: e instanceof ApiError && [413, 422, 429, 502, 503].includes(e.status)
+          ? ({413: "Receipt must be 5 MB or smaller.", 422: "No readable receipt lines were found. Enter the receipt manually.", 429: "Receipt reader is busy. Try again later or enter it manually.", 502: "Receipt reader is unavailable. Try again or enter it manually.", 503: "Receipt reading is not configured or temporarily unavailable. Enter the receipt manually."}[e.status])
+          : e?.message ?? "Please enter the receipt manually.",
         variant: "destructive",
       });
       setStep("form");

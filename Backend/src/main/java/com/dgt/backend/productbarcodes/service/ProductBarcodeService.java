@@ -16,10 +16,12 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
+// Coordinate product barcode persistence and response mapping; caller authorization is handled at the controller.
 public class ProductBarcodeService {
     private final ProductBarcodeRepository repository;
     public ProductBarcodeService(ProductBarcodeRepository repository) { this.repository = repository; }
 
+    // Read a page sorted by primary key and include the total record count.
     public PageResponse<ProductBarcodeResponse> list(int page, int size) {
         log.debug("Listing product barcode page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("productBarcodeId")));
@@ -27,6 +29,7 @@ public class ProductBarcodeService {
         return new PageResponse<>(p.getContent().stream().map(ProductBarcodeResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    // Map the stored record to the API response, or return HTTP 404 when absent.
     public ProductBarcodeResponse get(Long id) {
         log.debug("Fetching product barcode id={}", id);
         return ProductBarcodeResponse.from(repository.findById(id)
@@ -38,6 +41,7 @@ public class ProductBarcodeService {
     }
 
     @Transactional
+    // Build and save a record from the submitted create fields inside the transaction.
     public ProductBarcodeResponse create(CreateProductBarcodeRequest req) {
         log.info("Creating product barcode");
         var entity = ProductBarcode.builder()
@@ -52,6 +56,7 @@ public class ProductBarcodeService {
     }
 
     @Transactional
+    // Load the existing record and apply only non-null fields; null does not clear a stored value.
     public ProductBarcodeResponse update(Long id, UpdateProductBarcodeRequest req) {
         log.info("Updating product barcode id={}", id);
         var entity = repository.findById(id)

@@ -1,6 +1,6 @@
 package com.dgt.backend.productbarcodes.controller;
 
-import com.dgt.backend.access.PagePermissions;
+import com.dgt.backend.access.security.PagePermissions;
 import com.dgt.backend.productbarcodes.dto.*;
 import com.dgt.backend.productbarcodes.service.ProductBarcodeService;
 import com.dgt.backend.common.dto.PageResponse;

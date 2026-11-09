@@ -1,3 +1,7 @@
+/**
+ * Non-scanned-item search and display UI. Check the local data source below before treating these
+ * results as persisted POS transactions.
+ */
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

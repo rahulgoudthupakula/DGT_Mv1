@@ -1,3 +1,7 @@
+/**
+ * Standalone order-guide UI uses the local PRODUCT_CATALOG and component state. The connected
+ * purchase-order workflow lives in PurchaseOrdersPage.
+ */
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

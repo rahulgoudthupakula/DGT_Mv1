@@ -1,6 +1,6 @@
 package com.dgt.backend.fuel.adjustment;
 
-import com.dgt.backend.access.ScopedAccess;
+import com.dgt.backend.access.security.ScopedAccess;
 import com.dgt.backend.common.entity.Rows;
 import java.math.BigDecimal;
 import java.time.*;
@@ -13,6 +13,11 @@ import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * Store-scoped measured-gallon correction workflow, gated by app.gas.adjustments.enabled.
+ * Drafts and pending requests change inventory only when posted after baseline validation.
+ */
+
 @Slf4j
 @RestController
 @ConditionalOnProperty(name="app.gas.adjustments.enabled",havingValue="true")
@@ -22,6 +27,7 @@ public class GasAdjustmentController {
  public GasAdjustmentController(ScopedAccess a,ObjectMapper json){this.a=a;this.json=json;}
  private static final String VIEW="GAS_VIEW_ADJUSTMENTS",EDIT="GAS_RECORD_ADJUSTMENT",APPROVE="GAS_APPROVE_ADJUSTMENT";
  private boolean admin(String store){return a.admin(a.user(),a.company(store));}
+ // Check explicit store gas permissions; non-admin approval is restricted to managers.
  private boolean allowed(String store,String code){if(admin(store))return true;return Boolean.TRUE.equals(a.db.queryForObject("""
  SELECT EXISTS(SELECT 1 FROM user_roles r JOIN role_types t USING(role_type_id)
  JOIN store_role_permissions p ON p.dgt_id=r.dgt_id AND p.role_type_id=r.role_type_id
@@ -35,11 +41,17 @@ public class GasAdjustmentController {
  private ResponseStatusException conflict(String s){return new ResponseStatusException(HttpStatus.CONFLICT,s);}
  private String text(String s,int max){String v=s==null?"":s.trim();if(v.length()>max)throw bad("Text exceeds "+max+" characters");return v;}
  private LocalDate today(String store){try{return LocalDate.now(ZoneId.of(a.db.queryForObject("SELECT timezone FROM stores WHERE dgt_id=?",String.class,store)));}catch(Exception e){throw bad("Configure the store timezone first");}}
+ // Require nonnegative quantities with at most three fractional digits and a bounded magnitude.
  private BigDecimal gallons(BigDecimal x){if(x==null||x.signum()<0||x.compareTo(new BigDecimal("1000000000"))>=0||x.stripTrailingZeros().scale()>3)throw bad("Gallons must be zero or greater with up to 3 decimal places");return x;}
+ // Capture reviewed baseline reading/movement IDs alongside measured and expected gallons.
  public record Line(long tankId,long gradeId,BigDecimal systemGallons,BigDecimal actualGallons,long readingId,Long movementId,String reason){}
+ // Adjustment form; submit moves a saved draft into the review workflow.
  public record Input(LocalDate date,String notes,List<Line> lines,boolean submit){}
+ // Reason supplied for a review decision; rejection requires nonempty text.
  public record Decision(String reason){}
+ // Measured gallons used to establish a tank initial baseline.
  public record Reading(BigDecimal gallons){}
+ // Resolve current grade and estimate gallons from the latest reading plus subsequent movements.
  private Map<String,Object> tank(String store,long id){
   var ts=a.db.queryForList("SELECT tank_id::text AS id,tank_number AS number,tank_name AS name,capacity_gallons AS capacity FROM fuel_tanks WHERE tank_id=? AND dgt_id=?",id,store);
   if(ts.isEmpty())throw bad("Tank does not belong to this store");var t=ts.getFirst();
@@ -68,8 +80,10 @@ public class GasAdjustmentController {
  FROM fuel_adjustments x JOIN users u ON u.user_id=x.created_by LEFT JOIN users r ON r.user_id=x.reviewed_by
  WHERE x.dgt_id=? AND x.adjustment_id=?
  """,store,id);if(rs.isEmpty())throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Adjustment not found in this store");var row=rs.getFirst();row.put("lines",lines(store,id));boolean own=((Number)row.get("creatorId")).longValue()==a.user();row.put("canEdit",allowed(store,EDIT)&&(own||allowed(store,APPROVE)));row.put("canApprove",allowed(store,APPROVE)&&(!own||admin(store)));return Rows.normalize(row);}
+ // Return adjustments, tank baselines, store-local date, and caller capabilities.
  @GetMapping @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
  public Object list(@PathVariable String store){read(store);var records=a.db.queryForList("SELECT adjustment_id FROM fuel_adjustments WHERE dgt_id=? ORDER BY adjustment_id DESC",Long.class,store).stream().map(id->detail(store,id)).toList();var tanks=a.db.queryForList("SELECT tank_id FROM fuel_tanks WHERE dgt_id=? ORDER BY tank_number",Long.class,store).stream().map(id->tank(store,id)).toList();return Map.of("records",records,"tanks",tanks,"today",today(store).toString(),"canEdit",allowed(store,EDIT),"canApprove",allowed(store,APPROVE),"isAdmin",admin(store));}
+ // Only admins may establish an initial reading; existing readings cannot be replaced here.
  @PostMapping("/tanks/{tankId}/initial-reading") @Transactional
  public Object initialReading(@PathVariable String store,@PathVariable long tankId,@RequestBody Reading in){
   a.requireAdmin(store);lock(store);a.requireAdmin(store);a.db.queryForList("SELECT tank_id FROM fuel_tanks WHERE tank_id=? AND dgt_id=? FOR UPDATE",tankId,store);var t=tank(store,tankId);
@@ -77,6 +91,7 @@ public class GasAdjustmentController {
   BigDecimal g=gallons(in.gallons());if(g.stripTrailingZeros().scale()>2)throw bad("Initial tank readings support up to 2 decimal places");if(g.compareTo((BigDecimal)t.get("capacity"))>0)throw bad("Gallons exceed tank capacity");if(t.get("gradeId")==null)throw bad("Assign a fuel grade in Gas Settings first");
   a.db.update("INSERT INTO fuel_tank_readings(tank_id,reading_datetime,volume_gallons,created_by) VALUES (?,clock_timestamp(),?,?)",tankId,g,a.user());a.audit(store,"GAS_INITIAL_READING",Long.toString(tankId),json.writeValueAsString(in));return list(store);
  }
+ // Require today, unique tanks, matching baseline IDs, valid grades, and actual gallons within capacity.
  private void validate(String store,Input in){
   if(in==null||in.date()==null||!in.date().equals(today(store)))throw bad("Use today's store-local date; adjustments compare against current recorded gallons");
   text(in.notes(),5000);if(in.lines()==null||in.lines().isEmpty()||in.lines().size()>50)throw bad("Enter 1–50 tank adjustments");Set<Long> seen=new HashSet<>();
@@ -89,19 +104,25 @@ public class GasAdjustmentController {
    if(!Set.of("meter_variance","evaporation","leak","theft","calibration","other").contains(l.reason()==null?"":l.reason()))throw bad("Select an adjustment reason");
   }
  }
+ // Archive omitted adjustment lines and upsert the submitted tank measurements.
  private void saveLines(String store,long id,Input in){a.db.update("UPDATE fuel_adjustment_lines SET archived_at=CURRENT_TIMESTAMP WHERE archived_at IS NULL AND adjustment_id=? AND dgt_id=?",id,store);for(var l:in.lines())a.db.update("INSERT INTO fuel_adjustment_lines(adjustment_id,dgt_id,tank_id,fuel_grade_id,system_gallons,actual_gallons,baseline_reading_id,baseline_movement_id,reason) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(adjustment_id,tank_id) DO UPDATE SET fuel_grade_id=EXCLUDED.fuel_grade_id,system_gallons=EXCLUDED.system_gallons,actual_gallons=EXCLUDED.actual_gallons,baseline_reading_id=EXCLUDED.baseline_reading_id,baseline_movement_id=EXCLUDED.baseline_movement_id,reason=EXCLUDED.reason,archived_at=NULL",id,store,l.tankId(),l.gradeId(),l.systemGallons(),l.actualGallons(),l.readingId(),l.movementId(),l.reason());}
  private Map<String,Object> locked(String store,long id){var rs=a.db.queryForList("SELECT *,xmin::text AS version FROM fuel_adjustments WHERE dgt_id=? AND adjustment_id=? FOR UPDATE",store,id);if(rs.isEmpty())throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Adjustment not found in this store");return rs.getFirst();}
+ // Reject a stale xmin version before editing or reviewing the request.
  private void version(Map<String,Object> row,String version){if(!Objects.equals(row.get("version"),version))throw conflict("Adjustment changed; reopen the latest record");}
  private void audit(String store,String event,long id){a.audit(store,event,Long.toString(id),json.writeValueAsString(detail(store,id)));}
+ // Deduplicate creation by request key and payload hash before saving or submitting.
  @PostMapping @Transactional
  public Object create(@PathVariable String store,@RequestHeader("Idempotency-Key") UUID key,@RequestBody Input in){
   access(store,EDIT);lock(store);access(store,EDIT);String hash;try{hash=HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(json.writeValueAsString(in).getBytes(java.nio.charset.StandardCharsets.UTF_8)));}catch(Exception e){throw new IllegalStateException(e);}
   var prior=a.db.queryForList("SELECT adjustment_id,request_hash FROM fuel_adjustments WHERE dgt_id=? AND client_request_id=?",store,key);if(!prior.isEmpty()){if(!hash.equals(prior.getFirst().get("request_hash")))throw conflict("Save request already used for different details");return detail(store,((Number)prior.getFirst().get("adjustment_id")).longValue());}
   validate(store,in);Long id=a.db.queryForObject("INSERT INTO fuel_adjustments(dgt_id,client_request_id,request_hash,adjustment_date,notes,created_by) VALUES (?,?,?,?,?,?) RETURNING adjustment_id",Long.class,store,key,hash,in.date(),text(in.notes(),5000),a.user());saveLines(store,id,in);audit(store,"GAS_ADJUSTMENT_CREATED",id);if(in.submit())submit(store,id);return detail(store,id);
  }
+ // Allow authorized edits to draft/pending requests and reset the saved state to draft.
  @PutMapping("/{id}") @Transactional
  public Object update(@PathVariable String store,@PathVariable long id,@RequestHeader("If-Match") String version,@RequestBody Input in){access(store,EDIT);lock(store);access(store,EDIT);var row=locked(store,id);version(row,version);if(!Set.of("DRAFT","PENDING").contains(row.get("status")))throw conflict("Completed adjustments cannot be edited");if(((Number)row.get("created_by")).longValue()!=a.user()&&!allowed(store,APPROVE))throw a.denied();validate(store,in);saveLines(store,id,in);a.db.update("UPDATE fuel_adjustments SET adjustment_date=?,notes=?,status='DRAFT',updated_at=clock_timestamp() WHERE adjustment_id=?",in.date(),text(in.notes(),5000),id);audit(store,"GAS_ADJUSTMENT_UPDATED",id);if(in.submit())submit(store,id);return detail(store,id);}
+ // Mark pending; company-admin submissions are posted immediately.
  private void submit(String store,long id){a.db.update("UPDATE fuel_adjustments SET status='PENDING',updated_at=clock_timestamp() WHERE adjustment_id=?",id);audit(store,"GAS_ADJUSTMENT_SUBMITTED",id);if(admin(store))post(store,id);}
+ // Revalidate the baseline, post signed differences as inventory movements, and mark reviewed.
  private void post(String store,long id){
   var row=locked(store,id);var ls=lines(store,id);var input=new ArrayList<Line>();for(var l:ls)input.add(new Line(Long.parseLong(l.get("tankId").toString()),Long.parseLong(l.get("gradeId").toString()),new BigDecimal(l.get("systemGallons").toString()),new BigDecimal(l.get("actualGallons").toString()),Long.parseLong(l.get("readingId").toString()),l.get("movementId")==null?null:Long.parseLong(l.get("movementId").toString()),(String)l.get("reason")));
   // A pending request must be reconfirmed when its date or baseline becomes stale.
@@ -109,6 +130,7 @@ public class GasAdjustmentController {
   for(var l:ls)a.db.update("INSERT INTO inventory_movements(dgt_id,product_id,movement_type,qty_changed,unit_cost,reference_id,tank_id,fuel_grade_id,fuel_adjustment_line_id,created_at) VALUES (?,NULL,'FUEL_ADJUSTMENT',?,NULL,?,?,?,?,clock_timestamp())",store,new BigDecimal(l.get("difference").toString()),id,Long.parseLong(l.get("tankId").toString()),Long.parseLong(l.get("gradeId").toString()),Long.parseLong(l.get("id").toString()));
   a.db.update("UPDATE fuel_adjustments SET status='POSTED',reviewed_by=?,reviewed_at=clock_timestamp(),updated_at=clock_timestamp() WHERE adjustment_id=?",a.user(),id);audit(store,"GAS_ADJUSTMENT_POSTED",id);
  }
+ // Review pending requests; non-admin reviewers cannot approve or reject their own request.
  @PostMapping("/{id}/{action:approve|reject}") @Transactional
  public Object decide(@PathVariable String store,@PathVariable long id,@PathVariable String action,@RequestHeader("If-Match") String version,@RequestBody(required=false) Decision in){access(store,APPROVE);lock(store);access(store,APPROVE);var row=locked(store,id);if(((Number)row.get("created_by")).longValue()==a.user()&&!admin(store))throw a.denied();String target=action.equals("approve")?"POSTED":"REJECTED";if(target.equals(row.get("status")))return detail(store,id);version(row,version);if(!"PENDING".equals(row.get("status")))throw conflict("Only pending adjustments can be reviewed");if(action.equals("approve"))post(store,id);else{String reason=text(in==null?null:in.reason(),1000);if(reason.isEmpty())throw bad("Enter a rejection reason");a.db.update("UPDATE fuel_adjustments SET status='REJECTED',reviewed_by=?,reviewed_at=clock_timestamp(),rejection_reason=?,updated_at=clock_timestamp() WHERE adjustment_id=?",a.user(),reason,id);audit(store,"GAS_ADJUSTMENT_REJECTED",id);}return detail(store,id);}
 }

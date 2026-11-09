@@ -3,6 +3,11 @@ package com.dgt.backend.lottery.dto;
 import jakarta.validation.constraints.Size;
 import java.time.OffsetDateTime;
 
+/**
+ * Partial update payload for LotteryPack.
+ * The service ignores null fields, so omitted values are preserved rather than cleared.
+ */
+
 public record UpdateLotteryPackRequest(
         Long invoiceId,
         @Size(max = 50) String dgtId,

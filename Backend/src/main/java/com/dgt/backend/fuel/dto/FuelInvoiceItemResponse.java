@@ -4,6 +4,10 @@ import com.dgt.backend.fuel.entity.FuelInvoiceItem;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
+/**
+ * Response DTO for stored FuelInvoiceItem fields.
+ */
+
 public record FuelInvoiceItemResponse(
         Long fuelInvoiceItemId,
         Long invoiceId,
@@ -14,6 +18,7 @@ public record FuelInvoiceItemResponse(
         BigDecimal fuelLineTotal,
         OffsetDateTime createdAt
 ) {
+    /** Copy entity fields to the response without changing the stored record. */
     public static FuelInvoiceItemResponse from(FuelInvoiceItem e) {
         return new FuelInvoiceItemResponse(
                 e.getFuelInvoiceItemId(), e.getInvoiceId(), e.getFuelGradeId(),

@@ -6,8 +6,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Layers, Eye, Pencil, Trash2 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
+import { Plus, Layers, Eye, Pencil, Trash2, ChevronsUpDown, Check } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery,useQueryClient } from '@tanstack/react-query';
 import { request,isPendingChange } from '@/lib/backend';
@@ -16,6 +17,7 @@ interface GroupItem {
   id: number;
   groupId?: number;
   sku: string;
+  barcodes?: string;
   name: string;
   cost: number | null;
   retail: number;
@@ -29,6 +31,28 @@ interface PriceGroup {
   description: string;
   groupPrice: number;
   items: GroupItem[];
+}
+
+function GroupItemPicker({items,value,onChange,disabled}:{items:GroupItem[];value:string;onChange:(value:string)=>void;disabled:boolean}) {
+  const [open,setOpen]=useState(false);
+  const [search,setSearch]=useState('');
+  const selected=items.find(item=>String(item.id)===value);
+  const matches=items.filter(item=>`${item.name} ${item.sku} ${item.barcodes??''}`.toLowerCase().includes(search.trim().toLowerCase()));
+  return <Popover open={open} onOpenChange={next=>{setOpen(next);if(next)setSearch('');}}>
+    <PopoverTrigger asChild><Button type="button" variant="outline" disabled={disabled} aria-label="Select item" aria-haspopup="listbox" aria-expanded={open} className="w-full justify-between font-normal">
+      <span className="truncate">{selected?`${selected.name} (${selected.sku})`:'Choose an item'}</span><ChevronsUpDown className="ml-2 h-4 w-4 shrink-0"/>
+    </Button></PopoverTrigger>
+    <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-0">
+      <Command shouldFilter={false}>
+        <CommandInput aria-label="Search items" placeholder="Search by name, SKU or barcode" value={search} onValueChange={setSearch}/>
+        <CommandList><CommandEmpty>No matching items.</CommandEmpty><CommandGroup>
+          {matches.map(item=><CommandItem key={item.id} value={String(item.id)} onSelect={()=>{onChange(String(item.id));setOpen(false);}}>
+            <Check className={`mr-2 h-4 w-4 shrink-0 ${String(item.id)===value?'opacity-100':'opacity-0'}`}/>{item.name} ({item.sku})
+          </CommandItem>)}
+        </CommandGroup></CommandList>
+      </Command>
+    </PopoverContent>
+  </Popover>;
 }
 
 const formatCurrency = (value: number | null) => value == null ? "" : `$${value.toFixed(2)}`;
@@ -203,18 +227,7 @@ export const PriceGroupsPage = ({storeId}:{storeId:string}) => {
                   <div className="flex items-end gap-2">
                     <div className="grid gap-1.5 flex-1">
                       <Label className="text-xs">Select Item</Label>
-                      <Select value={newItemSku} onValueChange={(value) => setNewItemSku(value)}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Choose an item" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {availableItems(newItems.map((i) => String(i.id))).map((item) => (
-                            <SelectItem key={item.id} value={String(item.id)}>
-                              {item.name} ({item.sku})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <GroupItemPicker items={availableItems(newItems.map(i=>String(i.id)))} value={newItemSku} onChange={setNewItemSku} disabled={busy} />
                     </div>
                     <Button size="sm" onClick={() => addItem(newItemSku, "new")} disabled={!newItemSku}>
                       <Plus className="h-4 w-4 mr-1" /> Add
@@ -352,18 +365,7 @@ export const PriceGroupsPage = ({storeId}:{storeId:string}) => {
                 <div className="flex items-end gap-2">
                   <div className="grid gap-1.5 flex-1">
                     <Label className="text-xs">Select Item</Label>
-                    <Select value={editItemSku} onValueChange={(value) => setEditItemSku(value)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Choose an item" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableItems(editItems.map((i) => String(i.id))).map((item) => (
-                          <SelectItem key={item.id} value={String(item.id)}>
-                            {item.name} ({item.sku})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <GroupItemPicker items={availableItems(editItems.map(i=>String(i.id)))} value={editItemSku} onChange={setEditItemSku} disabled={busy} />
                   </div>
                   <Button size="sm" onClick={() => addItem(editItemSku, "edit")} disabled={!editItemSku}>
                     <Plus className="h-4 w-4 mr-1" /> Add

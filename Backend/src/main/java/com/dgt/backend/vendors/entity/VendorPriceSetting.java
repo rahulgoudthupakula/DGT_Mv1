@@ -10,8 +10,10 @@ import java.time.*;
 @Entity
 @Table(name = "vendor_price_settings")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+// JPA mapping for vendor_price_settings; related record IDs are scalar fields rather than entity associations.
 public class VendorPriceSetting {
 
+    // Database-generated primary key used by the repository.
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "setting_id")
@@ -45,10 +47,12 @@ public class VendorPriceSetting {
     private Boolean considerLeadTime;
 
     @Column(name = "created_at", updatable = false)
+    // Hibernate populates this timestamp when the entity is first persisted.
     @CreationTimestamp
     private OffsetDateTime createdAt;
 
     @Column(name = "updated_at")
+    // Hibernate refreshes this timestamp when the entity is updated.
     @UpdateTimestamp
     private OffsetDateTime updatedAt;
 }

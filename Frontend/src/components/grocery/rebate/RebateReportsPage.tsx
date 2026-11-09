@@ -1,3 +1,7 @@
+/**
+ * Standalone RebateReportsPage UI contains local/sample state rather than a connected report
+ * query. Do not treat the displayed values or local actions as persisted business records.
+ */
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Gift, Tag, Building2, Store } from "lucide-react";

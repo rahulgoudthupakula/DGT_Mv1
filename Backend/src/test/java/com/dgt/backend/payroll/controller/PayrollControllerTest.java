@@ -1,6 +1,6 @@
 package com.dgt.backend.payroll.controller;
 
-import com.dgt.backend.access.PagePermissions;
+import com.dgt.backend.access.security.PagePermissions;
 import com.dgt.backend.payroll.service.PayrollService;
 import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;

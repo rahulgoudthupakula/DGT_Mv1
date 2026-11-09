@@ -16,10 +16,12 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
+// Coordinate promotion persistence and response mapping; caller authorization is handled at the controller.
 public class PromotionService {
     private final PromotionRepository repository;
     public PromotionService(PromotionRepository repository) { this.repository = repository; }
 
+    // Read a page sorted by primary key and include the total record count.
     public PageResponse<PromotionResponse> list(int page, int size) {
         log.debug("Listing promotion page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("promotionId")));
@@ -27,6 +29,7 @@ public class PromotionService {
         return new PageResponse<>(p.getContent().stream().map(PromotionResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    // Map the stored record to the API response, or return HTTP 404 when absent.
     public PromotionResponse get(Long id) {
         log.debug("Fetching promotion id={}", id);
         return PromotionResponse.from(repository.findById(id)
@@ -38,6 +41,7 @@ public class PromotionService {
     }
 
     @Transactional
+    // Build and save a record from the submitted create fields inside the transaction.
     public PromotionResponse create(CreatePromotionRequest req) {
         log.info("Creating promotion");
         var entity = Promotion.builder()
@@ -55,6 +59,7 @@ public class PromotionService {
     }
 
     @Transactional
+    // Load the existing record and apply only non-null fields; null does not clear a stored value.
     public PromotionResponse update(Long id, UpdatePromotionRequest req) {
         log.info("Updating promotion id={}", id);
         var entity = repository.findById(id)

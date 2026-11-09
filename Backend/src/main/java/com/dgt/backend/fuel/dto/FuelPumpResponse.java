@@ -3,6 +3,10 @@ package com.dgt.backend.fuel.dto;
 import com.dgt.backend.fuel.entity.FuelPump;
 import java.time.OffsetDateTime;
 
+/**
+ * Response DTO for stored FuelPump fields.
+ */
+
 public record FuelPumpResponse(
         Long pumpId,
         String dgtId,
@@ -12,6 +16,7 @@ public record FuelPumpResponse(
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
 ) {
+    /** Copy entity fields to the response without changing the stored record. */
     public static FuelPumpResponse from(FuelPump e) {
         return new FuelPumpResponse(
                 e.getPumpId(), e.getDgtId(), e.getPumpNumber(),

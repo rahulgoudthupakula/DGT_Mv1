@@ -4,6 +4,7 @@ import com.dgt.backend.stores.entity.StoreBusinessHour;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 
+// Response projection for the store business hours record, including database identity and lifecycle timestamps.
 public record StoreBusinessHourResponse(
         Long businessHoursId,
         String dgtId,
@@ -14,6 +15,7 @@ public record StoreBusinessHourResponse(
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
 ) {
+    // Copy entity fields into the response without exposing the persistence object itself.
     public static StoreBusinessHourResponse from(StoreBusinessHour e) {
         return new StoreBusinessHourResponse(
                 e.getBusinessHoursId(), e.getDgtId(), e.getDayOfWeek(),

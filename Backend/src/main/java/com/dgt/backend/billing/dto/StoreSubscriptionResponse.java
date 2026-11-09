@@ -4,6 +4,11 @@ import com.dgt.backend.billing.entity.StoreSubscription;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
+/**
+ * Response snapshot of a StoreSubscription entity for the generic API.
+ * Contains stored values rather than computed billing-page summaries.
+ */
+
 public record StoreSubscriptionResponse(
         Long subscriptionId,
         String storeId,
@@ -18,6 +23,7 @@ public record StoreSubscriptionResponse(
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
 ) {
+    /** Copy persisted entity fields into the API response without recalculating amounts. */
     public static StoreSubscriptionResponse from(StoreSubscription e) {
         return new StoreSubscriptionResponse(
                 e.getSubscriptionId(), e.getStoreId(), e.getSubscriptionPlanId(),

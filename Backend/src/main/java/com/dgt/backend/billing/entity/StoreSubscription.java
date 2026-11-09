@@ -6,11 +6,17 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import java.time.*;
 
+/**
+ * JPA mapping of store_subscriptions for the generic record API.
+ * Database identifiers are stored as scalar values rather than JPA relationship objects.
+ */
+
 @Entity
 @Table(name = "store_subscriptions")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class StoreSubscription {
 
+    // Database-generated primary key.
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "subscription_id")
@@ -44,10 +50,12 @@ public class StoreSubscription {
     private OffsetDateTime cancelledAt;
 
     @Column(name = "created_at", updatable = false)
+    // Hibernate records the creation timestamp when the entity is inserted.
     @CreationTimestamp
     private OffsetDateTime createdAt;
 
     @Column(name = "updated_at")
+    // Hibernate maintains the timestamp when the entity is updated.
     @UpdateTimestamp
     private OffsetDateTime updatedAt;
 }

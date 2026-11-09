@@ -7,6 +7,11 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
+/**
+ * Creation payload for LotterySettlement.
+ * Bean Validation annotations declare field requirements for the generic API.
+ */
+
 public record CreateLotterySettlementRequest(
         @NotBlank @Size(max = 50) String dgtId,
         Long vendorId,

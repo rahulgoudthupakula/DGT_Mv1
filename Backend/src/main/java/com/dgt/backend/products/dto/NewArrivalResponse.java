@@ -4,6 +4,7 @@ import com.dgt.backend.products.entity.NewArrival;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
+// Response projection for the new-arrival record, including database identity and lifecycle timestamps.
 public record NewArrivalResponse(
         Long newArrivalsId,
         Long invoiceItemId,
@@ -15,6 +16,7 @@ public record NewArrivalResponse(
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
 ) {
+    // Copy entity fields into the response without exposing the persistence object itself.
     public static NewArrivalResponse from(NewArrival e) {
         return new NewArrivalResponse(
                 e.getNewArrivalsId(), e.getInvoiceItemId(), e.getProductName(),

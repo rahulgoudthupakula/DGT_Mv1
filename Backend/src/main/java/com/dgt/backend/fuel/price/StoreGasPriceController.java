@@ -1,6 +1,6 @@
 package com.dgt.backend.fuel.price;
 
-import com.dgt.backend.access.ScopedAccess;
+import com.dgt.backend.access.security.ScopedAccess;
 import com.dgt.backend.common.entity.Rows;
 import java.math.BigDecimal;
 import java.time.*;
@@ -13,6 +13,11 @@ import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * Records immediate or scheduled store fuel prices, gated by app.gas.price.enabled.
+ * Maintains effective intervals and audit history; this controller does not send prices to a POS.
+ */
+
 @Slf4j
 @RestController
 @ConditionalOnProperty(name="app.gas.price.enabled",havingValue="true")
@@ -20,10 +25,12 @@ import lombok.extern.slf4j.Slf4j;
 public class StoreGasPriceController {
  private final ScopedAccess a;private final ObjectMapper json;private final GasDashboardService dashboard;
  public StoreGasPriceController(ScopedAccess a,ObjectMapper json,GasDashboardService dashboard){this.a=a;this.json=json;this.dashboard=dashboard;}
+ // Allow admins or active managers with the store GAS_SETTINGS permission.
  private void access(String store){if(a.admin(a.user(),a.company(store)))return;
   if(!Boolean.TRUE.equals(a.db.queryForObject("SELECT EXISTS(SELECT 1 FROM user_roles r JOIN role_types t USING(role_type_id) JOIN store_role_permissions p ON p.dgt_id=r.dgt_id AND p.role_type_id=r.role_type_id WHERE r.user_id=? AND r.dgt_id=? AND r.is_active AND t.is_active AND upper(t.role_type_name)='MANAGER' AND p.permission_code='GAS_SETTINGS' AND p.allowed)",Boolean.class,a.user(),store)))throw a.denied();}
  private ResponseStatusException bad(String m){return new ResponseStatusException(HttpStatus.BAD_REQUEST,m);}
  private ResponseStatusException conflict(String m){return new ResponseStatusException(HttpStatus.CONFLICT,m);}
+ // Classify price intervals as current, previous, scheduled, or cancelled and attach audit context.
  private List<Map<String,Object>> history(String store){return a.db.queryForList("""
  SELECT p.fuel_price_id::text AS id,p.fuel_grade_id::text AS "gradeId",g.grade_name AS "gradeName",p.cash_price AS cash,p.credit_price AS credit,
  p.effective_from AS "effectiveFrom",p.effective_to AS "effectiveTo",p.xmin::text AS version,
@@ -38,13 +45,18 @@ public class StoreGasPriceController {
  LEFT JOIN LATERAL(SELECT event_id,changes FROM access_audit_events WHERE dgt_id=p.dgt_id AND event_type='GAS_PRICE_CHANGED' AND target_id=p.fuel_price_id::text ORDER BY event_id DESC LIMIT 1)e ON true
  WHERE p.dgt_id=? ORDER BY p.effective_from DESC,p.fuel_price_id DESC
  """,store).stream().map(Rows::normalize).toList();}
+ // Return price history, grade choices, tank assignments, and store timezone.
  @GetMapping @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
  public Object get(@PathVariable String store){access(store);return data(store);}
+ // Combine recorded tank estimates with prices currently in effect.
  @GetMapping("/dashboard") @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
  public Object dashboard(@PathVariable String store){access(store);var result=dashboard.tanks(store);result.put("prices",history(store).stream().filter(p->"CURRENT".equals(p.get("status"))).toList());return result;}
  private Object data(String store){return Map.of("history",history(store),"grades",a.db.queryForList("SELECT fuel_grade_id::text AS id,grade_name AS name FROM fuel_grades WHERE is_active ORDER BY grade_name,fuel_grade_id"),"assignedGrades",a.db.queryForList("SELECT DISTINCT x.fuel_grade_id::text FROM fuel_tank_grade_assignments x JOIN fuel_tanks t USING(tank_id) WHERE t.dgt_id=? AND x.effective_from<=(CURRENT_TIMESTAMP AT TIME ZONE (SELECT timezone FROM stores WHERE dgt_id=?))::date AND (x.effective_to IS NULL OR x.effective_to>=(CURRENT_TIMESTAMP AT TIME ZONE (SELECT timezone FROM stores WHERE dgt_id=?))::date)",String.class,store,store,store),"timezone",Objects.toString(a.db.queryForObject("SELECT timezone FROM stores WHERE dgt_id=?",String.class,store),"UTC"));}
+ // Price form including store-local scheduled time and repeated-clock-time choice.
  public record Input(String gradeId,BigDecimal cash,BigDecimal credit,String reason,String notes,String effectiveTime,LocalDateTime scheduledFor,String overlapChoice){}
+ // Require positive cash and credit prices with no more than three decimal places.
  private void price(BigDecimal p){if(p==null||p.signum()<=0||p.compareTo(new BigDecimal("9999999.999"))>0||p.stripTrailingZeros().scale()>3)throw bad("Enter positive cash and credit prices, with up to three decimal places");}
+ // Lock the store, validate version and retry key, then update effective price intervals atomically.
  @PostMapping @Transactional
  public Object save(@PathVariable String store,@RequestHeader(value="If-Match",required=false)String version,@RequestHeader("Idempotency-Key")UUID key,@RequestBody Input in){
   access(store);a.db.queryForList("SELECT dgt_id FROM stores WHERE dgt_id=? FOR UPDATE",store);access(store);
@@ -52,6 +64,7 @@ public class StoreGasPriceController {
   String reason=Objects.toString(in.reason(),"").trim(),notes=Objects.toString(in.notes(),"").trim();if(!Set.of("","market","competitor","cost","promotion").contains(reason)||notes.length()>2000)throw bad("Invalid reason or notes (maximum 2000 characters)");
   String mode=Objects.toString(in.effectiveTime(),"now");
   String payload=json.writeValueAsString(new Input(in.gradeId(),in.cash(),in.credit(),reason,notes,mode,in.scheduledFor(),in.overlapChoice()));
+  // An identical key/payload replay returns current data; changed content under the key conflicts.
   var retry=a.db.queryForList("SELECT changes->>'payload' AS payload FROM access_audit_events WHERE dgt_id=? AND event_type='GAS_PRICE_CHANGED' AND changes->>'requestKey'=?",store,key.toString());
   if(!retry.isEmpty()){if(!Objects.equals(payload,retry.getFirst().get("payload")))throw conflict("This save request was already used for different values");return data(store);}
   if(a.db.queryForList("SELECT fuel_grade_id FROM fuel_grades WHERE fuel_grade_id=? AND is_active FOR SHARE",grade).isEmpty())throw bad("Fuel grade is unavailable");
@@ -59,6 +72,7 @@ public class StoreGasPriceController {
   var existing=a.db.queryForList("SELECT *,xmin::text AS version FROM fuel_prices WHERE dgt_id=? AND fuel_grade_id=? AND (effective_to IS NULL OR effective_to>?) AND (effective_to IS NULL OR effective_to>effective_from) ORDER BY effective_from FOR UPDATE",store,grade,now);
   var active=existing.stream().filter(r->!time(r.get("effective_from")).isAfter(now)).toList();
   var upcoming=existing.stream().filter(r->time(r.get("effective_from")).isAfter(now)).toList();
+  // Ambiguous active or scheduled intervals require review before another change.
   if(active.size()>1||upcoming.size()>1)throw conflict("This grade has overlapping prices. Existing records need review before a change");
   var old=active.isEmpty()?null:active.getFirst();var future=upcoming.isEmpty()?null:upcoming.getFirst();
   if(future!=null&&future.get("effective_to")!=null || old!=null&&((future==null&&old.get("effective_to")!=null)||(future!=null&&(old.get("effective_to")==null||!time(old.get("effective_to")).isEqual(time(future.get("effective_from")))))))throw conflict("Existing price intervals need review before a change");
@@ -75,6 +89,7 @@ public class StoreGasPriceController {
   a.audit(store,"GAS_PRICE_CHANGED",id.toString(),json.writeValueAsString(event));return data(store);
  }
  private OffsetDateTime time(Object value){return ((java.sql.Timestamp)value).toInstant().atOffset(ZoneOffset.UTC);}
+ // Reject nonexistent daylight-saving times and require a choice when a local time occurs twice.
  private OffsetDateTime scheduledInstant(String store,LocalDateTime local,String choice){
   if(local==null)throw bad("Enter a scheduled date and time");
   String name=a.db.queryForObject("SELECT timezone FROM stores WHERE dgt_id=?",String.class,store);ZoneId zone;try{zone=ZoneId.of(name);}catch(Exception e){throw bad("Set a valid store timezone before scheduling");}
@@ -84,6 +99,7 @@ public class StoreGasPriceController {
   if(offsets.size()>1&&!Set.of("earlier","later").contains(Objects.toString(choice,"")))throw bad("This clock time occurs twice. Select its first or second occurrence");
   return OffsetDateTime.of(local,offsets.get(offsets.size()>1&&"later".equals(choice)?1:0));
  }
+ // Cancel only a future interval and restore the preceding price open-ended duration.
  @PostMapping("/{priceId}/cancel") @Transactional
  public Object cancel(@PathVariable String store,@PathVariable long priceId,@RequestHeader(value="If-Match",required=false)String version){
   access(store);a.db.queryForList("SELECT dgt_id FROM stores WHERE dgt_id=? FOR UPDATE",store);access(store);

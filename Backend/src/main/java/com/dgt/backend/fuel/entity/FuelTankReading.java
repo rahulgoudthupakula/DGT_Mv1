@@ -6,11 +6,17 @@ import org.hibernate.annotations.CreationTimestamp;
 import java.math.BigDecimal;
 import java.time.*;
 
+/**
+ * JPA mapping of fuel_tank_readings.
+ * Stores record fields and scalar relationship identifiers; workflow rules live outside this entity.
+ */
+
 @Entity
 @Table(name = "fuel_tank_readings")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class FuelTankReading {
 
+    // Database-generated primary key.
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "tank_reading_id")
@@ -38,6 +44,7 @@ public class FuelTankReading {
     private String imageUrl;
 
     @Column(name = "created_at", updatable = false)
+    // Hibernate supplies this timestamp when inserting the record.
     @CreationTimestamp
     private OffsetDateTime createdAt;
 }

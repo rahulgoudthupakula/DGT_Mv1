@@ -3,7 +3,7 @@ package com.dgt.backend.billing.service;
 import java.util.*;
 import java.time.*;
 import java.math.BigDecimal;
-import com.dgt.backend.access.ScopedAccess;
+import com.dgt.backend.access.security.ScopedAccess;
 import com.dgt.backend.common.entity.Rows;
 import org.springframework.stereotype.Service;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -13,6 +13,12 @@ import org.springframework.scheduling.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
 
+/**
+ * Store-admin billing workflow, enabled only when app.billing.enabled is true.
+ * Uses JDBC transactions and company/store locks to coordinate commands and renewals.
+ * Creates invoices for amounts due; this service does not collect payments.
+ */
+
 @Service
 @EnableScheduling
 @ConditionalOnProperty(name="app.billing.enabled",havingValue="true")
@@ -20,16 +26,25 @@ public class StoreBilling {
  private final ScopedAccess access;private final TransactionTemplate transactions;
  public StoreBilling(ScopedAccess access,TransactionTemplate transactions){this.access=access;this.transactions=transactions;}
  private ResponseStatusException bad(String message){return new ResponseStatusException(HttpStatus.BAD_REQUEST,message);}
+ // Resolve the public DGT identifier to the store reference used by billing tables.
  private String reference(String store){return access.db.queryForObject("SELECT store_id FROM stores WHERE dgt_id=?",String.class,store);}
+ // Use the store timezone for billing dates; a missing timezone blocks billing.
  public LocalDate today(String store){String zone=access.db.queryForObject("SELECT timezone FROM stores WHERE dgt_id=?",String.class,store);if(zone==null)throw bad("Set this store's timezone before managing billing");return LocalDate.now(ZoneId.of(zone));}
+ // Load the subscription and current catalog price; xmin supplies the optimistic version.
  private Map<String,Object> subscription(String ref){var rows=access.db.queryForList("SELECT ss.*,ss.xmin::text AS version,p.plan_name,p.monthly_price FROM store_subscriptions ss JOIN subscription_plans p USING(subscription_plan_id) WHERE store_id=?",ref);return rows.isEmpty()?null:rows.getFirst();}
  private LocalDate date(Object v){return ((java.sql.Date)v).toLocalDate();}
+ // Keep the original billing day where possible, clamping it for shorter months.
  private LocalDate next(LocalDate start,int anchor){var month=start.plusMonths(1);return month.withDayOfMonth(Math.min(anchor,month.lengthOfMonth()));}
+ // Authorize the administrator before returning the billing page; reads do not renew periods.
  public Object read(String store){access.requireAdmin(store);return view(store);}
+ // Assemble subscription, available add-ons, plans, and invoice history for the page.
  private Object view(String store){var result=new LinkedHashMap<String,Object>();var sub=subscription(reference(store));result.put("subscription",sub==null?null:Rows.normalize(sub));result.put("addons",access.db.queryForList("SELECT a.*,coalesce(sa.active,false) AS active,coalesce(sa.cancel_at_period_end,false) AS cancel_at_period_end FROM billing_addons a LEFT JOIN store_billing_addons sa ON sa.addon_id=a.addon_id AND sa.subscription_id=? ORDER BY a.addon_id",sub==null?null:sub.get("subscription_id")).stream().map(Rows::normalize).toList());result.put("plans",access.db.queryForList("SELECT subscription_plan_id,plan_name,monthly_price FROM subscription_plans ORDER BY monthly_price").stream().map(Rows::normalize).toList());result.put("invoices",access.db.queryForList("SELECT invoice_id,invoice_number,invoice_date,period_start,period_end,subtotal,tax_amount,total_amount,dgt_invoice_status,invoice_kind,plan_name_snapshot,currency FROM billing_invoices WHERE store_id=? ORDER BY invoice_date DESC,invoice_id DESC",reference(store)).stream().map(Rows::normalize).toList());return result;}
+ // Lock company before store so commands and scheduled renewals serialize consistently.
  private void lock(String store){access.db.queryForList("SELECT company_id FROM companies WHERE company_id=? FOR UPDATE",access.company(store));access.db.queryForList("SELECT dgt_id FROM stores WHERE dgt_id=? FOR UPDATE",store);}
+ // Record a DUE invoice with a name snapshot and zero tax; no payment is processed.
  private void invoice(Map<String,Object> sub,LocalDate day,String kind,BigDecimal amount,String name,long planId){access.db.update("INSERT INTO billing_invoices(store_id,subscription_plan_id,invoice_number,invoice_date,period_start,period_end,subtotal,tax_amount,total_amount,dgt_invoice_status,subscription_id,invoice_kind,plan_name_snapshot) VALUES (?,?,?,?,?,?,?,0,?,'DUE',?,?,?)",sub.get("store_id"),planId,"DGT-"+UUID.randomUUID(),day,sub.get("current_period_start"),sub.get("current_period_end"),amount,amount,sub.get("subscription_id"),kind,name);}
  // Called within the same company/store lock as commands; a unique index prevents duplicate renewal invoices.
+ // Catch up expired periods, stopping after 120; cancellation takes effect at period end.
  private void advanceLocked(String store,LocalDate day){String ref=reference(store);var sub=subscription(ref);int periods=0;
   while(sub!=null&&"ACTIVE".equals(sub.get("subscription_status"))&&!date(sub.get("current_period_end")).isAfter(day)){
    if(++periods>120)throw bad("Billing is more than 120 periods behind; review required");
@@ -40,15 +55,21 @@ public class StoreBilling {
    for(var addon:access.db.queryForList("SELECT a.* FROM billing_addons a JOIN store_billing_addons sa USING(addon_id) WHERE sa.subscription_id=? AND sa.active=true",sub.get("subscription_id")))invoice(sub,start,"ADDON",(BigDecimal)addon.get("monthly_price"),(String)addon.get("name"),((Number)sub.get("subscription_plan_id")).longValue());
   }
  }
+ // Use an explicit transaction so scheduler calls also hold locks until all writes complete.
  public void advance(String store,LocalDate day){transactions.executeWithoutResult(tx->{lock(store);advanceLocked(store,day);});}
+ // Check active subscriptions every minute; one store failure does not stop the others.
  @Scheduled(fixedDelay=60000,initialDelay=60000) public void renewDue(){for(var row:access.db.queryForList("SELECT s.dgt_id FROM stores s JOIN store_subscriptions ss ON ss.store_id=s.store_id WHERE ss.subscription_status='ACTIVE' AND s.company_id IS NOT NULL AND s.timezone IS NOT NULL")){String store=(String)row.get("dgt_id");try{advance(store,today(store));}catch(Exception e){org.slf4j.LoggerFactory.getLogger(StoreBilling.class).warn("Billing renewal failed for store {}",store,e);}}}
+ // Command version is subscription xmin (0 before creation); planId holds an add-on ID for ADDON actions.
  public record Command(String action,Long planId,String version){}
+ // Apply the command, invoice writes, retry receipt, and access audit atomically.
  @Transactional public Object change(String store,Command c,UUID key){
   access.requireAdmin(store);lock(store);access.requireAdmin(store);long user=access.user();
   if(!Set.of("START","CHANGE","CANCEL","ADDON_ADD","ADDON_CANCEL").contains(c.action()==null?"":c.action()))throw bad("Invalid billing action");
+  // A repeated user/key pair must have the same store, action, and plan; return the current view on replay.
   var previous=access.db.queryForList("SELECT dgt_id,action,plan_id FROM billing_change_requests WHERE user_id=? AND request_key=?",user,key);
   if(!previous.isEmpty()){var p=previous.getFirst();if(!Objects.equals(store,p.get("dgt_id"))||!Objects.equals(c.action(),p.get("action"))||!Objects.equals(c.planId(),p.get("plan_id")))throw new ResponseStatusException(HttpStatus.CONFLICT,"Request key already used");return view(store);}
   String ref=reference(store);LocalDate day=today(store);var sub=subscription(ref);
+  // Reject stale page versions before making changes.
   if(!Objects.equals(c.version(),sub==null?"0":sub.get("version")))throw new ResponseStatusException(HttpStatus.CONFLICT,"Billing changed; reload before saving");
   if(sub!=null&&"ACTIVE".equals(sub.get("subscription_status"))&&!date(sub.get("current_period_end")).isAfter(day))throw new ResponseStatusException(HttpStatus.CONFLICT,"Billing period is closing; refresh after the renewal check");
   if(c.action().startsWith("ADDON_")){
@@ -58,6 +79,7 @@ public class StoreBilling {
    if(c.action().equals("ADDON_ADD")){
     if(Boolean.TRUE.equals(addon.get("active")))throw bad("Add-on already active");
     access.db.update("INSERT INTO store_billing_addons(subscription_id,addon_id) VALUES (?,?) ON CONFLICT(subscription_id,addon_id) DO UPDATE SET active=true,cancel_at_period_end=false,updated_at=CURRENT_TIMESTAMP",sub.get("subscription_id"),c.planId());
+    // Adding an add-on charges its full monthly price immediately, without proration.
     invoice(sub,day,"ADDON",(BigDecimal)addon.get("monthly_price"),(String)addon.get("name"),((Number)sub.get("subscription_plan_id")).longValue());
    }else{
     if(!Boolean.TRUE.equals(addon.get("active")))throw bad("Add-on is not active");
@@ -77,11 +99,13 @@ public class StoreBilling {
    }else{
     if(sub==null||!"ACTIVE".equals(sub.get("subscription_status"))||!Boolean.TRUE.equals(sub.get("auto_renewal")))throw bad("Plan changes require an active subscription without scheduled cancellation");
     if(Objects.equals(c.planId(),((Number)sub.get("subscription_plan_id")).longValue()))throw bad("This plan is already selected");
+    // Charge only an increase above the committed period price; downgrades do not issue refunds.
     BigDecimal committed=(BigDecimal)sub.get("current_period_price"),extra=price.subtract(committed).max(BigDecimal.ZERO);
     if(extra.signum()>0)invoice(sub,day,"UPGRADE",extra,(String)plan.get("plan_name"),c.planId());
     access.db.update("UPDATE store_subscriptions SET subscription_plan_id=?,current_period_price=?,updated_at=CURRENT_TIMESTAMP WHERE subscription_id=?",c.planId(),committed.max(price),sub.get("subscription_id"));
    }
   }
+  // Save the idempotency receipt only after all command writes have succeeded.
   access.db.update("INSERT INTO billing_change_requests(user_id,request_key,dgt_id,action,plan_id) VALUES (?,?,?,?,?)",user,key,store,c.action(),c.planId());
   access.audit(store,"SUBSCRIPTION_"+c.action(),ref,"{\"planId\":"+c.planId()+"}");return view(store);
  }

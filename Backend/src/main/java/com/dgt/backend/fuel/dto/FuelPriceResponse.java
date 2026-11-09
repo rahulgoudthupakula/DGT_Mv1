@@ -4,6 +4,10 @@ import com.dgt.backend.fuel.entity.FuelPrice;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
+/**
+ * Response DTO for stored FuelPrice fields.
+ */
+
 public record FuelPriceResponse(
         Long fuelPriceId,
         String dgtId,
@@ -16,6 +20,7 @@ public record FuelPriceResponse(
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
 ) {
+    /** Copy entity fields to the response without changing the stored record. */
     public static FuelPriceResponse from(FuelPrice e) {
         return new FuelPriceResponse(
                 e.getFuelPriceId(), e.getDgtId(), e.getFuelGradeId(),

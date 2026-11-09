@@ -1,6 +1,6 @@
 package com.dgt.backend.lottery.controller;
 
-import com.dgt.backend.access.PagePermissions;
+import com.dgt.backend.access.security.PagePermissions;
 import com.dgt.backend.lottery.dto.*;
 import com.dgt.backend.lottery.service.LotteryPackInventoryService;
 import com.dgt.backend.common.dto.PageResponse;

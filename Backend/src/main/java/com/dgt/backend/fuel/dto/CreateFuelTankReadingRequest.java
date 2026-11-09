@@ -4,6 +4,11 @@ import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
+/**
+ * Creation payload for FuelTankReading.
+ * Bean Validation annotations declare field requirements for the generic API.
+ */
+
 public record CreateFuelTankReadingRequest(
         @NotNull Long tankId,
         @NotNull OffsetDateTime readingDatetime,

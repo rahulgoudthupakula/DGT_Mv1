@@ -1,3 +1,7 @@
+/**
+ * Renders purchase summaries supplied by the parent. Payment recording is disabled here because
+ * that workflow is not connected.
+ */
 import { useState } from "react";
 import { useAppNavigation } from "@/contexts/NavigationContext";
 import { usePagination } from "@/hooks/use-pagination";
@@ -45,7 +49,7 @@ export interface PurchaseInvoice {
   paymentDueDate: string;
 }
 
-const fmt = (n: number | null) => n===null?"—":
+const fmt = (n: number | null) => n==null?"—":
   `$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 
 type PaymentStatus = "Paid" | "Partial" | "Unpaid" | "Unknown";
@@ -67,9 +71,10 @@ const statusVariant = (status: PaymentStatus) => {
 
 interface Props {
   data: PurchaseInvoice[];
+  totals: {invoiceTotal?:number|null;paidAmount?:number|null;pendingAmount?:number|null};
 }
 
-export const PurchaseInvoiceSummaryTable = ({ data }: Props) => {
+export const PurchaseInvoiceSummaryTable = ({ data, totals }: Props) => {
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
   const { paginated, page, totalPages, totalItems, pageSize, hasPrev, hasNext, nextPage, prevPage } = usePagination(data, 10);
 
@@ -82,17 +87,6 @@ export const PurchaseInvoiceSummaryTable = ({ data }: Props) => {
     });
   };
 
-  const totals = data.reduce(
-    (acc, row) => {
-      const paidAmount = row.paidAmount;
-      return {
-        invoiceTotal: acc.invoiceTotal + row.invoiceAmount,
-        paidAmount: acc.paidAmount + (paidAmount??0),
-        pendingAmount: acc.pendingAmount + (row.pendingAmount??0),
-      };
-    },
-    { invoiceTotal: 0, paidAmount: 0, pendingAmount: 0 }
-  );
 
   return (
     <div className="rounded-md border">

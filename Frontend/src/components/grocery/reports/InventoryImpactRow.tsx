@@ -1,3 +1,7 @@
+/**
+ * Presentation-only inventory impact row. It displays caller-provided figures and does not fetch
+ * or post inventory movements.
+ */
 import { Package, ArrowRightLeft, AlertTriangle, Warehouse } from "lucide-react";
 
 interface InventoryImpactData {

@@ -14,12 +14,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * JPA CRUD operations for FuelPump.
+ * The caller is responsible for authorization and workflow validation; these queries add no store predicate.
+ */
+
 @Slf4j
 @Service
 public class FuelPumpService {
     private final FuelPumpRepository repository;
     public FuelPumpService(FuelPumpRepository repository) { this.repository = repository; }
 
+    /** Load a page sorted by primary key and map its records to response DTOs. */
     public PageResponse<FuelPumpResponse> list(int page, int size) {
         log.debug("Listing fuel pump page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("pumpId")));
@@ -27,6 +33,7 @@ public class FuelPumpService {
         return new PageResponse<>(p.getContent().stream().map(FuelPumpResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    /** Load a record by ID or return HTTP 404. */
     public FuelPumpResponse get(Long id) {
         log.debug("Fetching fuel pump id={}", id);
         return FuelPumpResponse.from(repository.findById(id)
@@ -37,6 +44,7 @@ public class FuelPumpService {
     
     }
 
+    /** Persist the supplied fields in one transaction and return the saved values. */
     @Transactional
     public FuelPumpResponse create(CreateFuelPumpRequest req) {
         log.info("Creating fuel pump");
@@ -51,6 +59,7 @@ public class FuelPumpService {
         return FuelPumpResponse.from(saved);
     }
 
+    /** Apply only non-null fields in one transaction, leaving omitted fields unchanged. */
     @Transactional
     public FuelPumpResponse update(Long id, UpdateFuelPumpRequest req) {
         log.info("Updating fuel pump id={}", id);

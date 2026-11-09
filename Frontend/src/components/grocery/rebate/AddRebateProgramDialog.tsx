@@ -1,3 +1,7 @@
+/**
+ * Builds a rebate program draft and delegates saving to its parent. The initial program hydrates
+ * edit mode; validation and persistence remain separate from dialog visibility.
+ */
 import {useRebates} from './useRebates';
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";

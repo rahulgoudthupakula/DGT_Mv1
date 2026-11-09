@@ -14,12 +14,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * JPA CRUD operations for LotteryPackInventoryItem.
+ * The caller is responsible for authorization and workflow validation; these queries add no store predicate.
+ */
+
 @Slf4j
 @Service
 public class LotteryPackInventoryItemService {
     private final LotteryPackInventoryItemRepository repository;
     public LotteryPackInventoryItemService(LotteryPackInventoryItemRepository repository) { this.repository = repository; }
 
+    /** Load a page sorted by primary key and map its records to response DTOs. */
     public PageResponse<LotteryPackInventoryItemResponse> list(int page, int size) {
         log.debug("Listing lottery pack inventory item page={} size={}", page, size);
         var p = repository.findAll(PageRequest.of(page, size, Sort.by("lotteryPackInventoryItemId")));
@@ -27,6 +33,7 @@ public class LotteryPackInventoryItemService {
         return new PageResponse<>(p.getContent().stream().map(LotteryPackInventoryItemResponse::from).toList(), page, size, p.getTotalElements());
     }
 
+    /** Load a record by ID or return HTTP 404. */
     public LotteryPackInventoryItemResponse get(Long id) {
         log.debug("Fetching lottery pack inventory item id={}", id);
         return LotteryPackInventoryItemResponse.from(repository.findById(id)
@@ -37,6 +44,7 @@ public class LotteryPackInventoryItemService {
     
     }
 
+    /** Persist the supplied fields in one transaction and return the saved values. */
     @Transactional
     public LotteryPackInventoryItemResponse create(CreateLotteryPackInventoryItemRequest req) {
         log.info("Creating lottery pack inventory item");
@@ -54,6 +62,7 @@ public class LotteryPackInventoryItemService {
         return LotteryPackInventoryItemResponse.from(saved);
     }
 
+    /** Apply only non-null fields in one transaction, leaving omitted fields unchanged. */
     @Transactional
     public LotteryPackInventoryItemResponse update(Long id, UpdateLotteryPackInventoryItemRequest req) {
         log.info("Updating lottery pack inventory item id={}", id);

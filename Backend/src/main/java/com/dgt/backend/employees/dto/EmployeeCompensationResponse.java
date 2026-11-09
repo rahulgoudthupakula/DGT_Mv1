@@ -5,6 +5,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
+/**
+ * Response DTO for stored EmployeeCompensation fields.
+ */
+
 public record EmployeeCompensationResponse(
         Long compensationId,
         Long employeeId,
@@ -17,6 +21,7 @@ public record EmployeeCompensationResponse(
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
 ) {
+    /** Copy entity fields to the response without changing the stored record. */
     public static EmployeeCompensationResponse from(EmployeeCompensation e) {
         return new EmployeeCompensationResponse(
                 e.getCompensationId(), e.getEmployeeId(), e.getPayType(),
