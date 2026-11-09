@@ -32,10 +32,11 @@ public class ProfileSessions {
     private final JwtService jwt;
     private final RefreshTokenService refreshTokens;
 
-    private static final java.util.concurrent.ConcurrentHashMap<String, long[]> RATE =
+    private final java.util.concurrent.ConcurrentHashMap<String, long[]> rate =
             new java.util.concurrent.ConcurrentHashMap<>();
     private static final long RATE_MS = 5 * 60_000L;
-    private static final int RATE_MAX = 10;
+    @org.springframework.beans.factory.annotation.Value("${app.profile.rate-limit.max:10}")
+    private int rateMax;
 
     public ProfileSessions(ScopedAccess access, PasswordEncoder encoder, JwtService jwt, RefreshTokenService refreshTokens, SessionRepository repository) {this.repository=repository;
         this.access = access;
@@ -53,16 +54,16 @@ public class ProfileSessions {
         }
     }
 
-    // Process-local IP window for calls reaching create: at most ten attempts per five minutes.
+    // Process-local IP window for calls reaching create: a configurable attempt limit per five minutes.
     // This is not a distributed rate limiter.
     private void checkRate(String ip) {
         long now = System.currentTimeMillis();
-        var w = RATE.compute(ip, (k, v) -> {
+        var w = rate.compute(ip, (k, v) -> {
             if (v == null || now - v[0] > RATE_MS) return new long[]{now, 1};
             v[1]++;
             return v;
         });
-        if (w[1] > RATE_MAX) throw new org.springframework.web.server.ResponseStatusException(
+        if (w[1] > rateMax) throw new org.springframework.web.server.ResponseStatusException(
                 org.springframework.http.HttpStatus.TOO_MANY_REQUESTS, "Too many sign-in attempts; try again later");
     }
 
@@ -81,23 +82,31 @@ public class ProfileSessions {
         }
     }
 
-    // Resolve the current identity, recheck the Basic password against the stored hash, then issue
+    // Resolve the Basic username, verify its password against the stored hash, then issue
     // both tokens.
     public Map<String, Object> create(HttpServletRequest request) {
         checkRate(request.getRemoteAddr());
-        long uid = access.user();
-        var u = repository.lockCredentials(uid);
-
         String raw = new String(Base64.getDecoder().decode(
                 request.getHeader("Authorization").substring(6)), StandardCharsets.UTF_8);
         int colon = raw.indexOf(':');
-        if (colon < 0 || !encoder.matches(raw.substring(colon + 1), (String) u.get("password_hash"))) {
+        if (colon < 0) throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.UNAUTHORIZED, "Sign in again");
+        String email = raw.substring(0, colon);
+        String password = raw.substring(colon + 1);
+
+        var rows = access.db.queryForList(
+                "SELECT user_id,email,password_hash FROM users WHERE email=? AND account_status='ACTIVE' AND two_factor_authentication=false FOR UPDATE",
+                email);
+        boolean valid = rows.size() == 1 && encoder.matches(password, (String) rows.getFirst().get("password_hash"));
+        if (!valid) {
+            if (rows.size() == 1) event((Long) rows.getFirst().get("user_id"), request, "FAILED");
             throw new org.springframework.web.server.ResponseStatusException(
                     org.springframework.http.HttpStatus.UNAUTHORIZED, "Sign in again");
         }
 
-        String email = (String) u.get("email");
-        String token = jwt.issue(email);
+        long uid = (Long) rows.getFirst().get("user_id");
+        String resolvedEmail = (String) rows.getFirst().get("email");
+        String token = jwt.issue(resolvedEmail);
         String refreshToken = refreshTokens.issue(uid);
         event(uid, request, "SUCCESS");
         log.info("JWT issued for user_id={}", uid);

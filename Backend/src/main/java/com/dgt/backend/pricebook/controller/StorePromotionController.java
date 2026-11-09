@@ -70,7 +70,6 @@ public class StorePromotionController {
    if(!wholeQuantity(in.buyQty())||!wholeQuantity(in.freeQty()))throw bad("Buy and free quantities must be positive whole numbers up to 1000000");
    if(in.discountValue()!=null)throw bad("Buy X Get Y uses quantities, not a discount amount");
   }else{
-   if(in.buyQty()!=null||in.freeQty()!=null)throw bad("Buy/free quantities apply only to Buy X Get Y");
    BigDecimal n=in.discountValue();if(n==null||n.signum()<0||n.scale()>2||n.compareTo(new BigDecimal("9999999999.99"))>0)throw bad("Enter a non-negative value with at most two decimals");
    if("% Discount".equals(in.type())?n.compareTo(BigDecimal.valueOf(100))>0:n.signum()==0)throw bad("Percentage must be at most 100; price must be greater than zero");
   }

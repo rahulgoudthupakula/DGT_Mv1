@@ -1,7 +1,7 @@
 [
   {
     "name": "Grocery",
-    "subDepartments": [
+    "sub_departments": [
       "Fresh Produce",
       "Packaged Produce",
       "Fresh Fruit",
@@ -59,7 +59,7 @@
   },
   {
     "name": "Beer, Wine & Spirits",
-    "subDepartments": [
+    "sub_departments": [
       "Beer",
       "Craft Beer",
       "Imported Beer",
@@ -76,7 +76,7 @@
   },
   {
     "name": "Tobacco & Nicotine",
-    "subDepartments": [
+    "sub_departments": [
       "Cigarettes",
       "Cigars",
       "Little Cigars",
@@ -90,7 +90,7 @@
   },
   {
     "name": "Health & Wellness",
-    "subDepartments": [
+    "sub_departments": [
       "OTC Medicines",
       "Pain Relief",
       "Cold & Flu",
@@ -111,7 +111,7 @@
   },
   {
     "name": "Pharmacy",
-    "subDepartments": [
+    "sub_departments": [
       "Prescription Pharmacy",
       "Prescription Pickup",
       "Pharmacy Services",
@@ -120,7 +120,7 @@
   },
   {
     "name": "Beauty & Personal Care",
-    "subDepartments": [
+    "sub_departments": [
       "Skin Care",
       "Hair Care",
       "Shampoo & Conditioner",
@@ -145,7 +145,7 @@
   },
   {
     "name": "Baby",
-    "subDepartments": [
+    "sub_departments": [
       "Diapers",
       "Wipes",
       "Baby Food",
@@ -164,7 +164,7 @@
   },
   {
     "name": "Household Essentials",
-    "subDepartments": [
+    "sub_departments": [
       "Paper Products",
       "Toilet Paper",
       "Paper Towels",
@@ -188,7 +188,7 @@
   },
   {
     "name": "Pet Supplies",
-    "subDepartments": [
+    "sub_departments": [
       "Dog Food",
       "Dog Treats",
       "Dog Supplies",
@@ -206,7 +206,7 @@
   },
   {
     "name": "Electronics",
-    "subDepartments": [
+    "sub_departments": [
       "TVs",
       "Home Theater",
       "Streaming Devices",
@@ -236,7 +236,7 @@
   },
   {
     "name": "Home",
-    "subDepartments": [
+    "sub_departments": [
       "Furniture",
       "Living Room",
       "Bedroom",
@@ -266,7 +266,7 @@
   },
   {
     "name": "Clothing & Apparel",
-    "subDepartments": [
+    "sub_departments": [
       "Men's Clothing",
       "Women's Clothing",
       "Boys' Clothing",
@@ -283,7 +283,7 @@
   },
   {
     "name": "Shoes",
-    "subDepartments": [
+    "sub_departments": [
       "Men's Shoes",
       "Women's Shoes",
       "Boys' Shoes",
@@ -297,7 +297,7 @@
   },
   {
     "name": "Jewelry & Accessories",
-    "subDepartments": [
+    "sub_departments": [
       "Jewelry",
       "Watches",
       "Handbags",
@@ -312,7 +312,7 @@
   },
   {
     "name": "Automotive",
-    "subDepartments": [
+    "sub_departments": [
       "Motor Oil & Additives",
       "Transmission Fluids",
       "Coolants & Antifreeze",
@@ -338,7 +338,7 @@
   },
   {
     "name": "Hardware & Home Improvement",
-    "subDepartments": [
+    "sub_departments": [
       "Hand Tools",
       "Power Tools",
       "Tool Accessories",
@@ -361,7 +361,7 @@
   },
   {
     "name": "Lawn & Garden",
-    "subDepartments": [
+    "sub_departments": [
       "Gardening Tools",
       "Plants",
       "Seeds",
@@ -382,7 +382,7 @@
   },
   {
     "name": "Sports & Outdoors",
-    "subDepartments": [
+    "sub_departments": [
       "Exercise & Fitness",
       "Exercise Equipment",
       "Fitness Accessories",
@@ -409,7 +409,7 @@
   },
   {
     "name": "Toys & Games",
-    "subDepartments": [
+    "sub_departments": [
       "Action Figures",
       "Dolls",
       "Building Sets",
@@ -428,7 +428,7 @@
   },
   {
     "name": "Office & School Supplies",
-    "subDepartments": [
+    "sub_departments": [
       "Pens & Pencils",
       "Markers",
       "Paper",
@@ -448,7 +448,7 @@
   },
   {
     "name": "Books, Movies & Music",
-    "subDepartments": [
+    "sub_departments": [
       "Books",
       "Children's Books",
       "Magazines",
@@ -460,7 +460,7 @@
   },
   {
     "name": "Arts, Crafts & Sewing",
-    "subDepartments": [
+    "sub_departments": [
       "Art Supplies",
       "Painting",
       "Drawing",
@@ -477,7 +477,7 @@
   },
   {
     "name": "Party & Celebrations",
-    "subDepartments": [
+    "sub_departments": [
       "Party Supplies",
       "Balloons",
       "Decorations",
@@ -492,7 +492,7 @@
   },
   {
     "name": "Seasonal",
-    "subDepartments": [
+    "sub_departments": [
       "Christmas",
       "Halloween",
       "Thanksgiving",
@@ -510,7 +510,7 @@
   },
   {
     "name": "Travel & Luggage",
-    "subDepartments": [
+    "sub_departments": [
       "Luggage",
       "Backpacks",
       "Travel Bags",
@@ -522,7 +522,7 @@
   },
   {
     "name": "Convenience / Front End",
-    "subDepartments": [
+    "sub_departments": [
       "Candy",
       "Gum",
       "Mints",
@@ -537,7 +537,7 @@
   },
   {
     "name": "Lottery",
-    "subDepartments": [
+    "sub_departments": [
       "Scratch-Off Lottery",
       "Draw Games",
       "Daily Games",
@@ -547,7 +547,7 @@
   },
   {
     "name": "Fuel",
-    "subDepartments": [
+    "sub_departments": [
       "Regular Unleaded",
       "Mid-Grade Unleaded",
       "Premium Unleaded",
@@ -560,7 +560,7 @@
   },
   {
     "name": "Gift Cards & Prepaid",
-    "subDepartments": [
+    "sub_departments": [
       "Store Gift Cards",
       "Restaurant Gift Cards",
       "Entertainment Gift Cards",
@@ -573,7 +573,7 @@
   },
   {
     "name": "Floral",
-    "subDepartments": [
+    "sub_departments": [
       "Fresh Flowers",
       "Bouquets",
       "Plants",
@@ -585,7 +585,7 @@
   },
   {
     "name": "Photo & Printing",
-    "subDepartments": [
+    "sub_departments": [
       "Photo Prints",
       "Passport Photos",
       "Photo Gifts",
@@ -597,7 +597,7 @@
   },
   {
     "name": "Services",
-    "subDepartments": [
+    "sub_departments": [
       "Money Services",
       "Money Orders",
       "Bill Pay",

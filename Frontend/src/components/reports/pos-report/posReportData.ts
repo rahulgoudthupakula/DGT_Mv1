@@ -1,6 +1,7 @@
 import {format,parseISO,differenceInCalendarDays,eachDayOfInterval} from 'date-fns';
 export type PosLine={id:string;saleId:string;productId:string;date:string;hour:number;name:string;sku:string;unit:string;barcode:string;department:string;category:string;direction:number;quantity:number;gross:number;discount:number;taxable:number;tax:number;price:number};
 export type PosPayment={saleId:string;code:string;name:string;brand:string|null;amount:number};
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type PosReport={start:string;end:string;today:string;timezone:string;rows:PosLine[];payments:PosPayment[];closing:any;closingMeta:{id?:string;reviewer?:string;updated?:string}};
 const groups=(rows:PosLine[],key:(r:PosLine)=>string)=>{const result=new Map<string,PosLine[]>();for(const r of rows){const k=key(r);const list=result.get(k)??[];list.push(r);result.set(k,list);}return [...result.entries()];};
 const sum=(rows:PosLine[],fn:(r:PosLine)=>number)=>rows.reduce((s,r)=>s+fn(r),0);

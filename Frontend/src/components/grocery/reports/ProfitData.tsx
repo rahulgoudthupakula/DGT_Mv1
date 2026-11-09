@@ -1,5 +1,6 @@
 import {createContext,useContext} from 'react';
 import {useReportSummary} from './useReportSummary';
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const Context=createContext<any>(null);
 export const ProfitDataProvider=Context.Provider;
 export const useProfitData=()=>useContext(Context);

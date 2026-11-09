@@ -21,6 +21,8 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         jdbc:
           time_zone: UTC
+        connection:
+          handling_mode: DELAYED_ACQUISITION_AND_HOLD
   jackson:
     property-naming-strategy: SNAKE_CASE
   sql:

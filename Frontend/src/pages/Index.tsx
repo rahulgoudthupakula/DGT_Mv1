@@ -112,7 +112,7 @@ const getInitialState = () => {
       if(disabledModules.has(parsed.activeNav)){parsed.activeNav="Home";parsed.activeSubNav="Dashboard";parsed.activeSubPage=null;parsed.navParams={};}
       return parsed;
     }
-  } catch {}
+  } catch {/* no-op */}
   return null;
 };
 
@@ -158,7 +158,7 @@ const Index = ({ onLogout }: { onLogout: () => void }) => {
       sessionStorage.setItem(SESSION_KEY, JSON.stringify({
         activeNav, activeSubNav, activeSubPage, navParams, activeProfilePage, showLiveCounter, selectedStoreId,
       }));
-    } catch {}
+    } catch {/* no-op */}
   }, [activeNav, activeSubNav, activeSubPage, navParams, activeProfilePage, showLiveCounter, selectedStoreId]);
 
   const handleNavClick = (nav: string) => {

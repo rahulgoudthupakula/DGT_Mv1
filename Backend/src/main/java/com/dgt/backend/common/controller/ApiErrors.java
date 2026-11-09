@@ -40,6 +40,16 @@ public class ApiErrors {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
             "The record violates a database relationship, uniqueness, type, or check constraint."));
     }
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    ResponseEntity<ProblemDetail> access(org.springframework.security.access.AccessDeniedException ex, HttpServletRequest req) {
+        log.warn("Access denied on {} {}: {}", req.getMethod(), req.getRequestURI(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, "Access denied for this store or module"));
+    }
+    @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
+    ResponseEntity<ProblemDetail> methodNotSupported(org.springframework.web.HttpRequestMethodNotSupportedException ex, HttpServletRequest req) {
+        log.warn("Method not allowed {} on {}", req.getMethod(), req.getRequestURI());
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(ProblemDetail.forStatusAndDetail(HttpStatus.METHOD_NOT_ALLOWED, "Method not allowed"));
+    }
     // Log unexpected failures and send a generic HTTP 500 response.
     @ExceptionHandler(Exception.class)
     ResponseEntity<ProblemDetail> handleGeneric(Exception ex, HttpServletRequest req) {

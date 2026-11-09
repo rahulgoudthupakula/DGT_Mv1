@@ -298,7 +298,7 @@ const UserRolePermissions = () => {
 
 /* ─── Audit Controls ─── */
 const AuditControls = () => {
-  const c=useCards();const logs=c.q.data!.audit.map(e=>{let change:{before?:unknown;after?:unknown}={};try{change=typeof e.changes==='string'?JSON.parse(e.changes):e.changes as typeof change;}catch{}return {date:new Date(e.created_at).toLocaleString(),user:e.actor,action:e.event_type,from:JSON.stringify(change.before??{}),to:JSON.stringify(change.after??{})};});
+  const c=useCards();const logs=c.q.data!.audit.map(e=>{let change:{before?:unknown;after?:unknown}={};try{change=typeof e.changes==='string'?JSON.parse(e.changes):e.changes as typeof change;}catch{/* no-op */}return {date:new Date(e.created_at).toLocaleString(),user:e.actor,action:e.event_type,from:JSON.stringify(change.before??{}),to:JSON.stringify(change.after??{})};});
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">

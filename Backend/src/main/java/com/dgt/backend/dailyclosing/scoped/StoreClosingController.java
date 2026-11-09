@@ -99,6 +99,7 @@ public class StoreClosingController {
   result.put("variance",cashVariance==null?null:cashVariance.add(checkVariance==null?BigDecimal.ZERO:checkVariance));return result;
  }
  // Include both the closing version and reviewed source token; close selects CLOSED instead of DRAFT.
+ @tools.jackson.databind.annotation.JsonNaming(tools.jackson.databind.PropertyNamingStrategies.LowerCamelCaseStrategy.class)
  public record Save(String version,String sourceToken,BigDecimal openingCash,BigDecimal cashAdded,BigDecimal cashDrops,BigDecimal payouts,BigDecimal actualCash,String notes,boolean close,Map<String,BigDecimal> reconciliation){}
  // Lock the store and closing; reject stale versions, changed source data, or edits to a closed day.
  // All header, tender, expense, reconciliation, and audit writes share this transaction.

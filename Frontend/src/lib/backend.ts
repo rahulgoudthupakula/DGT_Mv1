@@ -143,6 +143,7 @@ export interface StoreRecord {
 export async function listStores(): Promise<StoreRecord[]> { return request<StoreRecord[]>("/access/stores"); }
 export interface PendingChange { pending: true; requestId: number; status: string; }
 export function isPendingChange(value: unknown): value is PendingChange {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return typeof value === "object" && value !== null && "pending" in value && (value as any).pending === true;
 }
 export const getStore = (id: string) => request<StoreRecord>(`/stores/${encodeURIComponent(id)}`);

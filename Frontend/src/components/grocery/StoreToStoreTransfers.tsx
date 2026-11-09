@@ -64,6 +64,7 @@ export const StoreToStoreTransfers = ({storeId}:{storeId:string}) => {
   const [targetProduct,setTargetProduct]=useState(''),[totalReceived,setTotalReceived]=useState('');
   const path=`/access/stores/${encodeURIComponent(storeId)}/reductions/transfers`;
   const fetchRecords = async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     try{const data=await request<{transfers:any[];items:typeof items;canReceive:boolean}>(path);setItems(data.items);setCanReceive(data.canReceive);setRecords(data.transfers.map(r=>({id:String(r.reduction_request_id),item_name:r.product_name,scan_code:r.product_sku,quantity:Number(r.quantity),received:Number(r.qty_received),destinationProduct:r.destination_product_id,notes:null,direction:r.destination===storeId?'received':'sent',counterparty_store:r.destination===storeId?r.dgt_id:r.destination,status:r.transfer_status==='COMPLETED'?'confirmed':r.destination===storeId?'pending':'sent',transferred_at:r.updated_at,confirmed_at:null})));}catch(e){toast({title:'Could not load records',description:String(e),variant:'destructive'});}finally{setLoading(false);}
   };
   useEffect(()=>{fetchRecords();},[storeId]);

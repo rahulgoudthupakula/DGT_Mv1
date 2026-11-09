@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Links approved reductions to vendor return slips. Creating a slip and changing its status are
  * separate backend operations; the approved reduction remains the stock history source.

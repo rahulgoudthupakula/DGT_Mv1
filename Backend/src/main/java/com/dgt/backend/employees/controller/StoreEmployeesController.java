@@ -58,7 +58,7 @@ public class StoreEmployeesController {
     if(in.firstName()==null||in.firstName().isBlank()||in.firstName().length()>100||in.lastName()==null||in.lastName().isBlank()||in.lastName().length()>100)throw bad("First and last name required, maximum 100 characters each");
     uid=null;role=null;
    // New website accounts initially receive the active CASHIER role.
-   }else if(in.userId()==null){
+   }else if(in.userId()==null||(in.email()!=null&&in.password()!=null)){
     role=a.db.queryForObject("SELECT role_type_id FROM role_types WHERE role_type_name='CASHIER' AND is_active",Long.class);
     var created=(Map<?,?>)accounts.createUser(store,new com.dgt.backend.access.dto.CreateAccessUserRequest(in.firstName(),in.lastName(),in.employeeCode(),in.email(),in.password(),role,List.of(store),List.of()));uid=((Number)created.get("userId")).longValue();
    }else{uid=in.userId();var choices=candidates(store).stream().filter(r->((Number)r.get("user_id")).longValue()==uid.longValue()&&Objects.equals(r.get("role_type_id"),in.roleTypeId())).toList();if(choices.isEmpty())throw a.denied();role=((Number)choices.getFirst().get("role_type_id")).longValue();}

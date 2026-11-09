@@ -60,6 +60,7 @@ const statusBadge = (status: ApprovalStatus) => {
 
 export const InventoryApprovals = ({storeId}:{storeId:string}) => {
   const client=useQueryClient();const path=`/access/stores/${encodeURIComponent(storeId)}/reductions`;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const query=useQuery({queryKey:['reductions',storeId],queryFn:()=>apiRequest<{requests:any[]}>(path)});
   const requests=(query.data?.requests??[]).map(r=>({id:String(r.reduction_request_id),itemName:r.product_name,scanCode:r.product_sku,quantity:r.quantity,reason:r.reason,reasonLabel:r.reason.replaceAll("-", " "),decisionNotes:r.rejection_reason,type:r.route==='transfers'?'transfer':r.route==='shrinkage'?'shrinkage':'reduction',status:r.status.toLowerCase(),requestedAt:r.created_at,decidedAt:r.status==='PENDING'?undefined:r.updated_at,transferStore:r.destination_name,canReview:r.canReview} as ApprovalRequest&{canReview:boolean}));
   const { toast } = useToast();
