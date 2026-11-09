@@ -50,6 +50,17 @@ public class ApiErrors {
         log.warn("Method not allowed {} on {}", req.getMethod(), req.getRequestURI());
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(ProblemDetail.forStatusAndDetail(HttpStatus.METHOD_NOT_ALLOWED, "Method not allowed"));
     }
+    // Multipart parsing can fail before a controller runs; return useful client errors.
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    ResponseEntity<ProblemDetail> uploadTooLarge() {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(ProblemDetail.forStatusAndDetail(
+                HttpStatus.PAYLOAD_TOO_LARGE, "Uploaded file exceeds the allowed size."));
+    }
+    @ExceptionHandler(org.springframework.web.multipart.support.MissingServletRequestPartException.class)
+    ResponseEntity<ProblemDetail> missingUpload() {
+        return ResponseEntity.badRequest().body(ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_REQUEST, "Choose a receipt file."));
+    }
     // Log unexpected failures and send a generic HTTP 500 response.
     @ExceptionHandler(Exception.class)
     ResponseEntity<ProblemDetail> handleGeneric(Exception ex, HttpServletRequest req) {

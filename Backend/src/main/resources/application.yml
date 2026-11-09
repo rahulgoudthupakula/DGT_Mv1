@@ -1,4 +1,8 @@
 spring:
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   application:
     name: dgt-backend
   datasource:
@@ -34,6 +38,9 @@ server:
     include-message: never
     include-stacktrace: never
 app:
+  receipt-reader:
+    api-key: ${LOVABLE_API_KEY:}
+    model: ${RECEIPT_READER_MODEL:google/gemini-3.7-flash}
   cors-origins: ${CORS_ORIGINS:http://localhost:5173,http://localhost:8081}
   access:
     administrator-emails: ${SCHEMA_ADMIN_EMAILS:}

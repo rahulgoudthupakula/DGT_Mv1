@@ -100,7 +100,7 @@ public class PagePermissionInterceptor implements WebMvcConfigurer {
   boolean read=method.equals("GET");
   if(path.equals("lottery-verification/decision"))return new String[]{"LOTTERY_PAGE_ACTIVATE_VERIFY"};
   if(path.equals("lottery-verification/activation"))return new String[]{"LOTTERY_PAGE_ACTIVATE_ACTIVATE"};
-  if(path.equals("lottery-deliveries")&&!read)return new String[]{"LOTTERY_PAGE_RECEIVED_ADD"};
+  if((path.equals("lottery-deliveries")||path.equals("lottery-deliveries/parse-receipt"))&&!read)return new String[]{"LOTTERY_PAGE_RECEIVED_ADD"};
   if(path.equals("gas-deliveries")&&!read)return new String[]{"GAS_PAGE_DELIVERY_ADD"};
   if(path.equals("gas-adjustments")&&!read)return new String[]{"GAS_PAGE_INVENTORY_NEW"};
   if(path.startsWith("invoice-entry")){

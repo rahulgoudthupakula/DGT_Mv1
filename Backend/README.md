@@ -63,3 +63,29 @@ API paths, database schema and business behavior are unchanged. Run a clean buil
 ```sh
 mvn -Dtest=PosValidationTest clean test
 ```
+
+## Lottery receipt reader
+
+`POST /api/v1/access/stores/{store}/lottery-deliveries/parse-receipt` accepts
+multipart form field `file` (PDF, JPEG or PNG; maximum 5 MiB). It requires the
+normal authenticated DGT user, store/page access and `LOTTERY_RECEIVE_DELIVERY`.
+It returns a draft with `vendor`, `invoiceNumber`, `invoiceDate` and `lines`
+(description, sku/book number, quantity). Users must review and explicitly save
+through the existing receipt endpoint. Parsing makes no database writes.
+
+Set `LOVABLE_API_KEY` in the backend service environment, never in Vite or Git.
+`RECEIPT_READER_MODEL` optionally overrides the previous gateway model,
+`google/gemini-3.7-flash`; confirm model availability with the configured account.
+Receipt documents are sent to Lovable's AI gateway. The backend does not persist
+uploads or log their contents. Missing configuration returns 503, invalid uploads
+400/413, unreadable output 422, busy/rate limits 429 and upstream failures 502.
+Manual entry remains available on failure. Provider calls time out after 60 seconds;
+at most four run concurrently per backend process. Keep the reverse proxy upload
+limit at least 6 MiB and its read timeout above 60 seconds.
+
+The frontend no longer uses the Supabase SDK, edge function or legacy database
+clients. Existing DGT invoice and inventory endpoints remain authoritative.
+Historical Supabase files are recoverable from Git. This code change does not
+export remote Supabase data, delete a hosted project, or configure production secrets.
+
+Targeted tests: `mvn -Dtest=ReceiptReaderTest,LotteryReceiptReaderControllerTest test`.

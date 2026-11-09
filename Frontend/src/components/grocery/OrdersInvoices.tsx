@@ -65,7 +65,7 @@ import {
 } from "lucide-react";
 import { Trash2 } from "lucide-react";
 
-import { type PostDeliveryInput, type PostDeliveryLine } from "@/lib/postDelivery";
+import { type PostDeliveryInput, type PostDeliveryLine } from "@/lib/invoiceTypes";
 
 
 import { toast } from "sonner";

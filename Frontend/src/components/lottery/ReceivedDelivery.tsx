@@ -301,6 +301,7 @@ export const ReceivedDelivery = ({storeId}:{storeId:string}) => {
       </Dialog>
 
       <AddReceivedReceiptDialog
+        storeId={storeId}
         open={receiptDialogOpen&&canOpenForm}
         onOpenChange={setReceiptDialogOpen}
         distributors={distributors}
