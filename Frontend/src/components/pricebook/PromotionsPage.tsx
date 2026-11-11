@@ -1,3 +1,4 @@
+import { PromotionProductPicker, type PromotionProductOption } from "./PromotionProductPicker";
 import { useState, useRef } from "react";
 import { useQuery,useQueryClient } from '@tanstack/react-query';
 import { request,isPendingChange } from '@/lib/backend';
@@ -10,36 +11,37 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Tag, Calendar, X, Eye, Pencil, Trash2 } from "lucide-react";
+import { Plus, Tag, Calendar, X, Eye, Pencil, Trash2, Copy, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 
 
 type ProductRule={productId:number;name:string;sku:string;quantity:number};
-type SavedPromotion={id:number;version:string;name:string;type:string;products:ProductRule[];discountValue:number|null;buyQty:number|null;freeQty:number|null;start:string;end:string;status:string;active:boolean;expiredWithin30Days:boolean};
+type SavedPromotion={id:number;version:string;name:string;type:string;products:ProductRule[];discountValue:number|null;buyQty:number|null;freeQty:number|null;start:string;end:string;status:string;active:boolean;canReactivate:boolean;expiredWithin30Days:boolean};
 type Promotion=Omit<SavedPromotion,'products'> & {products:string[];rules:ProductRule[];discount:string};
 const statusColors:Record<string,"default"|"outline"|"secondary"|"destructive">={Active:'default',Upcoming:'outline',Expired:'secondary',Inactive:'secondary'};
 const emptyForm={name:'',type:'',products:[] as string[],quantities:{} as Record<string,string>,discountValue:'',buyQty:'',freeQty:'',bundlePrice:'',start:'',end:''};
 export const PromotionsPage=({storeId}:{storeId:string})=>{
  const path=`/access/stores/${encodeURIComponent(storeId)}/promotions`,client=useQueryClient();
- const query=useQuery({queryKey:['promotions',storeId],queryFn:()=>request<{discountTypes:{value:string;label:string}[];promotions:SavedPromotion[];items:{id:number;name:string;sku:string;active:boolean}[];timezone:string}>(path),enabled:!!storeId,refetchInterval:60000});
- const pricebookItems=query.data?.items??[];
+ const query=useQuery({queryKey:['promotions',storeId],queryFn:()=>request<{discountTypes:{value:string;label:string}[];promotions:SavedPromotion[];timezone:string}>(path),enabled:!!storeId,refetchInterval:60000});
  const promotions:Promotion[]=(query.data?.promotions??[]).map(p=>({...p,rules:p.products,products:p.products.map(i=>p.type==='Bundle'?`${i.name} × ${i.quantity}`:i.name),discount:p.type==='Buy X Get Y'?`Buy ${p.buyQty} Get ${p.freeQty} — Mix & Match`:p.type==='% Discount'?`${p.discountValue}%`:p.type==='Bundle'?`Bundle $${p.discountValue?.toFixed(2)}`:`$${p.discountValue?.toFixed(2)}`}));
- const [open,setOpen]=useState(false),[form,setForm]=useState(emptyForm),[itemToAdd,setItemToAdd]=useState(''),[viewPromo,setViewPromo]=useState<Promotion|null>(null),[editPromo,setEditPromo]=useState<Promotion|null>(null),[deletePromo,setDeletePromo]=useState<Promotion|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ const [open,setOpen]=useState(false),[form,setForm]=useState(emptyForm),[itemToAdd,setItemToAdd]=useState<PromotionProductOption|null>(null),[viewPromo,setViewPromo]=useState<Promotion|null>(null),[editPromo,setEditPromo]=useState<Promotion|null>(null),[deletePromo,setDeletePromo]=useState<Promotion|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ const [selectedProducts,setSelectedProducts]=useState<Record<string,PromotionProductOption>>({});
  const attempt=useRef({payload:'',key:''});
  const set=(patch:Partial<typeof emptyForm>)=>setForm(f=>({...f,...patch}));
- const availableItems=pricebookItems.filter(i=>i.active&&!form.products.includes(String(i.id)));
- const addProduct=()=>{if(!itemToAdd)return;setForm(f=>({...f,products:[...f.products,itemToAdd],quantities:{...f.quantities,[itemToAdd]:'1'}}));setItemToAdd('');};
+ const addProduct=()=>{if(!itemToAdd)return;const id=String(itemToAdd.id);if(form.products.includes(id))return;setSelectedProducts(products=>({...products,[id]:itemToAdd}));setForm(f=>({...f,products:[...f.products,id],quantities:{...f.quantities,[id]:'1'}}));setItemToAdd(null);};
  const removeProduct=(id:string)=>setForm(f=>({...f,products:f.products.filter(p=>p!==id)}));
- const openEdit=(p:Promotion)=>{if(p.status==='Expired')return;setError('');setForm({name:p.name,type:p.type,products:p.rules.map(i=>String(i.productId)),quantities:Object.fromEntries(p.rules.map(i=>[String(i.productId),String(i.quantity)])),start:p.start,end:p.end,discountValue:p.discountValue==null?'':String(p.discountValue),bundlePrice:p.discountValue==null?'':String(p.discountValue),buyQty:p.buyQty==null?'':String(p.buyQty),freeQty:p.freeQty==null?'':String(p.freeQty)});setItemToAdd('');setEditPromo(p);};
+ const openEdit=(p:Promotion)=>{if(p.status==='Expired')return;setError('');setSelectedProducts(Object.fromEntries(p.rules.map(item=>[String(item.productId),{id:item.productId,name:item.name,sku:item.sku}])));setForm({name:p.name,type:p.type,products:p.rules.map(i=>String(i.productId)),quantities:Object.fromEntries(p.rules.map(i=>[String(i.productId),String(i.quantity)])),start:p.start,end:p.end,discountValue:p.discountValue==null?'':String(p.discountValue),bundlePrice:p.discountValue==null?'':String(p.discountValue),buyQty:p.buyQty==null?'':String(p.buyQty),freeQty:p.freeQty==null?'':String(p.freeQty)});setItemToAdd(null);setEditPromo(p);};
  async function save(edit:boolean){
   setError('');if(!form.name.trim()||!form.type||!form.products.length||!form.start||!form.end){setError('Complete the name, type, products and dates.');return;}
   const raw=form.type==='Bundle'?form.bundlePrice:form.discountValue;
   if(form.type==='Buy X Get Y'?(!form.buyQty||!form.freeQty):raw===''){setError('Complete the discount details.');return;}
   const payload=JSON.stringify({name:form.name.trim(),type:form.type,products:form.products.map(id=>({productId:Number(id),quantity:form.type==='Bundle'?Number(form.quantities[id]):1})),discountValue:form.type==='Buy X Get Y'?null:Number(raw),buyQty:form.type==='Buy X Get Y'?Number(form.buyQty):null,freeQty:form.type==='Buy X Get Y'?Number(form.freeQty):null,start:form.start,end:form.end});
   if(attempt.current.payload!==payload)attempt.current={payload,key:crypto.randomUUID()};
-  setBusy(true);try{const result=await request(edit?`${path}/${editPromo?.id}`:path,{method:edit?'PUT':'POST',headers:{'Idempotency-Key':attempt.current.key,...(edit?{'If-Match':editPromo!.version}:{})},body:payload});await client.invalidateQueries({queryKey:['promotions',storeId]});toast.success(isPendingChange(result)?'Submitted for approval.':'Promotion saved.');setOpen(false);setEditPromo(null);setForm(emptyForm);attempt.current={payload:'',key:''};}catch(e){setError(e instanceof Error?e.message:'Could not save promotion');}finally{setBusy(false);}
+  setBusy(true);try{const result=await request(edit?`${path}/${editPromo?.id}`:path,{method:edit?'PUT':'POST',headers:{'Idempotency-Key':attempt.current.key,...(edit?{'If-Match':editPromo!.version}:{})},body:payload});await client.invalidateQueries({queryKey:['promotions',storeId]});toast.success(isPendingChange(result)?'Submitted for approval.':'Promotion saved.');setOpen(false);setEditPromo(null);setForm(emptyForm);setSelectedProducts({});setItemToAdd(null);attempt.current={payload:'',key:''};}catch(e){setError(e instanceof Error?e.message:'Could not save promotion');}finally{setBusy(false);}
  }
+ const repost=(p:Promotion)=>{openEdit({...p,status:'Active'});setEditPromo(null);set({start:'',end:''});setOpen(true);attempt.current={payload:'',key:''};};
+ async function reactivate(p:Promotion){setBusy(true);try{const result=await request(`${path}/${p.id}/reactivate`,{method:'POST',headers:{'If-Match':p.version,'Idempotency-Key':crypto.randomUUID()},body:'{}'});await client.invalidateQueries({queryKey:['promotions',storeId]});toast.success(isPendingChange(result)?'Submitted for approval.':'Promotion reactivated.');}catch(e){toast.error(e instanceof Error?e.message:'Could not reactivate promotion');}finally{setBusy(false);}}
  const handleCreate=()=>save(false),handleUpdate=()=>save(true);
  async function confirmDelete(){if(!deletePromo)return;setBusy(true);setError('');try{const result=await request(`${path}/${deletePromo.id}/deactivate`,{method:'POST',headers:{'If-Match':deletePromo.version,'Idempotency-Key':crypto.randomUUID()},body:'{}'});await client.invalidateQueries({queryKey:['promotions',storeId]});toast.success(isPendingChange(result)?'Submitted for approval.':'Promotion deactivated.');setDeletePromo(null);}catch(e){setError(e instanceof Error?e.message:'Could not deactivate promotion');}finally{setBusy(false);}}
  const activeCount=promotions.filter(p=>p.status==='Active').length,upcomingCount=promotions.filter(p=>p.status==='Upcoming').length,expiredCount=promotions.filter(p=>p.status==='Expired'&&p.expiredWithin30Days).length;
@@ -52,7 +54,7 @@ export const PromotionsPage=({storeId}:{storeId:string})=>{
           <h1 className="text-2xl font-bold text-foreground">Promotions</h1>
           <p className="text-sm text-muted-foreground">Create and manage product-level promotions</p>
         </div>
-        <Dialog open={open} onOpenChange={v=>{if(busy)return;setOpen(v);if(v){setForm(emptyForm);setItemToAdd('');setError('');attempt.current={payload:'',key:''};}}}>
+        <Dialog open={open} onOpenChange={v=>{if(busy)return;setOpen(v);if(v){setForm(emptyForm);setSelectedProducts({});setItemToAdd(null);setError('');attempt.current={payload:'',key:''};}}}>
           <DialogTrigger asChild>
             <Button size="sm" disabled={!query.data}><Plus className="h-4 w-4 mr-1" /> New Promotion</Button>
           </DialogTrigger>
@@ -85,14 +87,7 @@ export const PromotionsPage=({storeId}:{storeId:string})=>{
               <div className="grid gap-1.5">
                 <Label>Products</Label>{form.type==='Buy X Get Y'&&<p className="text-xs text-muted-foreground">Mix and match across the selected products.</p>}{form.type==='Bundle'&&<p className="text-xs text-muted-foreground">Use 1 of each, or change each product’s quantity below.</p>}
                 <div className="flex gap-2">
-                  <Select value={itemToAdd} onValueChange={setItemToAdd}>
-                    <SelectTrigger className="flex-1"><SelectValue placeholder="Select product to add" /></SelectTrigger>
-                    <SelectContent>
-                      {availableItems.map((i) => (
-                        <SelectItem key={i.id} value={String(i.id)}>{i.name} — {i.sku}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <PromotionProductPicker storeId={storeId} value={itemToAdd} onChange={setItemToAdd} selectedIds={form.products} disabled={busy} />
                   <Button type="button" variant="outline" onClick={addProduct} disabled={!itemToAdd}>
                     <Plus className="h-4 w-4" />
                   </Button>
@@ -117,7 +112,7 @@ export const PromotionsPage=({storeId}:{storeId:string})=>{
                         </TableRow>
                       ) : (
                         form.products.map((p) => {
-                          const item = pricebookItems.find((i) => String(i.id) === p);
+                          const item = selectedProducts[p];
                           return (
                             <TableRow key={p}>
                               <TableCell className="text-xs font-medium">{item?.sku || "—"}</TableCell>
@@ -227,7 +222,7 @@ export const PromotionsPage=({storeId}:{storeId:string})=>{
                 <TableHead>ID</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Discount Type</TableHead>
-                <TableHead>Products</TableHead>
+                <TableHead>No. of Products</TableHead>
                 <TableHead>Discount</TableHead>
                 <TableHead>Start</TableHead>
                 <TableHead>End</TableHead>
@@ -242,13 +237,7 @@ export const PromotionsPage=({storeId}:{storeId:string})=>{
                   <TableCell className="font-medium text-xs">{p.id}</TableCell>
                   <TableCell className="font-medium">{p.name}</TableCell>
                   <TableCell><Badge variant="outline">{p.type}</Badge></TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1 max-w-[220px]">
-                      {p.products.map((prod,index) => (
-                        <Badge key={index} variant="secondary" className="text-[11px]">{prod}</Badge>
-                      ))}
-                    </div>
-                  </TableCell>
+                  <TableCell>{p.products.length}</TableCell>
                   <TableCell className="font-medium text-primary">{p.discount}</TableCell>
                   <TableCell className="text-sm">{p.start}</TableCell>
                   <TableCell className="text-sm">{p.end}</TableCell>
@@ -258,12 +247,14 @@ export const PromotionsPage=({storeId}:{storeId:string})=>{
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setViewPromo(p)} aria-label="View">
                         <Eye className="h-4 w-4" />
                       </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" disabled={busy} onClick={()=>repost(p)} aria-label="Repost" title="Repost with new dates"><Copy className="h-4 w-4" /></Button>
+                      {p.canReactivate && <Button variant="ghost" size="icon" className="h-8 w-8" disabled={busy} onClick={()=>void reactivate(p)} aria-label="Reactivate" title="Reactivate"><RotateCcw className="h-4 w-4" /></Button>}
                       {p.status !== 'Expired' && <Button variant="ghost" size="icon" className="h-8 w-8" disabled={!p.active} onClick={() => {attempt.current={payload:'',key:''};openEdit(p);}} aria-label="Edit">
                         <Pencil className="h-4 w-4" />
                       </Button>}
-                      <Button variant="ghost" size="icon" className="h-8 w-8" disabled={!p.active} onClick={() => {setError('');setDeletePromo(p);}} aria-label="Deactivate">
+                      {p.active && p.status !== 'Expired' && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {setError('');setDeletePromo(p);}} aria-label="Deactivate">
                         <X className="h-4 w-4" />
-                      </Button>
+                      </Button>}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -300,7 +291,7 @@ export const PromotionsPage=({storeId}:{storeId:string})=>{
       </Dialog>
 
       {/* Edit Dialog */}
-      <Dialog open={!!editPromo} onOpenChange={(v) => { if (!v&&!busy) { setEditPromo(null); setForm(emptyForm); setItemToAdd(""); } }}>
+      <Dialog open={!!editPromo} onOpenChange={(v) => { if (!v&&!busy) { setEditPromo(null); setForm(emptyForm); setSelectedProducts({}); setItemToAdd(null); } }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Edit Promotion</DialogTitle></DialogHeader>
           <fieldset disabled={busy} className="grid gap-4 py-4">
@@ -324,14 +315,7 @@ export const PromotionsPage=({storeId}:{storeId:string})=>{
             <div className="grid gap-1.5">
               <Label>Products</Label>{form.type==='Buy X Get Y'&&<p className="text-xs text-muted-foreground">Mix and match across the selected products.</p>}{form.type==='Bundle'&&<p className="text-xs text-muted-foreground">Use 1 of each, or change each product’s quantity below.</p>}
               <div className="flex gap-2">
-                <Select value={itemToAdd} onValueChange={setItemToAdd}>
-                  <SelectTrigger className="flex-1"><SelectValue placeholder="Select product to add" /></SelectTrigger>
-                  <SelectContent>
-                    {availableItems.map((i) => (
-                      <SelectItem key={i.id} value={String(i.id)}>{i.name} — {i.sku}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <PromotionProductPicker storeId={storeId} value={itemToAdd} onChange={setItemToAdd} selectedIds={form.products} disabled={busy} />
                 <Button type="button" variant="outline" onClick={addProduct} disabled={!itemToAdd}>
                   <Plus className="h-4 w-4" />
                 </Button>
@@ -352,7 +336,7 @@ export const PromotionsPage=({storeId}:{storeId:string})=>{
                       </TableRow>
                     ) : (
                       form.products.map((p) => {
-                        const item = pricebookItems.find((i) => String(i.id) === p);
+                        const item = selectedProducts[p];
                         return (
                           <TableRow key={p}>
                             <TableCell className="text-xs font-medium">{item?.sku || "—"}</TableCell>
@@ -408,7 +392,7 @@ export const PromotionsPage=({storeId}:{storeId:string})=>{
             </div>
 
             {error&&<p role="alert">{error}</p>}<div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => { setEditPromo(null); setForm(emptyForm); setItemToAdd(""); }}>Cancel</Button>
+              <Button variant="outline" onClick={() => { setEditPromo(null); setForm(emptyForm); setSelectedProducts({}); setItemToAdd(null); }}>Cancel</Button>
               <Button onClick={handleUpdate}>Save Changes</Button>
             </div>
           </fieldset>

@@ -94,6 +94,7 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
       url: path,
       method: (init.method as string | undefined) ?? "GET",
       data: init.body,
+      signal: init.signal ?? undefined,
       headers,
     });
     return res.data;
