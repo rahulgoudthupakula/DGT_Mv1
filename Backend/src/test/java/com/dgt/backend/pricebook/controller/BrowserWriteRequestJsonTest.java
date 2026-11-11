@@ -36,6 +36,7 @@ class BrowserWriteRequestJsonTest {
     @MockitoBean ApprovalService approvals;
     @MockitoBean PagePermissions pages;
     @MockitoBean BulkItemLinks bulkLinks;
+    @MockitoBean com.dgt.backend.departments.service.StoreDepartmentCatalog departmentCatalog;
 
     @Test void browserCamelCasePromotionReachesApprovalWithAllValues() throws Exception {
         when(approvals.submit(anyString(),anyString(),isNull(),isNull(),any(),anyString()))

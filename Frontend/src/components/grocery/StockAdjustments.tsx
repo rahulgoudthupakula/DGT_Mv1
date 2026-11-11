@@ -1,3 +1,5 @@
+import { RecentFilterSelect, RecentFilterContent } from "@/components/shared/RecentFilterSelect";
+import { DepartmentFilter } from "@/components/shared/DepartmentFilter";
 /**
  * Builds reasoned inventory reduction requests from current versus requested counts. Batch
  * submission sends the difference, with a destination only for store transfers; backend rules
@@ -52,18 +54,6 @@ import { useToast } from "@/hooks/use-toast";
 import { addApprovalRequests } from "@/lib/approvalsStore";
 
 // Sample data for dropdowns
-const departments = [
-  "All Departments",
-  "Beverages",
-  "Snacks",
-  "Dairy",
-  "Frozen Foods",
-  "Bakery",
-  "Meat",
-  "Produce",
-  "Canned Goods",
-  "Household",
-];
 
 const taxTypes = ["All Tax Types", "Taxable", "Non-Taxable", "Exempt"];
 
@@ -261,7 +251,6 @@ export const StockAdjustments = ({storeId}:{storeId:string}) => {
   const client=useQueryClient();const path=`/access/stores/${encodeURIComponent(storeId)}/reductions`;
   const query=useQuery({queryKey:['reductions',storeId],queryFn:()=>request<{items:(InventoryItem&{taxable:boolean})[];canSubmit:boolean;stores:{dgt_id:string;store_name:string}[]}>(path)});
   const inventoryData=(query.data?.items??[]).map(i=>({...i,taxType:i.taxable?'Taxable':'Non-Taxable',reason:'',rebate:null,marginAfterRebate:null}));
-  const departments=['All Departments',...new Set(inventoryData.map(i=>i.department))];
   const vendors=['All Vendors',...new Set(inventoryData.map(i=>i.vendor).filter(Boolean))];
   const transferStoreOptions=(query.data?.stores??[]).map(s=>s.dgt_id);
   const [saving,setSaving]=useState(false);
@@ -601,18 +590,7 @@ export const StockAdjustments = ({storeId}:{storeId:string}) => {
               <Label htmlFor="department" className="text-xs font-medium">
                 Department
               </Label>
-              <Select value={department} onValueChange={setDepartment}>
-                <SelectTrigger id="department">
-                  <SelectValue placeholder="Select department" />
-                </SelectTrigger>
-                <SelectContent>
-                  {departments.map((dept) => (
-                    <SelectItem key={dept} value={dept}>
-                      {dept}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <DepartmentFilter storeId={storeId} value={department} onValueChange={setDepartment} allValue="All Departments" extraNames={inventoryData.map(item=>item.department)} id="department" />
             </div>
 
             {/* Tax Type Dropdown */}
@@ -620,18 +598,18 @@ export const StockAdjustments = ({storeId}:{storeId:string}) => {
               <Label htmlFor="tax-type" className="text-xs font-medium">
                 Tax Type
               </Label>
-              <Select value={taxType} onValueChange={setTaxType}>
+              <RecentFilterSelect storeId={storeId} filterType="tax" value={taxType} onValueChange={setTaxType}>
                 <SelectTrigger id="tax-type">
                   <SelectValue placeholder="Select tax type" />
                 </SelectTrigger>
-                <SelectContent>
+                <RecentFilterContent>
                   {taxTypes.map((type) => (
                     <SelectItem key={type} value={type}>
                       {type}
                     </SelectItem>
                   ))}
-                </SelectContent>
-              </Select>
+                </RecentFilterContent>
+              </RecentFilterSelect>
             </div>
 
             {/* Vendor List Dropdown */}
@@ -639,18 +617,18 @@ export const StockAdjustments = ({storeId}:{storeId:string}) => {
               <Label htmlFor="vendor" className="text-xs font-medium">
                 Vendor
               </Label>
-              <Select value={vendor} onValueChange={setVendor}>
+              <RecentFilterSelect storeId={storeId} filterType="vendor" value={vendor} onValueChange={setVendor}>
                 <SelectTrigger id="vendor">
                   <SelectValue placeholder="Select vendor" />
                 </SelectTrigger>
-                <SelectContent>
+                <RecentFilterContent>
                   {vendors.map((v) => (
                     <SelectItem key={v} value={v}>
                       {v}
                     </SelectItem>
                   ))}
-                </SelectContent>
-              </Select>
+                </RecentFilterContent>
+              </RecentFilterSelect>
             </div>
 
             {/* Sort By Dropdown */}
@@ -658,18 +636,18 @@ export const StockAdjustments = ({storeId}:{storeId:string}) => {
               <Label htmlFor="sort-by" className="text-xs font-medium">
                 Sort By
               </Label>
-              <Select value={sortBy} onValueChange={setSortBy}>
+              <RecentFilterSelect storeId={storeId} filterType="sort:inventory" value={sortBy} onValueChange={setSortBy}>
                 <SelectTrigger id="sort-by">
                   <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
-                <SelectContent>
+                <RecentFilterContent>
                   {sortOptions.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}
                     </SelectItem>
                   ))}
-                </SelectContent>
-              </Select>
+                </RecentFilterContent>
+              </RecentFilterSelect>
             </div>
           </div>
         </CardContent>

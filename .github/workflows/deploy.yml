@@ -58,6 +58,10 @@ jobs:
           npm ci
           npm run lint
 
+      - name: Frontend filter history tests
+        working-directory: Frontend
+        run: npm run test:filters
+
   deploy:
     name: Deploy
     needs: test

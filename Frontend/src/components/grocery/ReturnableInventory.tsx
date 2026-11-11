@@ -1,3 +1,5 @@
+import { RecentFilterSelect, RecentFilterContent } from "@/components/shared/RecentFilterSelect";
+import { DepartmentFilter } from "@/components/shared/DepartmentFilter";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Links approved reductions to vendor return slips. Creating a slip and changing its status are
@@ -161,7 +163,6 @@ export const ReturnableInventory = ({storeId}:{storeId:string}) => {
     setInventoryItems((approved.data?.requests??[]).filter(r=>r.status==='APPROVED'&&r.route==='returnable').map(r=>{const item=approved.data?.items.find(i=>Number(i.id)===Number(r.product_id));return {id:String(r.reduction_request_id),scanCode:r.product_sku,itemName:r.product_name,vendor:item?.vendor??'',department:item?.department??'',currentStock:Number(item?.inventoryCount??0),returnQty:Number(r.quantity),netCost:Number(item?.netCost??0),reason:r.reason};}));
   }, [approved.data]);
   const vendors=['All Vendors',...(slips.data?.vendors??[]).map(v=>v.vendor_name)];
-  const departments=['All Departments',...new Set((approved.data?.items??[]).map(i=>String(i.department??'')).filter(Boolean))];
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
 
   // Return details
@@ -437,30 +438,21 @@ export const ReturnableInventory = ({storeId}:{storeId:string}) => {
               <Label className="text-xs">
                 Vendor <span className="text-destructive">*</span>
               </Label>
-              <Select value={selectedVendor} onValueChange={setSelectedVendor}>
+              <RecentFilterSelect storeId={storeId} filterType="vendor" value={selectedVendor} onValueChange={setSelectedVendor}>
                 <SelectTrigger className="h-9 text-sm">
                   <SelectValue placeholder="Select vendor" />
                 </SelectTrigger>
-                <SelectContent>
+                <RecentFilterContent>
                   {vendors.map((vendor) => (
                     <SelectItem key={vendor} value={vendor}>{vendor}</SelectItem>
                   ))}
-                </SelectContent>
-              </Select>
+                </RecentFilterContent>
+              </RecentFilterSelect>
             </div>
 
             <div className="space-y-1.5">
               <Label className="text-xs">Department</Label>
-              <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                <SelectTrigger className="h-9 text-sm">
-                  <SelectValue placeholder="Select department" />
-                </SelectTrigger>
-                <SelectContent>
-                  {departments.map((dept) => (
-                    <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <DepartmentFilter storeId={storeId} value={selectedDepartment} onValueChange={setSelectedDepartment} allValue="All Departments" extraNames={(approved.data?.items??[]).map(item=>String(item.department??''))} className="h-9 text-sm" />
             </div>
 
           </div>

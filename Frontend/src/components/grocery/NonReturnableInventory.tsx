@@ -1,3 +1,6 @@
+import { RecentFilterSelect, RecentFilterContent } from "@/components/shared/RecentFilterSelect";
+import { useStoreDepartments } from "@/hooks/use-store-departments";
+import { DepartmentFilter } from "@/components/shared/DepartmentFilter";
 /**
  * Displays approved reductions from the reductions API alongside the non-returnable workflow UI.
  * Read-only history and local form state must not be mistaken for an additional stock deduction.
@@ -84,16 +87,6 @@ const reasons = [
   "Other",
 ];
 
-const departments = [
-  "Dairy",
-  "Produce",
-  "Frozen",
-  "Bakery",
-  "Meat",
-  "Beverages",
-  "Snacks",
-  "Grocery",
-];
 
 // Items appear here only after their reduce request is approved in Approvals.
 const loadApprovedNonReturnables = (): InventoryItem[] =>
@@ -116,6 +109,8 @@ const loadApprovedNonReturnables = (): InventoryItem[] =>
     }));
 
 export const NonReturnableInventory = ({storeId}:{storeId:string}) => {
+  const departmentQuery=useStoreDepartments(storeId);
+  const departments=(departmentQuery.data??[]).map(department=>department.name);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const approved=useQuery({queryKey:['reductions',storeId],queryFn:()=>request<{requests:any[];items:any[]}>(`/access/stores/${encodeURIComponent(storeId)}/reductions`)});
   const [date, setDate] = useState<Date>();
@@ -289,36 +284,24 @@ export const NonReturnableInventory = ({storeId}:{storeId:string}) => {
 
             <div className="space-y-2">
               <Label className="text-xs">Department</Label>
-              <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-                <SelectTrigger className="h-9 text-sm">
-                  <SelectValue placeholder="All Departments" />
-                </SelectTrigger>
-                <SelectContent className="z-50 bg-popover">
-                  <SelectItem value="all">All Departments</SelectItem>
-                  {departments.map((dept) => (
-                    <SelectItem key={dept} value={dept}>
-                      {dept}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <DepartmentFilter storeId={storeId} value={departmentFilter} onValueChange={setDepartmentFilter} allValue="all" extraNames={(approved.data?.items??[]).map(item=>String(item.department??''))} className="h-9 text-sm" />
             </div>
 
             <div className="space-y-2">
               <Label className="text-xs">Reason</Label>
-              <Select value={reasonFilter} onValueChange={setReasonFilter}>
+              <RecentFilterSelect storeId={storeId} filterType="reduction-reason" value={reasonFilter} onValueChange={setReasonFilter}>
                 <SelectTrigger className="h-9 text-sm">
                   <SelectValue placeholder="All Reasons" />
                 </SelectTrigger>
-                <SelectContent className="z-50 bg-popover">
+                <RecentFilterContent className="z-50 bg-popover">
                   <SelectItem value="all">All Reasons</SelectItem>
                   {reasons.map((reason) => (
                     <SelectItem key={reason} value={reason}>
                       {reason}
                     </SelectItem>
                   ))}
-                </SelectContent>
-              </Select>
+                </RecentFilterContent>
+              </RecentFilterSelect>
             </div>
 
           </div>

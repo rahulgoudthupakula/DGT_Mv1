@@ -1,4 +1,7 @@
+import { RecentFilterSelect, RecentFilterContent } from "@/components/shared/RecentFilterSelect";
 import {useGroceryDefaults} from "@/lib/grocerySettings";
+import { useStoreDepartments } from "@/hooks/use-store-departments";
+import { DepartmentFilter } from "@/components/shared/DepartmentFilter";
 import { useState, useEffect } from "react";
 import { usePagination } from "@/hooks/use-pagination";
 import { TablePagination } from "@/components/ui/table-pagination";
@@ -99,7 +102,8 @@ const CurrencyInput = ({
 export const ItemsPage = ({storeId}: {storeId:string}) => {
   const defaults=useGroceryDefaults(storeId);
   const client=useQueryClient(),path=`/access/stores/${encodeURIComponent(storeId)}/items`;
-  const query=useQuery({queryKey:['pricebook-items',storeId],queryFn:()=>request<{items:Item[];departments:{name:string;children:string[]}[];canEdit:boolean}>(path),enabled:!!storeId});
+  const departmentQuery=useStoreDepartments(storeId);
+  const query=useQuery({queryKey:['pricebook-items',storeId],queryFn:()=>request<{items:Item[];canEdit:boolean}>(path),enabled:!!storeId});
   const items=(query.data?.items??[]).map(i=>({...emptyItem,...i,unitType:i.unitType??"item"}));
   const [busy,setBusy]=useState(false),[message,setMessage]=useState('');
   const [attempted,setAttempted]=useState(false);
@@ -135,8 +139,8 @@ export const ItemsPage = ({storeId}: {storeId:string}) => {
 
   const categories = [...new Set(items.map((i) => i.category).filter(Boolean))];
   const vendors = [...new Set(items.flatMap((i) => i.vendorNames??(i.vendor?[i.vendor]:[])).filter(Boolean))];
-  const depts = [...new Set((query.data?.departments??[]).map(d=>d.name))];
-  const subDepts = query.data?.departments.find(d=>d.name===form?.dept)?.children??[];
+  const depts = (departmentQuery.data??[]).map(d=>d.name);
+  const subDepts = departmentQuery.data?.find(d=>d.name===form?.dept)?.children??[];
 
 
   const filtered = items
@@ -452,57 +456,51 @@ export const ItemsPage = ({storeId}: {storeId:string}) => {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Category</Label>
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <RecentFilterSelect storeId={storeId} filterType="category" value={categoryFilter} onValueChange={setCategoryFilter}>
                 <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="All Categories" /></SelectTrigger>
-                <SelectContent>
+                <RecentFilterContent>
                   <SelectItem value="all">All Categories</SelectItem>
                   {categories.map((c) => <SelectItem key={c} value={c.toLowerCase()}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
+                </RecentFilterContent>
+              </RecentFilterSelect>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Vendor</Label>
-              <Select value={vendorFilter} onValueChange={setVendorFilter}>
+              <RecentFilterSelect storeId={storeId} filterType="vendor" value={vendorFilter} onValueChange={setVendorFilter}>
                 <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="All Vendors" /></SelectTrigger>
-                <SelectContent>
+                <RecentFilterContent>
                   <SelectItem value="all">All Vendors</SelectItem>
                   {vendors.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
-                </SelectContent>
-              </Select>
+                </RecentFilterContent>
+              </RecentFilterSelect>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Department</Label>
-              <Select value={deptFilter} onValueChange={setDeptFilter}>
-                <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="All Departments" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Departments</SelectItem>
-                  {depts.map((d) => <SelectItem key={d} value={d.toLowerCase()}>{d}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <DepartmentFilter storeId={storeId} value={deptFilter} onValueChange={setDeptFilter} className="h-9 text-sm" lowercaseValues extraNames={items.map(item=>item.dept)} />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Status</Label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <RecentFilterSelect storeId={storeId} filterType="status" value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="All Status" /></SelectTrigger>
-                <SelectContent>
+                <RecentFilterContent>
                   <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value="active">Active</SelectItem>
                   <SelectItem value="inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
+                </RecentFilterContent>
+              </RecentFilterSelect>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Sort By</Label>
-              <Select value={sortBy} onValueChange={setSortBy}>
+              <RecentFilterSelect storeId={storeId} filterType="sort:items" value={sortBy} onValueChange={setSortBy}>
                 <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-                <SelectContent>
+                <RecentFilterContent>
                   <SelectItem value="name">Product Name</SelectItem>
                   <SelectItem value="retail_asc">Price: Low → High</SelectItem>
                   <SelectItem value="retail_desc">Price: High → Low</SelectItem>
                   <SelectItem value="margin">Margin (High)</SelectItem>
                   <SelectItem value="last_updated">Last Updated</SelectItem>
-                </SelectContent>
-              </Select>
+                </RecentFilterContent>
+              </RecentFilterSelect>
             </div>
           </div>
           {hasActiveFilters && (

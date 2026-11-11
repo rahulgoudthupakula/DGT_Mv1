@@ -1,3 +1,5 @@
+import { RecentFilterSelect, RecentFilterContent } from "@/components/shared/RecentFilterSelect";
+import { DepartmentFilter } from "@/components/shared/DepartmentFilter";
 /**
  * Loads store permissions and the purchase-order catalog before building vendor order groups.
  * Draft quantities feed the order workflow; catalog stock is not changed by editing a draft.
@@ -107,6 +109,7 @@ export const PurchaseOrdersPage = ({storeId}:{storeId:string}) => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [vendorFilter, setVendorFilter] = useState("all");
   const [historySearch, setHistorySearch] = useState("");
+  const [historyDepartment,setHistoryDepartment]=useState("all");
   const [selectedOrder, setSelectedOrder] = useState<PurchaseOrder | null>(null);
   const [addItemsOrder, setAddItemsOrder] = useState<PurchaseOrder | null>(null);
   const [addItemsSearch, setAddItemsSearch] = useState("");
@@ -124,7 +127,7 @@ export const PurchaseOrdersPage = ({storeId}:{storeId:string}) => {
 
   useEffect(() => {
     // Never carry another store's draft quantities or manually added items into this store.
-    setSuggestedQty({}); setAddedGuideItems({}); setRemovedGuideItems([]);
+    setSuggestedQty({}); setAddedGuideItems({}); setRemovedGuideItems([]); setHistoryDepartment("all");
     setCreateContext(null); setSelectedOrder(null); setAddItemsOrder(null);
   }, [storeId]);
 
@@ -205,7 +208,7 @@ export const PurchaseOrdersPage = ({storeId}:{storeId:string}) => {
     } finally {setBusy(false);}
   };
 
-  const filteredOrders = orders.filter((order) => (statusFilter === "all" || order.status === statusFilter) && (vendorFilter === "all" || order.vendor === vendorFilter) && (!historySearch || `${order.poNumber} ${order.vendor}`.toLowerCase().includes(historySearch.toLowerCase())));
+  const filteredOrders = orders.filter((order) => (historyDepartment === "all" || order.lines.some(line=>line.department===historyDepartment)) && (statusFilter === "all" || order.status === statusFilter) && (vendorFilter === "all" || order.vendor === vendorFilter) && (!historySearch || `${order.poNumber} ${order.vendor}`.toLowerCase().includes(historySearch.toLowerCase())));
 
   const downloadOrder = (order: PurchaseOrder) => {
     const rows = [["PO", order.poNumber], ["Vendor", order.vendor], ["Status", order.status], [], ["SKU", "Product", "Ordered", "Unit Cost", "Total"], ...order.lines.map((line) => [line.sku, line.itemName, line.orderedQuantity, line.unitCost, line.lineTotal])];
@@ -230,7 +233,7 @@ export const PurchaseOrdersPage = ({storeId}:{storeId:string}) => {
         </CardContent></Card>
       </TabsContent>
       <TabsContent value="history" className="mt-5 space-y-4">
-        <Card><CardContent className="grid gap-4 p-4 md:grid-cols-3"><div className="relative"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input value={historySearch} onChange={(event) => setHistorySearch(event.target.value)} placeholder="Search PO or vendor" className="pl-9" /></div><Select value={vendorFilter} onValueChange={setVendorFilter}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All Vendors</SelectItem>{vendors.map((vendor) => <SelectItem key={vendor} value={vendor}>{vendor}</SelectItem>)}</SelectContent></Select><Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All Statuses</SelectItem>{["Draft", "Pending Approval", "Approved", "Cancelled"].map((status) => <SelectItem key={status} value={status}>{status}</SelectItem>)}</SelectContent></Select></CardContent></Card>
+        <Card><CardContent className="grid gap-4 p-4 md:grid-cols-4"><div className="relative"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input value={historySearch} onChange={(event) => setHistorySearch(event.target.value)} placeholder="Search PO or vendor" className="pl-9" /></div><DepartmentFilter storeId={storeId} value={historyDepartment} onValueChange={setHistoryDepartment} extraNames={orders.flatMap(order=>order.lines.map(line=>line.department))} /><RecentFilterSelect storeId={storeId} filterType="vendor" value={vendorFilter} onValueChange={setVendorFilter}><SelectTrigger><SelectValue /></SelectTrigger><RecentFilterContent><SelectItem value="all">All Vendors</SelectItem>{vendors.map((vendor) => <SelectItem key={vendor} value={vendor}>{vendor}</SelectItem>)}</RecentFilterContent></RecentFilterSelect><RecentFilterSelect storeId={storeId} filterType="status" value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger><SelectValue /></SelectTrigger><RecentFilterContent><SelectItem value="all">All Statuses</SelectItem>{["Draft", "Pending Approval", "Approved", "Cancelled"].map((status) => <SelectItem key={status} value={status}>{status}</SelectItem>)}</RecentFilterContent></RecentFilterSelect></CardContent></Card>
         <Card><CardContent className="p-0"><div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>PO Number</TableHead><TableHead>Vendor</TableHead><TableHead>Order Date</TableHead><TableHead>Expected Delivery</TableHead><TableHead className="text-center">Items</TableHead><TableHead className="text-center">Quantity</TableHead><TableHead className="text-right">Total</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader><TableBody>
           {loadingOrders ? <TableRow><TableCell colSpan={9} className="py-12 text-center text-muted-foreground">Loading purchase orders…</TableCell></TableRow> : filteredOrders.length === 0 ? <TableRow><TableCell colSpan={9} className="py-12 text-center text-muted-foreground">No purchase orders found.</TableCell></TableRow> : filteredOrders.map((order) => <TableRow key={order.id}><TableCell className="font-mono font-medium">{order.poNumber}</TableCell><TableCell>{order.vendor}</TableCell><TableCell>{format(new Date(`${order.orderDate}T12:00:00`), "MMM d, yyyy")}</TableCell><TableCell>{order.expectedDeliveryDate ? format(new Date(`${order.expectedDeliveryDate}T12:00:00`), "MMM d, yyyy") : "—"}</TableCell><TableCell className="text-center">{order.totalItems}</TableCell><TableCell className="text-center">{order.totalQuantity}</TableCell><TableCell className="text-right font-medium">{money(order.totalValue)}</TableCell><TableCell><Badge variant={statusVariant(order.status)}>{order.status}</Badge></TableCell><TableCell><div className="flex justify-end gap-1"><Button variant="ghost" size="icon" title="View" onClick={() => setSelectedOrder(order)}><Eye className="h-4 w-4" /></Button>{order.canEdit && <><Button variant="ghost" size="icon" title="Add Items" onClick={() => { setAddItemsOrder(order); setAddItemsQty({}); setAddItemsSearch(""); }}><Plus className="h-4 w-4" /></Button><Button variant="ghost" size="icon" title="Submit for approval" disabled={busy} onClick={() => changeStatus(order, "Pending Approval")}><Send className="h-4 w-4" /></Button></>}{order.canApprove&&<Button disabled={busy} variant="outline" onClick={()=>changeStatus(order,"Approved")}>Approve</Button>}<Button variant="ghost" size="icon" title="Download" onClick={() => downloadOrder(order)}><Download className="h-4 w-4" /></Button></div></TableCell></TableRow>)}
         </TableBody></Table></div></CardContent></Card>
