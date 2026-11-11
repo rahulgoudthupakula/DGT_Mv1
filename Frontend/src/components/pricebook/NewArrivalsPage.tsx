@@ -1,7 +1,7 @@
 import {useGroceryDefaults} from "@/lib/grocerySettings";
 import { useMemo, useState } from "react";
 import { differenceInDays, format, parseISO, isAfter, subDays } from "date-fns";
-import { PackagePlus, Search, Sparkles, Boxes, DollarSign, Package, Tag, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Check, ChevronsUpDown, PackagePlus, Search, Sparkles, Boxes, DollarSign, Package, Tag, CheckCircle2, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +14,36 @@ import { useQuery,useQueryClient } from "@tanstack/react-query";
 import { request,isPendingChange } from "@/lib/backend";
 
 
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
+
 import { toast } from "@/hooks/use-toast";
+
+// Keep search inside the dropdown; selections continue through the existing margin handlers.
+function ArrivalCategoryPicker({ label, value, options, placeholder, disabled = false, onChange }: {
+  label: string; value: string; options: string[]; placeholder: string; disabled?: boolean; onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const matches = options.filter(option => option.toLowerCase().includes(search.trim().toLowerCase()));
+  return <Popover open={open} onOpenChange={next => { setOpen(next); if (next) setSearch(""); }}>
+    <PopoverTrigger asChild>
+      <Button type="button" variant="outline" role="combobox" aria-label={label} aria-expanded={open} disabled={disabled} className="h-9 w-full justify-between text-sm font-normal">
+        <span className="truncate">{value || placeholder}</span><ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+      </Button>
+    </PopoverTrigger>
+    <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-0">
+      <Command shouldFilter={false}>
+        <CommandInput placeholder={`Search ${label.toLowerCase()}…`} aria-label={`Search ${label.toLowerCase()}`} value={search} onValueChange={setSearch} />
+        <CommandList className="max-h-64"><CommandEmpty>No matching {label.toLowerCase()}.</CommandEmpty><CommandGroup>
+          {matches.map(option => <CommandItem key={option} value={option} onSelect={() => { onChange(option); setOpen(false); }}>
+            <Check className={`mr-2 h-4 w-4 shrink-0 ${value === option ? "opacity-100" : "opacity-0"}`} />{option}
+          </CommandItem>)}
+        </CommandGroup></CommandList>
+      </Command>
+    </PopoverContent>
+  </Popover>;
+}
 
 type Item = { id:number; version:string; effectiveRetail?:number|null; name:string; sku:string; barcode:string; dept:string; subDept:string; retail:number|null; currentInventory:number|null; [key:string]:unknown };
 type Arrival = { id:number; sku:string; itemName:string; barcode:string; vendor:string; firstReceived:string; unitsReceived:number|null; cost:number|null; retail:number|null; currentStock:number|null; isNew:boolean; needsCategory:boolean; msrp:number|null };
@@ -278,33 +307,11 @@ export const NewArrivalsPage = ({storeId}:{storeId:string}) => {
           <div className="space-y-3">
             <div className="space-y-1.5">
               <Label className="text-xs">Department</Label>
-              <Select value={dept} onValueChange={onDeptChange}>
-                <SelectTrigger className="h-9 text-sm">
-                  <SelectValue placeholder="Select department" />
-                </SelectTrigger>
-                <SelectContent className="max-h-64">
-                  {departmentTree.map((d) => (
-                    <SelectItem key={d.name} value={d.name}>
-                      {d.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <ArrivalCategoryPicker label="Department" value={dept} options={departmentTree.map(d => d.name)} placeholder="Select department" disabled={saving} onChange={onDeptChange} />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Sub-Department</Label>
-              <Select value={subDept} onValueChange={onSubDeptChange} disabled={!dept||defaults.isPending}>
-                <SelectTrigger className="h-9 text-sm">
-                  <SelectValue placeholder={dept ? "Select sub-department" : "Select department first"} />
-                </SelectTrigger>
-                <SelectContent className="max-h-64">
-                  {subDeptOptions.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <ArrivalCategoryPicker key={dept} label="Subdepartment" value={subDept} options={subDeptOptions} placeholder={dept ? "Select sub-department" : "Select department first"} disabled={!dept || defaults.isPending || saving} onChange={onSubDeptChange} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">

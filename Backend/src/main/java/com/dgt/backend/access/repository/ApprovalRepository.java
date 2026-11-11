@@ -22,8 +22,8 @@ public class ApprovalRepository {
         return db.queryForList("SELECT a.*,u.email AS requester_email FROM approval_requests a JOIN users u ON u.user_id=a.requested_by WHERE a.dgt_id=? AND a.company_id=? ORDER BY a.created_at DESC LIMIT 200", storeId, companyId);
     }
 
-    public List<String> findDefaultDepartmentName(Object departmentId) {
-        return db.queryForList("SELECT department_name FROM departments WHERE department_id=?", String.class, departmentId);
+    public List<String> findDefaultDepartmentName(Object departmentId, Object storeId) {
+        return db.queryForList("SELECT store_department_name FROM store_departments WHERE department_id=? AND dgt_id=?", String.class, departmentId, storeId);
     }
 
     public List<String> findStoreDepartmentName(Object departmentId, Object storeId) {

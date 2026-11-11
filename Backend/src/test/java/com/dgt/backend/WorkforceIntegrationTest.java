@@ -72,6 +72,7 @@ class WorkforceIntegrationTest {
   db.update("DELETE FROM store_role_permissions WHERE dgt_id IN (?,?,?)",store,second,foreign);
   db.update("DELETE FROM approval_requests WHERE company_id IN (?,?)",company,otherCompany);db.update("DELETE FROM access_audit_events WHERE company_id IN (?,?)",company,otherCompany);db.update("DELETE FROM module_approval_policies WHERE company_id IN (?,?)",company,otherCompany);
   db.update("DELETE FROM permissions WHERE user_role_id IN (SELECT user_role_id FROM user_roles WHERE dgt_id IN (?,?,?))",store,second,foreign);db.update("DELETE FROM user_roles WHERE dgt_id IN (?,?,?)",store,second,foreign);db.update("DELETE FROM company_admins WHERE company_id IN (?,?)",company,otherCompany);db.update("DELETE FROM users WHERE dgt_id IN (?,?,?)",store,second,foreign);
+  db.update("DELETE FROM store_sub_departments WHERE dgt_id IN (?,?,?)",store,second,foreign);
   db.update("DELETE FROM store_contact_info WHERE dgt_id IN (?,?,?)",store,second,foreign);db.update("DELETE FROM store_business_hours WHERE dgt_id IN (?,?,?)",store,second,foreign);db.update("DELETE FROM store_departments WHERE dgt_id IN (?,?,?)",store,second,foreign);db.update("DELETE FROM stores WHERE dgt_id IN (?,?,?)",store,second,foreign);db.update("DELETE FROM companies WHERE company_id IN (?,?)",company,otherCompany);
  }
  long staff,replacement,boss,adminEmployee; String day="2027-06-05"; long night;

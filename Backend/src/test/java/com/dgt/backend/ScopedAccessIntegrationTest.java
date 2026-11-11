@@ -58,6 +58,46 @@ class ScopedAccessIntegrationTest {
    db.update("INSERT INTO store_role_permissions(dgt_id,role_type_id,permission_code,allowed) SELECT ?,role_type_id,?,true FROM role_types WHERE role_type_name IN ('MANAGER','CASHIER','ACCOUNTANT')",store,section.code());
   db.update("INSERT INTO tender_types(tender_code,tender_name) VALUES ('CASH','Cash'),('CREDIT_CARD','Credit Card') ON CONFLICT(tender_code) DO NOTHING");
  }
+ @Test @Order(0) void departmentHierarchyIsStoreOwnedAndVersioned() throws Exception {
+  assertThat(db.queryForObject("SELECT count(*) FROM store_departments WHERE dgt_id=? AND department_id IS NOT NULL",Long.class,store))
+   .isEqualTo(db.queryForObject("SELECT count(*) FROM departments",Long.class));
+  var all=ok(req("admin","GET",dept(store),null),200);JsonNode parent=null;
+  for(var row:all)if(row.path("subDepartmentDetails").size()>1){parent=row;break;}
+  assertThat(parent).isNotNull();String id=parent.path("id").asText(),originalName=parent.path("name").asText();
+  var child=parent.path("subDepartmentDetails").get(0);String childId=child.path("id").asText();
+  var body=Map.of("name","Renamed "+tag,"sub_departments",List.of(Map.of("id",childId,"name",child.path("name").asText(),"active",false)));
+  var edited=ok(call("admin","PUT",dept(store)+"/"+id,body,parent.path("version").asText(),null),200);
+  assertThat(edited.path("name").asText()).isEqualTo("Renamed "+tag);
+  assertThat(db.queryForObject("SELECT is_active FROM store_sub_departments WHERE store_sub_department_id=?",Boolean.class,Long.parseLong(childId))).isFalse();
+  assertThat(db.queryForObject("SELECT department_name FROM departments WHERE department_id=?",String.class,Long.parseLong(id.substring(8)))).isEqualTo(originalName);
+  assertThat(db.queryForObject("SELECT store_department_name FROM store_departments WHERE dgt_id=? AND department_id=?",String.class,second,Long.parseLong(id.substring(8)))).isEqualTo(originalName);
+  ok(call("admin","PUT",dept(store)+"/"+id,body,parent.path("version").asText(),null),409);
+  ok(call("other","PUT",dept(store)+"/"+id,body,edited.path("version").asText(),null),403);
+  long beforeCount=db.queryForObject("SELECT count(*) FROM store_sub_departments WHERE dgt_id=?",Long.class,store);
+  db.queryForList("SELECT initialize_store_departments(?)",store);
+  assertThat(db.queryForObject("SELECT count(*) FROM store_sub_departments WHERE dgt_id=?",Long.class,store)).isEqualTo(beforeCount);
+  assertThat(db.queryForObject("SELECT is_active FROM store_sub_departments WHERE store_sub_department_id=?",Boolean.class,Long.parseLong(childId))).isFalse();
+  // An inactive child must not be offered by Price Book, even while its parent is active.
+  var options=ok(req("admin","GET",access()+"/items",null),200).path("departments");
+  for(var row:options)if(row.path("name").asText().equals("Renamed "+tag))assertThat(row.path("children").toString()).doesNotContain(child.path("name").asText());
+  long wrongChild=db.queryForObject("SELECT min(store_sub_department_id) FROM store_sub_departments WHERE dgt_id=?",Long.class,second);
+  ok(call("admin","PUT",dept(store)+"/"+id,Map.of("name",originalName,"sub_departments",List.of(Map.of("id",Long.toString(wrongChild),"name","Foreign child","active",true))),edited.path("version").asText(),null),400);
+  // Restore fixture names and state; all original child IDs must survive edits.
+  var restored=ok(call("admin","PUT",dept(store)+"/"+id,Map.of("name",originalName,"sub_departments",List.of(Map.of("id",childId,"name",child.path("name").asText(),"active",true))),edited.path("version").asText(),null),200);
+  assertThat(restored.path("subDepartmentDetails").size()).isEqualTo(parent.path("subDepartmentDetails").size());
+  var created=ok(req("admin","POST",dept(store),Map.of("name","ZZ hierarchy "+tag,"sub_departments",List.of(Map.of("name","Custom child","active",true)))),201);
+  assertThat(created.path("subDepartmentDetails").get(0).path("name").asText()).isEqualTo("Custom child");
+  String customPath=dept(store)+"/"+created.path("id").asText();
+  var proposal=Map.of("name","ZZ approved "+tag,"sub_departments",List.of(Map.of("id",created.path("subDepartmentDetails").get(0).path("id").asText(),"name","Approved child","active",false)));
+  long pending=ok(call("cashier","PUT",customPath,proposal,created.path("version").asText(),null),200).path("requestId").asLong();
+  assertThat(pending).isPositive();
+  assertThat(db.queryForObject("SELECT count(*) FROM store_departments WHERE dgt_id=? AND store_department_name=?",Long.class,store,"ZZ approved "+tag)).isZero();
+  ok(req("admin","POST",access()+"/approvals/"+pending+"/decision",Map.of("decision","APPROVED")),200);
+  assertThat(db.queryForObject("SELECT is_active FROM store_sub_departments WHERE dgt_id=? AND store_sub_department_name='Approved child'",Boolean.class,store)).isFalse();
+
+  ok(req("admin","POST",dept(store),Map.of("name","ZZ invalid "+tag,"sub_departments",List.of(Map.of("name","Duplicate","active",true),Map.of("name"," duplicate ","active",true)))),400);
+  assertThat(db.queryForObject("SELECT count(*) FROM store_departments WHERE dgt_id=? AND store_department_name=?",Long.class,store,"ZZ invalid "+tag)).isZero();
+ }
  @AfterAll void cleanup(){
   if(company==0)return;
   db.update("DELETE FROM store_creation_requests WHERE company_id IN (?,?)",company,otherCompany);
@@ -67,6 +107,8 @@ class ScopedAccessIntegrationTest {
    db.update("DELETE FROM store_role_permissions WHERE dgt_id=?",child);
    db.update("DELETE FROM store_contact_info WHERE dgt_id=?",child);
    db.update("DELETE FROM store_business_hours WHERE dgt_id=?",child);
+   db.update("DELETE FROM store_sub_departments WHERE dgt_id=?",child);
+   db.update("DELETE FROM store_departments WHERE dgt_id=?",child);
    db.update("DELETE FROM stores WHERE dgt_id=?",child);
   }
   db.update("DELETE FROM user_store_permission_overrides WHERE dgt_id IN (?,?,?)",store,second,foreign);
