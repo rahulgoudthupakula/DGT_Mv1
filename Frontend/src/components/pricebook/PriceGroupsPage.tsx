@@ -279,6 +279,7 @@ export const PriceGroupsPage = ({storeId}:{storeId:string}) => {
                 <TableHead className="w-10 text-right">#</TableHead>
                 <TableHead>Group Name</TableHead>
                 <TableHead>Description</TableHead>
+                <TableHead className="text-right">Group Price</TableHead>
                 <TableHead className="text-right">No. of Items</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -292,6 +293,7 @@ export const PriceGroupsPage = ({storeId}:{storeId:string}) => {
                       <TableCell className="text-right text-muted-foreground">{idx + 1}</TableCell>
                       <TableCell className="font-medium">{g.name}{!g.active&&<span className="ml-2 text-muted-foreground">Inactive</span>}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{g.description}</TableCell>
+                      <TableCell className="text-right font-medium">{formatCurrency(g.groupPrice)}</TableCell>
                       <TableCell className="text-right font-medium">{g.items.length}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
@@ -309,7 +311,7 @@ export const PriceGroupsPage = ({storeId}:{storeId:string}) => {
                     </TableRow>
                     {isOpen && (
                       <TableRow className="hover:bg-transparent">
-                        <TableCell colSpan={5} className="bg-muted/30 p-4">
+                        <TableCell colSpan={6} className="bg-muted/30 p-4">
                           <AddedItemsTable items={g.items} />
                         </TableCell>
                       </TableRow>

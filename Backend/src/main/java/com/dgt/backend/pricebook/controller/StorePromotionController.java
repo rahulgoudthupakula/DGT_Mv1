@@ -34,9 +34,24 @@ public class StorePromotionController {
  private ZoneId zone(String store){String name=a.db.queryForObject("SELECT timezone FROM stores WHERE dgt_id=?",String.class,store);try{return ZoneId.of(name);}catch(Exception e){throw bad("Set a valid store timezone before managing promotions");}}
  // Load the promotion list for users with pricebook read access.
  @GetMapping public Object list(@PathVariable String store){a.grant(a.user(),store,"PRICE_BOOK",false);String zone=zone(store).getId();
-  var promos=a.db.queryForList("SELECT p.promotion_id AS id,p.xmin::text AS version,p.promotion_name AS name,p.promotion_type AS type,p.discount_value AS \"discountValue\",p.buy_quantity AS \"buyQty\",p.free_quantity AS \"freeQty\",(p.start_date AT TIME ZONE ?)::date AS start,(p.end_date AT TIME ZONE ?)::date AS end,p.is_active AS active,CASE WHEN NOT p.is_active THEN 'Inactive' WHEN CURRENT_TIMESTAMP<p.start_date THEN 'Upcoming' WHEN CURRENT_TIMESTAMP>p.end_date THEN 'Expired' ELSE 'Active' END AS status,(p.end_date>=CURRENT_TIMESTAMP-INTERVAL '30 days') AS \"expiredWithin30Days\",COALESCE((SELECT json_agg(json_build_object('productId',pr.product_id,'name',pr.product_name,'sku',pr.product_sku,'quantity',pp.required_quantity) ORDER BY pr.product_name,pr.product_id) FROM promotion_products pp JOIN products pr ON pr.product_id=pp.product_id AND pr.dgt_id=pp.dgt_id WHERE pp.archived_at IS NULL AND pp.promotion_id=p.promotion_id AND pp.dgt_id=p.dgt_id),'[]'::json) AS products FROM promotions p WHERE p.dgt_id=? ORDER BY p.created_at DESC,p.promotion_id DESC",zone,zone,store);
-  var items=a.db.queryForList("SELECT product_id AS id,product_name AS name,product_sku AS sku,is_active AS active FROM products WHERE dgt_id=? ORDER BY product_name,product_id",store);
-  return Map.of("discountTypes",DiscountTypes.promotions(a.db),"promotions",promos.stream().map(Rows::normalize).toList(),"items",items.stream().map(Rows::normalize).toList(),"timezone",zone);
+  var promos=a.db.queryForList("SELECT p.promotion_id AS id,p.xmin::text AS version,p.promotion_name AS name,p.promotion_type AS type,p.discount_value AS \"discountValue\",p.buy_quantity AS \"buyQty\",p.free_quantity AS \"freeQty\",(p.start_date AT TIME ZONE ?)::date AS start,(p.end_date AT TIME ZONE ?)::date AS end,p.is_active AS active,(NOT p.is_active AND p.end_date>=CURRENT_TIMESTAMP) AS \"canReactivate\",CASE WHEN NOT p.is_active THEN 'Inactive' WHEN CURRENT_TIMESTAMP<p.start_date THEN 'Upcoming' WHEN CURRENT_TIMESTAMP>p.end_date THEN 'Expired' ELSE 'Active' END AS status,(p.end_date>=CURRENT_TIMESTAMP-INTERVAL '30 days') AS \"expiredWithin30Days\",COALESCE((SELECT json_agg(json_build_object('productId',pr.product_id,'name',pr.product_name,'sku',pr.product_sku,'quantity',pp.required_quantity) ORDER BY pr.product_name,pr.product_id) FROM promotion_products pp JOIN products pr ON pr.product_id=pp.product_id AND pr.dgt_id=pp.dgt_id WHERE pp.archived_at IS NULL AND pp.promotion_id=p.promotion_id AND pp.dgt_id=p.dgt_id),'[]'::json) AS products FROM promotions p WHERE p.dgt_id=? ORDER BY p.created_at DESC,p.promotion_id DESC",zone,zone,store);
+  return Map.of("discountTypes",DiscountTypes.promotions(a.db),"promotions",promos.stream().map(Rows::normalize).toList(),"timezone",zone);
+ }
+ // Fetch choices only when a promotion dialog needs them; never return an entire catalog.
+ @GetMapping("/product-options") public Object productOptions(@PathVariable String store,
+   @RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="25") int limit){
+  a.grant(a.user(),store,"PRICE_BOOK",false);
+  String term=search.trim().toLowerCase(Locale.ROOT);
+  if(term.length()>200||page<0||page>10000||limit<1||limit>50)throw bad("Use a search of at most 200 characters, a valid page, and a limit between 1 and 50");
+  var args=new ArrayList<Object>();args.add(store);
+  String sql="SELECT p.product_id AS id,p.product_name AS name,p.product_sku AS sku FROM products p WHERE p.dgt_id=? AND p.is_active";
+  if(!term.isEmpty()){
+   sql+=" AND (strpos(lower(p.product_name),?)>0 OR strpos(lower(coalesce(p.product_sku,'')),?)>0 OR EXISTS(SELECT 1 FROM product_barcodes b WHERE b.product_id=p.product_id AND b.dgt_id=p.dgt_id AND b.archived_at IS NULL AND strpos(lower(b.product_barcode_value),?)>0))";
+   args.add(term);args.add(term);args.add(term);
+  }
+  sql+=" ORDER BY lower(p.product_name),p.product_id LIMIT ? OFFSET ?";args.add(limit+1);args.add(page*limit);
+  var rows=a.db.queryForList(sql,args.toArray());
+  return Map.of("items",rows.subList(0,Math.min(limit,rows.size())).stream().map(Rows::normalize).toList(),"page",page,"hasMore",rows.size()>limit);
  }
  @PostMapping @Transactional public Object create(@PathVariable String store,@RequestBody Input in,@RequestHeader("Idempotency-Key") String key){
   UUID uuid;try{uuid=UUID.fromString(key);}catch(Exception e){throw bad("Idempotency-Key must be a UUID");}
@@ -44,6 +59,17 @@ public class StorePromotionController {
  }
  @PutMapping("/{id}") @Transactional public Object update(@PathVariable String store,@PathVariable long id,@RequestHeader("If-Match") String version,@RequestHeader("Idempotency-Key") String key,@RequestBody Input in){a.grant(a.user(),store,"PRICE_BOOK",true);requireNotExpired(store,id);return approvals.submit(store,"PROMOTION_SAVE",Long.toString(id),version,new Input(in.name(),in.type(),in.products(),in.discountValue(),in.buyQty(),in.freeQty(),in.start(),in.end(),null),key);}
  @PostMapping("/{id}/deactivate") @Transactional public Object deactivate(@PathVariable String store,@PathVariable long id,@RequestHeader("If-Match") String version,@RequestHeader("Idempotency-Key") String key){return approvals.submit(store,"PROMOTION_DEACTIVATE",Long.toString(id),version,Map.of(),key);}
+ @PostMapping("/{id}/reactivate") @Transactional public Object reactivate(@PathVariable String store,@PathVariable long id,@RequestHeader("If-Match") String version,@RequestHeader("Idempotency-Key") String key){return approvals.submit(store,"PROMOTION_REACTIVATE",Long.toString(id),version,Map.of(),key);}
+ // Recheck eligibility when approved, including the linked products' current availability.
+ public Object applyReactivate(String store,String target,String version){
+  a.db.queryForList("SELECT dgt_id FROM stores WHERE dgt_id=? FOR UPDATE",store);
+  var rows=a.db.queryForList("SELECT promotion_id FROM promotions WHERE promotion_id=? AND dgt_id=? AND xmin::text=? AND NOT is_active AND end_date>=CURRENT_TIMESTAMP FOR UPDATE",Long.valueOf(target),store,version);
+  if(rows.size()!=1)throw new ResponseStatusException(HttpStatus.CONFLICT,"Promotion changed, is already enabled, or has expired. Reload or repost with new dates.");
+  var products=a.db.queryForList("SELECT pr.product_id,pr.is_active FROM promotion_products pp JOIN products pr ON pr.product_id=pp.product_id AND pr.dgt_id=pp.dgt_id WHERE pp.promotion_id=? AND pp.dgt_id=? AND pp.archived_at IS NULL FOR SHARE OF pr",Long.valueOf(target),store);
+  if(products.isEmpty()||products.stream().anyMatch(p->!Boolean.TRUE.equals(p.get("is_active"))))throw bad("All linked products must be active before reactivating this promotion");
+  if(a.db.update("UPDATE promotions SET is_active=true,status='Active',updated_at=CURRENT_TIMESTAMP WHERE promotion_id=? AND dgt_id=? AND xmin::text=? AND NOT is_active AND end_date>=CURRENT_TIMESTAMP",Long.valueOf(target),store,version)!=1)throw conflict();
+  a.audit(store,"PROMOTION_REACTIVATED",target,"{}");return Map.of("reactivated",true);
+ }
  // Check the stored end timestamp, not the replacement dates supplied by the caller.
  private void requireNotExpired(String store,long id){
   var rows=a.db.queryForList("SELECT end_date<CURRENT_TIMESTAMP AS expired FROM promotions WHERE promotion_id=? AND dgt_id=?",id,store);

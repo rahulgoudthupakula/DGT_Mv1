@@ -637,6 +637,34 @@ class ScopedAccessIntegrationTest {
   assertThat(ok(req("admin","GET","/access/stores/"+second+"/price-groups",null),200).path("groups").size()).isZero();
  }
 
+ @Test @Order(32) void promotionProductOptionsArePagedActiveSearchableAndStoreScoped() throws Exception {
+  String pickerStore=addStore(company);String path="/access/stores/"+pickerStore+"/promotions";
+  try{
+   long sub=db.queryForObject("SELECT min(store_sub_department_id) FROM store_sub_departments WHERE dgt_id=?",Long.class,pickerStore);
+   long first=db.queryForObject("INSERT INTO products(dgt_id,store_sub_department_id,product_name,product_sku,is_active) VALUES (?,?,?, ?,true) RETURNING product_id",Long.class,pickerStore,sub,"Option A "+tag,"OPT-A-"+tag);
+   long next=db.queryForObject("INSERT INTO products(dgt_id,store_sub_department_id,product_name,product_sku,is_active) VALUES (?,?,?, ?,true) RETURNING product_id",Long.class,pickerStore,sub,"Option B "+tag,"OPT-B-"+tag);
+   db.update("INSERT INTO products(dgt_id,store_sub_department_id,product_name,product_sku,is_active) VALUES (?,?,?, ?,false)",pickerStore,sub,"Option Inactive "+tag,"OPT-INACTIVE-"+tag);
+   String barcode="8"+Long.parseUnsignedLong(tag,16);
+   db.update("INSERT INTO product_barcodes(dgt_id,product_id,product_barcode_type,product_barcode_value,is_primary) VALUES (?,?,'OTHER',?,true)",pickerStore,first,barcode);
+   assertThat(ok(req("admin","GET",path,null),200).has("items")).isFalse();
+   var page=ok(req("admin","GET",path+"/product-options?limit=1",null),200);
+   assertThat(page.path("items").size()).isEqualTo(1);assertThat(page.path("items").get(0).path("id").asLong()).isEqualTo(first);assertThat(page.path("hasMore").asBoolean()).isTrue();
+   var last=ok(req("admin","GET",path+"/product-options?limit=1&page=1",null),200);
+   assertThat(last.path("items").get(0).path("id").asLong()).isEqualTo(next);assertThat(last.path("hasMore").asBoolean()).isFalse();
+   for(String search:List.of("option a "+tag,"opt-a-"+tag,barcode)){
+    var found=ok(req("admin","GET",path+"/product-options?search="+java.net.URLEncoder.encode(search,StandardCharsets.UTF_8),null),200).path("items");
+    assertThat(found.size()).isEqualTo(1);assertThat(found.get(0).path("id").asLong()).isEqualTo(first);
+   }
+   assertThat(ok(req("admin","GET",path+"/product-options?search=inactive",null),200).path("items").isEmpty()).isTrue();
+   assertThat(ok(req("admin","GET",path+"/product-options?search=%25",null),200).path("items").isEmpty()).isTrue();
+   assertThat(ok(req("admin","GET",access()+"/promotions/product-options?search=OPT-A-"+tag,null),200).path("items").isEmpty()).isTrue();
+   ok(req("other","GET",path+"/product-options",null),403);ok(req("cashier","GET",path+"/product-options",null),403);
+   for(String invalid:List.of("limit=0","limit=51","page=-1"))ok(req("admin","GET",path+"/product-options?"+invalid,null),400);
+  }finally{
+   db.update("DELETE FROM product_barcodes WHERE dgt_id=?",pickerStore);db.update("DELETE FROM products WHERE dgt_id=?",pickerStore);
+   db.update("DELETE FROM store_sub_departments WHERE dgt_id=?",pickerStore);db.update("DELETE FROM store_departments WHERE dgt_id=?",pickerStore);db.update("DELETE FROM stores WHERE dgt_id=?",pickerStore);
+  }
+ }
  @Test @Order(31) void promotionsRulesIsolationAndDeactivation() throws Exception {
   String path=access()+"/promotions";
   var products=db.queryForList("SELECT product_id FROM products WHERE dgt_id=? AND is_active ORDER BY product_id LIMIT 2",Long.class,store);long p1=products.get(0),p2=products.get(1);
@@ -671,6 +699,18 @@ class ScopedAccessIntegrationTest {
   assertThat(ok(req("admin","GET","/access/stores/"+second+"/promotions",null),200).path("promotions").size()).isEqualTo(1);
   long module=db.queryForObject("SELECT module_id FROM modules WHERE module_name='PRICE_BOOK'",Long.class);
   db.update("INSERT INTO module_approval_policies(company_id,module_id,manager_requires_admin) VALUES (?,?,true) ON CONFLICT(company_id,module_id) DO UPDATE SET manager_requires_admin=true",company,module);
+  // Reactivation is version checked, scoped, and held until the required reviewer approves.
+  row=ok(req("admin","GET",path,null),200).path("promotions").get(0);
+  ok(call("admin","POST",path+"/"+activeId+"/deactivate",Map.of(),row.path("version").asText(),null),200);
+  row=ok(req("admin","GET",path,null),200).path("promotions").get(0);
+  assertThat(row.path("canReactivate").asBoolean()).isTrue();
+  ok(call("other","POST",path+"/"+activeId+"/reactivate",Map.of(),row.path("version").asText(),null),403);
+  ok(call("admin","POST",path+"/"+activeId+"/reactivate",Map.of(),"stale",null),409);
+  var reactivation=ok(call("manager","POST",path+"/"+activeId+"/reactivate",Map.of(),row.path("version").asText(),null),200);
+  assertThat(reactivation.path("pending").asBoolean()).isTrue();
+  assertThat(db.queryForObject("SELECT is_active FROM promotions WHERE promotion_id=?",Boolean.class,activeId)).isFalse();
+  ok(req("admin","POST",access()+"/approvals/"+reactivation.path("requestId").asLong()+"/decision",Map.of("decision","APPROVED")),200);
+  assertThat(db.queryForObject("SELECT is_active FROM promotions WHERE promotion_id=?",Boolean.class,activeId)).isTrue();
   body.put("name","Needs approval");var pending=ok(req("manager","POST",path,body),200);assertThat(pending.path("pending").asBoolean()).isTrue();
   assertThat(db.queryForObject("SELECT count(*) FROM promotions WHERE dgt_id=? AND promotion_name='Needs approval'",Integer.class,store)).isZero();
   ok(req("admin","POST",access()+"/approvals/"+pending.path("requestId").asLong()+"/decision",Map.of("decision","APPROVED")),200);
