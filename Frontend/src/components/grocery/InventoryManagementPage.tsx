@@ -57,7 +57,7 @@ export const InventoryManagementPage = ({storeId}:{storeId:string}) => {
         </TabsContent>
 
         <TabsContent value="expired" className="mt-6">
-          <ExpiredExpiringItems
+          <ExpiredExpiringItems storeId={storeId}
             onMoveToReduceInventory={(returnable) =>
               setActiveTab(returnable ? "returnable" : "shrinkage")
             }

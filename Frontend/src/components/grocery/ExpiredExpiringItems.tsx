@@ -1,3 +1,5 @@
+import { SearchMultiFilter } from "@/components/shared/SearchMultiFilter";
+import { matchesFilter } from "@/lib/filterSelection";
 /**
  * Expiry workflow UI currently backed by mockExpiringItems. Moving an item calls the supplied
  * parent callback; this component does not persist an expiry record.
@@ -172,16 +174,17 @@ const vendors = ["All Vendors", "Dairy Fresh Co", "Local Bakery", "Premium Meats
 const categories = ["All Categories", "Perishables", "Fresh", "Refrigerated", "Frozen"];
 
 interface ExpiredExpiringItemsProps {
+  storeId?: string;
   onMoveToReduceInventory?: (returnable: boolean) => void;
 }
 
-export const ExpiredExpiringItems = ({ onMoveToReduceInventory }: ExpiredExpiringItemsProps = {}) => {
+export const ExpiredExpiringItems = ({ storeId="", onMoveToReduceInventory }: ExpiredExpiringItemsProps = {}) => {
   const [activeTab, setActiveTab] = useState("items");
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterDaysToExpiry, setFilterDaysToExpiry] = useState("all");
-  const [filterDepartment, setFilterDepartment] = useState("All Departments");
-  const [filterVendor, setFilterVendor] = useState("All Vendors");
+  const [filterDepartment, setFilterDepartment] = useState<string[]>([]);
+  const [filterVendor, setFilterVendor] = useState<string[]>([]);
   const [filterCategory, setFilterCategory] = useState("All Categories");
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [noteItem, setNoteItem] = useState<{ id: string; itemName: string } | null>(null);
@@ -252,10 +255,10 @@ export const ExpiredExpiringItems = ({ onMoveToReduceInventory }: ExpiredExpirin
       (filterDaysToExpiry === "14days" && daysLeft <= 14 && daysLeft > 0);
     
     const matchesDepartment =
-      filterDepartment === "All Departments" || item.department === filterDepartment;
+      matchesFilter(filterDepartment,item.department);
     
     const matchesVendor =
-      filterVendor === "All Vendors" || item.vendor === filterVendor;
+      matchesFilter(filterVendor,item.vendor);
 
     return matchesSearch && matchesStatus && matchesDaysToExpiry && matchesDepartment && matchesVendor;
   });
@@ -452,30 +455,8 @@ export const ExpiredExpiringItems = ({ onMoveToReduceInventory }: ExpiredExpirin
                     <SelectItem value="14days">≤ 14 days</SelectItem>
                   </SelectContent>
                 </Select>
-                <Select value={filterDepartment} onValueChange={setFilterDepartment}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Department" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {departments.map((dept) => (
-                      <SelectItem key={dept} value={dept}>
-                        {dept}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={filterVendor} onValueChange={setFilterVendor}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Vendor" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {vendors.map((vendor) => (
-                      <SelectItem key={vendor} value={vendor}>
-                        {vendor}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchMultiFilter storeId={storeId} filterType="department" values={filterDepartment} onValuesChange={setFilterDepartment} allLabel="All Departments" options={departments.filter(name=>name!=="All Departments").map(name=>({value:name,label:name}))} className="h-9 text-sm" />
+                <SearchMultiFilter storeId={storeId} filterType="vendor" values={filterVendor} onValuesChange={setFilterVendor} allLabel="All Vendors" options={vendors.filter(name=>name!=="All Vendors").map(name=>({value:name,label:name}))} className="h-9 text-sm" />
               </div>
             </CardContent>
           </Card>

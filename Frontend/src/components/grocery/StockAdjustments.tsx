@@ -1,3 +1,5 @@
+import { matchesFilter } from "@/lib/filterSelection";
+import { SearchMultiFilter } from "@/components/shared/SearchMultiFilter";
 import { RecentFilterSelect, RecentFilterContent } from "@/components/shared/RecentFilterSelect";
 import { DepartmentFilter } from "@/components/shared/DepartmentFilter";
 /**
@@ -122,6 +124,7 @@ interface InventoryItem {
   itemName: string;
   department: string;
   vendor: string;
+  vendorNames?: string[];
   inventoryCount: number;
   netCost: number;
   price: number;
@@ -251,15 +254,15 @@ export const StockAdjustments = ({storeId}:{storeId:string}) => {
   const client=useQueryClient();const path=`/access/stores/${encodeURIComponent(storeId)}/reductions`;
   const query=useQuery({queryKey:['reductions',storeId],queryFn:()=>request<{items:(InventoryItem&{taxable:boolean})[];canSubmit:boolean;stores:{dgt_id:string;store_name:string}[]}>(path)});
   const inventoryData=(query.data?.items??[]).map(i=>({...i,taxType:i.taxable?'Taxable':'Non-Taxable',reason:'',rebate:null,marginAfterRebate:null}));
-  const vendors=['All Vendors',...new Set(inventoryData.map(i=>i.vendor).filter(Boolean))];
+  const vendors=['All Vendors',...new Set(inventoryData.flatMap(i=>i.vendorNames??[i.vendor]).filter(Boolean))];
   const transferStoreOptions=(query.data?.stores??[]).map(s=>s.dgt_id);
   const [saving,setSaving]=useState(false);
   const { toast } = useToast();
 
   const [scanCode, setScanCode] = useState("");
-  const [department, setDepartment] = useState("All Departments");
+  const [department, setDepartment] = useState<string[]>([]);
   const [taxType, setTaxType] = useState("All Tax Types");
-  const [vendor, setVendor] = useState("All Vendors");
+  const [vendor, setVendor] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState("item-name");
 
 
@@ -279,9 +282,9 @@ export const StockAdjustments = ({storeId}:{storeId:string}) => {
   const filteredData = inventoryData
     .filter((item) => {
       const matchesScanCode = scanCode === "" || item.scanCode.toLowerCase().includes(scanCode.toLowerCase()) || item.itemName.toLowerCase().includes(scanCode.toLowerCase());
-      const matchesDepartment = department === "All Departments" || item.department === department;
+      const matchesDepartment = matchesFilter(department,item.department);
       const matchesTaxType = taxType === "All Tax Types" || item.taxType === taxType;
-      const matchesVendor = vendor === "All Vendors" || item.vendor === vendor;
+      const matchesVendor = matchesFilter(vendor,item.vendorNames??[item.vendor]);
       return matchesScanCode && matchesDepartment && matchesTaxType && matchesVendor;
     })
     .sort((a, b) => {
@@ -590,7 +593,7 @@ export const StockAdjustments = ({storeId}:{storeId:string}) => {
               <Label htmlFor="department" className="text-xs font-medium">
                 Department
               </Label>
-              <DepartmentFilter storeId={storeId} value={department} onValueChange={setDepartment} allValue="All Departments" extraNames={inventoryData.map(item=>item.department)} id="department" />
+              <DepartmentFilter storeId={storeId} values={department} onValuesChange={setDepartment} extraNames={inventoryData.map(item=>item.department)} id="department" />
             </div>
 
             {/* Tax Type Dropdown */}
@@ -617,18 +620,7 @@ export const StockAdjustments = ({storeId}:{storeId:string}) => {
               <Label htmlFor="vendor" className="text-xs font-medium">
                 Vendor
               </Label>
-              <RecentFilterSelect storeId={storeId} filterType="vendor" value={vendor} onValueChange={setVendor}>
-                <SelectTrigger id="vendor">
-                  <SelectValue placeholder="Select vendor" />
-                </SelectTrigger>
-                <RecentFilterContent>
-                  {vendors.map((v) => (
-                    <SelectItem key={v} value={v}>
-                      {v}
-                    </SelectItem>
-                  ))}
-                </RecentFilterContent>
-              </RecentFilterSelect>
+              <SearchMultiFilter storeId={storeId} filterType="vendor" values={vendor} onValuesChange={setVendor} options={vendors.filter(name=>name!=="All Vendors").map(name=>({value:name,label:name}))} allLabel="All Vendors" className="h-9 text-sm" />
             </div>
 
             {/* Sort By Dropdown */}

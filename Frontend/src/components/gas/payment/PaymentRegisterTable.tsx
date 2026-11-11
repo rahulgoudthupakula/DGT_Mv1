@@ -47,7 +47,7 @@ const statusStyles: Record<string, string> = {
 };
 
 interface Props {
-  vendor: string;
+  vendor: string[];
   paymentMethod: string;
   status: string;
   deliveryRef: string;
@@ -61,10 +61,7 @@ export const PaymentRegisterTable = ({ vendor, paymentMethod, status, deliveryRe
   const [activeInvoice, setActiveInvoice] = useState<InvoiceRow | null>(null);
 
   const filtered = mockData.filter((r) => {
-    if (vendor !== "all") {
-      const v = vendor.toLowerCase();
-      if (!r.vendor.toLowerCase().includes(v)) return false;
-    }
+    if (vendor.length && !vendor.some(value=>r.vendor.toLowerCase().includes(value.toLowerCase()))) return false;
     if (paymentMethod !== "all" && r.paymentMethod !== paymentMethod) return false;
     if (status !== "all" && r.status.toLowerCase() !== status.toLowerCase()) return false;
     if (deliveryRef.trim()) {

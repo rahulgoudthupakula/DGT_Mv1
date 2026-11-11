@@ -619,7 +619,7 @@ const Index = ({ onLogout }: { onLogout: () => void }) => {
           ) : showGasTankReport ? (
             <TankReportPage key={selectedStoreId} storeId={selectedStoreId} />
           ) : showGasReports ? (
-            <GasReportsPage />
+            <GasReportsPage storeId={selectedStoreId} />
           ) : showGasPrice ? (
             <GasPricePage key={selectedStoreId} storeId={selectedStoreId} />
           ) : showGasSettings ? (

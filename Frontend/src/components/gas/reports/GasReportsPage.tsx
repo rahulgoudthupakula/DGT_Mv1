@@ -49,7 +49,7 @@ const reportTabs = [
   { id: "gas-profit-vat", label: "Gas Profit by VAT", icon: DollarSign },
 ];
 
-export const GasReportsPage = () => {
+export const GasReportsPage = ({storeId=""}:{storeId?:string} = {}) => {
   const [activeTab, setActiveTab] = useState<ReportTab>("gas-profit");
 
   return (
@@ -81,11 +81,11 @@ export const GasReportsPage = () => {
         </TabsContent>
 
         <TabsContent value="jobber-log" className="mt-6">
-          <JobberLogReport />
+          <JobberLogReport storeId={storeId} />
         </TabsContent>
 
         <TabsContent value="purchase-log" className="mt-6">
-          <PurchaseLogReport />
+          <PurchaseLogReport storeId={storeId} />
         </TabsContent>
 
         <TabsContent value="inventory-cost-log" className="mt-6">

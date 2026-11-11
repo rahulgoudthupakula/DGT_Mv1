@@ -911,6 +911,12 @@ class ScopedAccessIntegrationTest {
 
  @Test @Order(37) void reductionQueueApprovalRoutesAndOnceOnly() throws Exception {
   String path="/access/stores/"+store+"/reductions";
+  for(var item:ok(req("admin","GET",path,null),200).path("items")){
+   assertThat(item.path("vendorNames").isArray()).isTrue();
+   var expectedVendors=db.queryForList("SELECT v.vendor_name FROM product_vendors pv JOIN vendors v ON v.vendor_id=pv.vendor_id AND v.dgt_id=pv.dgt_id WHERE pv.archived_at IS NULL AND pv.dgt_id=? AND pv.product_id=? ORDER BY v.vendor_name,v.vendor_id",String.class,store,item.path("id").asLong());
+   var actualVendors=new ArrayList<String>();for(var vendorName:item.path("vendorNames"))actualVendors.add(vendorName.asText());
+   assertThat(actualVendors).isEqualTo(expectedVendors);
+  }
   long pid=db.queryForObject("SELECT product_id FROM products WHERE dgt_id=? AND product_sku=?",Long.class,store,"ARRIVAL-"+tag);
   for(String who:List.of("cashier","manager")){
    long role=db.queryForObject("SELECT role_type_id FROM user_roles WHERE user_role_id=?",Long.class,assignments.get(who));
@@ -1830,6 +1836,10 @@ ok(call("admin","PUT",path+"/programs/"+id,form,program.get("version").asText(),
   assertThat(line.get("receivedQty").decimalValue()).isEqualByComparingTo("6");
   assertThat(line.get("unitCost").decimalValue()).isEqualByComparingTo("2");
   assertThat(line.get("extendedCost").decimalValue()).isEqualByComparingTo("24");
+  String reportVendor=java.net.URLEncoder.encode(line.get("vendor").asText(),StandardCharsets.UTF_8);
+  var filteredPurchaseSummary=ok(req("admin","GET",path+"/purchase-summary?start=2026-01-05&end=2026-01-05&vendor=not-a-vendor&vendor="+reportVendor,null),200);
+  assertThat(filteredPurchaseSummary.path("items").size()).isPositive();
+  for(var selected:filteredPurchaseSummary.path("items"))assertThat(selected.path("vendor").asText()).isEqualTo(line.get("vendor").asText());
   db.update("UPDATE invoices SET approved_at=NULL,approved_by=NULL WHERE invoice_id=?",invoice);
   for(var r:ok(req("admin","GET",path+"/purchases",null),200).get("invoices"))assertThat(r.get("id").asLong()).isNotEqualTo(invoice);
   for(String suffix:List.of("/purchases","/sales","/stock")){

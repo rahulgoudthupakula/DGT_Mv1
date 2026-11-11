@@ -172,9 +172,10 @@ public class GroceryReportsController {
  }
 
  @GetMapping("/purchase-summary") @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
- public Object purchaseSummary(@PathVariable String store,@RequestParam(required=false) LocalDate start,@RequestParam(required=false) LocalDate end,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="all") String vendor,@RequestParam(defaultValue="all") String status){
+ public Object purchaseSummary(@PathVariable String store,@RequestParam(required=false) LocalDate start,@RequestParam(required=false) LocalDate end,@RequestParam(defaultValue="") String search,@RequestParam org.springframework.util.MultiValueMap<String,String> filters,@RequestParam(defaultValue="all") String status){
   var source=result(purchases(store,start,end));var all=rows(source,"items");
-  var selected=all.stream().filter(r->(vendor.equals("all")||vendor.equals(r.get("vendor")))&&!status.equals("uninvoiced")&&(search.isEmpty()||r.get("productName").toString().toLowerCase(Locale.ROOT).contains(search.toLowerCase(Locale.ROOT))||r.get("scanCode").toString().contains(search))).toList();
+  var vendors=filters.getOrDefault("vendor",List.of());
+  var selected=all.stream().filter(r->(vendors.isEmpty()||vendors.contains("all")||vendors.contains(r.get("vendor")))&&!status.equals("uninvoiced")&&(search.isEmpty()||r.get("productName").toString().toLowerCase(Locale.ROOT).contains(search.toLowerCase(Locale.ROOT))||r.get("scanCode").toString().contains(search))).toList();
   for(var r:selected)r.put("costChangePercent",r.get("prevUnitCost")==null||n(r.get("prevUnitCost")).signum()<=0?null:GroceryReportSummaries.percent(n(r.get("unitCost")).subtract(n(r.get("prevUnitCost"))),r.get("prevUnitCost")));
   var invoiceTotals=GroceryReportSummaries.totals(rows(source,"invoices"),"netPurchase","invoiceAmount","paidAmount","pendingAmount","rebateAmount");invoiceTotals.put("invoiceTotal",invoiceTotals.get("invoiceAmount"));
   return Map.of("invoices",source.get("invoices"),"items",selected,"vendors",all.stream().map(r->r.get("vendor")).distinct().toList(),"invoiceTotals",invoiceTotals,"itemTotals",GroceryReportSummaries.totals(selected,"receivedQty","extendedCost","rebate","netCost"));

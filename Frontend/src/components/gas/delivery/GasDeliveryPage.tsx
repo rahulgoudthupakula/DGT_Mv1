@@ -1,3 +1,5 @@
+import { SearchMultiFilter } from "@/components/shared/SearchMultiFilter";
+import { matchesFilter } from "@/lib/filterSelection";
 import { useStoreAccess } from "@/lib/store-access";
 import { useEffect, useState } from "react";
 import { Plus, Upload, Download, Calendar, X } from "lucide-react";
@@ -26,23 +28,23 @@ export const GasDeliveryPage = ({storeId}:{storeId:string}) => {
   const [error,setError]=useState('');
   const [startDate, setStartDate] = useState<Date>(DEFAULT_START);
   const [endDate, setEndDate] = useState<Date>(DEFAULT_END);
-  const [vendor, setVendor] = useState("all");
+  const [vendor, setVendor] = useState<string[]>([]);
   const [fuelType, setFuelType] = useState("all");
   const [status, setStatus] = useState("all");
   const [addDrawerOpen, setAddDrawerOpen] = useState(false);
 
   useEffect(()=>{if(query.data?.today){const date=parseISO(query.data.today);setStartDate(subDays(date,30));setEndDate(date);}},[query.data?.today]);
-  const hasActiveFilters = vendor !== "all" || fuelType !== "all" || status !== "all" || format(startDate,'yyyy-MM-dd')!==format(DEFAULT_START,'yyyy-MM-dd') || format(endDate,'yyyy-MM-dd')!==format(DEFAULT_END,'yyyy-MM-dd');
+  const hasActiveFilters = vendor.length > 0 || fuelType !== "all" || status !== "all" || format(startDate,'yyyy-MM-dd')!==format(DEFAULT_START,'yyyy-MM-dd') || format(endDate,'yyyy-MM-dd')!==format(DEFAULT_END,'yyyy-MM-dd');
   const grades=Array.from(new Map([...(options.data?.tanks.flatMap(t=>t.assignments)||[]),...(query.data?.deliveries.flatMap(d=>d.lines)||[])].map(g=>[g.gradeId,{id:g.gradeId,name:g.gradeName}])).values());
   const vendors=Array.from(new Map([...(options.data?.vendors||[]),...(query.data?.deliveries.map(d=>({id:d.header.supplier,name:d.vendorName}))||[])].map(v=>[v.id,v])).values());
-  const filtered=(query.data?.deliveries||[]).filter(d=>(vendor==='all'||d.header.supplier===vendor)&&(status==='all'||d.status===status)&&d.header.loadDate>=format(startDate,'yyyy-MM-dd')&&d.header.loadDate<=format(endDate,'yyyy-MM-dd')).map(d=>({...d,lines:d.lines.filter(l=>fuelType==='all'||l.gradeId===fuelType)})).filter(d=>d.lines.length>0);
+  const filtered=(query.data?.deliveries||[]).filter(d=>(matchesFilter(vendor,d.header.supplier))&&(status==='all'||d.status===status)&&d.header.loadDate>=format(startDate,'yyyy-MM-dd')&&d.header.loadDate<=format(endDate,'yyyy-MM-dd')).map(d=>({...d,lines:d.lines.filter(l=>fuelType==='all'||l.gradeId===fuelType)})).filter(d=>d.lines.length>0);
   async function view(delivery:Delivery){setOpening(true);setError('');try{const full=await request<Delivery>(path+'/'+delivery.id);setSelected(full);setAddDrawerOpen(true);void options.refetch();}catch(e){setError(e instanceof Error?e.message:'Unable to open delivery');}finally{setOpening(false);}}
   function saved(){setAddDrawerOpen(false);setSelected(null);void query.refetch();}
 
   const clearFilters = () => {
     setStartDate(subDays(parseISO(query.data?.today||format(new Date(),"yyyy-MM-dd")),30));
     setEndDate(parseISO(query.data?.today||format(new Date(),"yyyy-MM-dd")));
-    setVendor("all");
+    setVendor([]);
     setFuelType("all");
     setStatus("all");
   };
@@ -97,15 +99,7 @@ export const GasDeliveryPage = ({storeId}:{storeId:string}) => {
         </div>
 
         {/* Vendor */}
-        <Select value={vendor} onValueChange={setVendor}>
-          <SelectTrigger aria-label="Filter deliveries by vendor" className="w-[150px] h-8 text-xs">
-            <SelectValue placeholder="Vendor" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Vendors</SelectItem>
-            {vendors.map(v=><SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        <SearchMultiFilter storeId={storeId} filterType="vendor" values={vendor} onValuesChange={setVendor} allLabel="All Vendors" options={vendors.map(v=>({value:String(v.id),label:v.name}))} className="h-9 text-sm" />
 
         {/* Fuel Type */}
         <Select value={fuelType} onValueChange={setFuelType}>

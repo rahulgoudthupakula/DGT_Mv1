@@ -1,3 +1,5 @@
+import { matchesFilter } from "@/lib/filterSelection";
+import { SearchMultiFilter } from "@/components/shared/SearchMultiFilter";
 import { RecentFilterSelect, RecentFilterContent } from "@/components/shared/RecentFilterSelect";
 import {useGroceryDefaults} from "@/lib/grocerySettings";
 import { useStoreDepartments } from "@/hooks/use-store-departments";
@@ -59,7 +61,7 @@ export const NewArrivalsPage = ({storeId}:{storeId:string}) => {
   const itemsQuery=useQuery({queryKey:['pricebook-items',storeId],queryFn:()=>request<{items:Item[];canEdit:boolean}>(path)});
   const arrivalsQuery=useQuery({queryKey:['new-arrivals',storeId],queryFn:()=>request<{arrivals:Arrival[]}>(`/access/stores/${encodeURIComponent(storeId)}/new-arrivals`)});
   const loading=itemsQuery.isLoading||arrivalsQuery.isLoading||departmentQuery.isPending;
-  const [search,setSearch]=useState('');const [vendorFilter,setVendorFilter]=useState('all');
+  const [search,setSearch]=useState('');const [vendorFilter,setVendorFilter]=useState<string[]>([]);
   const [linkTarget,setLinkTarget]=useState<Arrival|null>(null);
   const [dept,setDept]=useState('');const [subDept,setSubDept]=useState('');const [marginInput,setMarginInput]=useState('');const [saving,setSaving]=useState(false);
   const departmentTree=(departmentQuery.data??[]).map(d=>({name:d.name,subDepartments:d.children}));
@@ -87,7 +89,7 @@ export const NewArrivalsPage = ({storeId}:{storeId:string}) => {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return arrivals.filter((a) => {
-      if (vendorFilter !== "all" && a.vendor !== vendorFilter) return false;
+      if (!matchesFilter(vendorFilter,a.vendor)) return false;
       if (!q) return true;
       return (
         a.itemName.toLowerCase().includes(q) ||
@@ -178,19 +180,7 @@ export const NewArrivalsPage = ({storeId}:{storeId:string}) => {
                   className="pl-8 h-8 text-xs w-[220px]"
                 />
               </div>
-              <RecentFilterSelect storeId={storeId} filterType="vendor" value={vendorFilter} onValueChange={setVendorFilter}>
-                <SelectTrigger className="h-8 text-xs w-[160px]">
-                  <SelectValue placeholder="All vendors" />
-                </SelectTrigger>
-                <RecentFilterContent>
-                  <SelectItem value="all">All vendors</SelectItem>
-                  {vendors.map((v) => (
-                    <SelectItem key={v} value={v}>
-                      {v}
-                    </SelectItem>
-                  ))}
-                </RecentFilterContent>
-              </RecentFilterSelect>
+              <SearchMultiFilter storeId={storeId} filterType="vendor" values={vendorFilter} onValuesChange={setVendorFilter} options={vendors.map(name=>({value:name,label:name}))} allLabel="All Vendors" className="h-9 text-xs" />
             </div>
           </div>
         </CardHeader>

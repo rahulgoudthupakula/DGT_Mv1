@@ -38,17 +38,14 @@ const statusVariant = (s: string) => {
 
 interface Props {
   onRowClick: (row: PurchaseLogRow) => void;
-  vendor: string;
+  vendor: string[];
   fuelType: string;
   search: string;
 }
 
 export const PurchaseLogTable = ({ onRowClick, vendor, fuelType, search }: Props) => {
   const filtered = allMockData.filter((row) => {
-    if (vendor !== "all") {
-      const v = vendor.toLowerCase();
-      if (!row.vendor.toLowerCase().includes(v)) return false;
-    }
+    if (vendor.length && !vendor.some(value=>row.vendor.toLowerCase().includes(value.toLowerCase()))) return false;
     if (fuelType !== "all" && !row.vendor.toLowerCase().includes(fuelType.toLowerCase())) return false;
     if (search.trim()) {
       const q = search.trim().toLowerCase();

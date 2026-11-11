@@ -1,3 +1,5 @@
+import { SearchMultiFilter } from "@/components/shared/SearchMultiFilter";
+import { matchesFilter } from "@/lib/filterSelection";
 /**
  * Edits margin values supplied by GrocerySettings. The parent saves the rows and their versions;
  * this table does not independently persist or recalculate product prices.
@@ -15,10 +17,10 @@ import { Search, Percent, Save } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 export type MarginRow={key:string;version:string;dept:string;subDept:string;margin:string|number|null};
-export const SubdepartmentMargin = ({allRows,onChange,editable,onSave}:{allRows:MarginRow[];onChange:(rows:MarginRow[])=>void;editable:boolean;onSave:()=>void}) => {
-  const [deptFilter,setDeptFilter]=useState('all');const [search,setSearch]=useState('');const [bulkMargin,setBulkMargin]=useState('');
+export const SubdepartmentMargin = ({storeId,allRows,onChange,editable,onSave}:{storeId:string;allRows:MarginRow[];onChange:(rows:MarginRow[])=>void;editable:boolean;onSave:()=>void}) => {
+  const [deptFilter,setDeptFilter]=useState<string[]>([]);const [search,setSearch]=useState('');const [bulkMargin,setBulkMargin]=useState('');
   const departmentNames=[...new Set(allRows.map(r=>r.dept))];
-  const rows=allRows.filter(r=>(deptFilter==='all'||r.dept===deptFilter)&&`${r.dept} ${r.subDept}`.toLowerCase().includes(search.toLowerCase()));
+  const rows=allRows.filter(r=>(matchesFilter(deptFilter,r.dept))&&`${r.dept} ${r.subDept}`.toLowerCase().includes(search.toLowerCase()));
   const setMargin=(key:string,value:string)=>onChange(allRows.map(r=>r.key===key?{...r,margin:value}:r));
   const applyBulk=()=>{const n=Number(bulkMargin);if(bulkMargin===''||!Number.isFinite(n)||n<0||n>=100){toast({title:'Enter a margin between 0 and 99.99%',variant:'destructive'});return;}const keys=new Set(rows.map(r=>r.key));onChange(allRows.map(r=>keys.has(r.key)?{...r,margin:bulkMargin}:r));};
   return (
@@ -37,13 +39,7 @@ export const SubdepartmentMargin = ({allRows,onChange,editable,onSave}:{allRows:
           <div className="grid gap-3 md:grid-cols-4">
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Department</Label>
-              <Select value={deptFilter} onValueChange={setDeptFilter}>
-                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-                <SelectContent className="max-h-72">
-                  <SelectItem value="all">All Departments</SelectItem>
-                  {departmentNames.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <SearchMultiFilter storeId={storeId} filterType="department" values={deptFilter} onValuesChange={setDeptFilter} allLabel="All Departments" options={departmentNames.map(name=>({value:name,label:name}))} className="h-9 text-sm" />
             </div>
             <div className="space-y-1.5 md:col-span-2">
               <Label className="text-xs text-muted-foreground">Search</Label>

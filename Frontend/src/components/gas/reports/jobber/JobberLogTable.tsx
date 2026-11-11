@@ -32,17 +32,14 @@ const fmt = (v: number, d = 0) => v.toLocaleString(undefined, { minimumFractionD
 
 interface JobberLogTableProps {
   onRowClick: (row: JobberLogRow) => void;
-  vendor: string;
+  vendor: string[];
   fuelType: string;
   search: string;
 }
 
 export const JobberLogTable = ({ onRowClick, vendor, fuelType, search }: JobberLogTableProps) => {
   const filtered = allMockData.filter((row) => {
-    if (vendor !== "all") {
-      const v = vendor.toLowerCase();
-      if (!row.vendor.toLowerCase().includes(v)) return false;
-    }
+    if (vendor.length && !vendor.some(value=>row.vendor.toLowerCase().includes(value.toLowerCase()))) return false;
     if (fuelType !== "all" && row.fuelType.toLowerCase() !== fuelType.toLowerCase()) return false;
     if (search.trim()) {
       const q = search.trim().toLowerCase();
