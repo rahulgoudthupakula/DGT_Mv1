@@ -1,3 +1,5 @@
+import { matchesFilter } from "@/lib/filterSelection";
+import { SearchMultiFilter } from "@/components/shared/SearchMultiFilter";
 import { RecentFilterSelect, RecentFilterContent } from "@/components/shared/RecentFilterSelect";
 import { DepartmentFilter } from "@/components/shared/DepartmentFilter";
 import { useQuery } from "@tanstack/react-query";
@@ -53,14 +55,14 @@ export const InventoryByItem = ({storeId}:{storeId:string}) => {
   const vendors=[...new Map(items.flatMap(i=>i.vendors).map(v=>[String(v.id),v])).values()];
 
   const [asOfDate, setAsOfDate] = useState<Date | undefined>();
-  const [department, setDepartment] = useState("all");
-  const [vendor, setVendor] = useState("all");
+  const [department, setDepartment] = useState<string[]>([]);
+  const [vendor, setVendor] = useState<string[]>([]);
   const [riskFilter, setRiskFilter] = useState<RiskFilter>("all");
   const [selectedItem, setSelectedItem] = useState<PricebookValuationItem | null>(null);
 
   const filteredItems = items.filter((item) => {
-    if (department !== "all" && item.department !== department) return false;
-    if (vendor !== "all" && !item.vendors.some(v=>String(v.id)===vendor)) return false;
+    if (!matchesFilter(department,item.department)) return false;
+    if (!matchesFilter(vendor,item.vendors.map(v=>String(v.id)))) return false;
     if (riskFilter === "expiring" && item.status !== "Expiring") return false;
     if (riskFilter === "negative" && (item.onHandQty == null || item.onHandQty >= 0)) return false;
     if (riskFilter === "zero-sales" && item.status !== "Slow-moving") return false;
@@ -115,17 +117,9 @@ export const InventoryByItem = ({storeId}:{storeId:string}) => {
               </SelectContent>
             </Select>
 
-            <DepartmentFilter storeId={storeId} value={department} onValueChange={setDepartment} allValue="all" extraNames={items.map(item=>item.department)} className="h-9 text-xs" />
+            <DepartmentFilter storeId={storeId} values={department} onValuesChange={setDepartment} extraNames={items.map(item=>item.department)} className="h-9 text-xs" />
 
-            <RecentFilterSelect storeId={storeId} filterType="vendor" value={vendor} onValueChange={setVendor}>
-              <SelectTrigger className="h-9 text-xs">
-                <SelectValue placeholder="Vendor" />
-              </SelectTrigger>
-              <RecentFilterContent>
-                <SelectItem value="all">All Vendors</SelectItem>
-                {vendors.map(v=><SelectItem key={v.id} value={String(v.id)}>{v.name}</SelectItem>)}
-              </RecentFilterContent>
-            </RecentFilterSelect>
+            <SearchMultiFilter storeId={storeId} filterType="vendor" values={vendor} onValuesChange={setVendor} options={vendors.map(v=>({value:String(v.id),label:v.name}))} allLabel="All Vendors" className="h-9 text-xs" />
 
             <Select value="current-cost" disabled>
               <SelectTrigger className="h-9 text-xs">

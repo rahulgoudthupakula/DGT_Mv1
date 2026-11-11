@@ -1,3 +1,5 @@
+import { SearchMultiFilter } from "@/components/shared/SearchMultiFilter";
+import { matchesFilter } from "@/lib/filterSelection";
 import { useStoreAccess } from "@/lib/store-access";
 import { useState } from "react";
 import { DollarSign, Download, Calendar, Search, X } from "lucide-react";
@@ -22,18 +24,18 @@ export const GasPaymentPage = ({storeId}:{storeId:string}) => {
   const canOpenForm = useStoreAccess(storeId).data?.pages?.["GAS_PAGE_INVOICES_PAYMENT"] === true;
   const [startDate, setStartDate] = useState<Date>(new Date());
   const [endDate, setEndDate] = useState<Date>(new Date());
-  const [vendor, setVendor] = useState("all");
+  const [vendor, setVendor] = useState<string[]>([]);
   const [paymentMethod, setPaymentMethod] = useState("all");
   const [status, setStatus] = useState("all");
   const [deliveryRef, setDeliveryRef] = useState("");
   const [recordOpen, setRecordOpen] = useState(false);
 
-  const hasActiveFilters = vendor !== "all" || paymentMethod !== "all" || status !== "all" || deliveryRef.trim() !== "";
+  const hasActiveFilters = vendor.length > 0 || paymentMethod !== "all" || status !== "all" || deliveryRef.trim() !== "";
 
   const clearFilters = () => {
     setStartDate(new Date());
     setEndDate(new Date());
-    setVendor("all");
+    setVendor([]);
     setPaymentMethod("all");
     setStatus("all");
     setDeliveryRef("");
@@ -86,18 +88,7 @@ export const GasPaymentPage = ({storeId}:{storeId:string}) => {
         </div>
 
         {/* Vendor */}
-        <Select value={vendor} onValueChange={setVendor}>
-          <SelectTrigger className="w-[150px] h-8 text-xs">
-            <SelectValue placeholder="Vendor" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Vendors</SelectItem>
-            <SelectItem value="sunoco">Sunoco LP</SelectItem>
-            <SelectItem value="marathon">Marathon Petroleum</SelectItem>
-            <SelectItem value="shell">Shell Oil</SelectItem>
-            <SelectItem value="exxon">ExxonMobil</SelectItem>
-          </SelectContent>
-        </Select>
+        <SearchMultiFilter storeId={storeId} filterType="vendor" values={vendor} onValuesChange={setVendor} allLabel="All Vendors" options={[{value:"sunoco",label:"Sunoco LP"},{value:"marathon",label:"Marathon Petroleum"},{value:"shell",label:"Shell Oil"},{value:"exxon",label:"ExxonMobil"}]} className="h-9 text-sm" />
 
         {/* Payment Method */}
         <Select value={paymentMethod} onValueChange={setPaymentMethod}>

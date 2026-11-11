@@ -1,3 +1,5 @@
+import { matchesFilter } from "@/lib/filterSelection";
+import { SearchMultiFilter } from "@/components/shared/SearchMultiFilter";
 import { RecentFilterSelect, RecentFilterContent } from "@/components/shared/RecentFilterSelect";
 import {useGroceryDefaults} from "@/lib/grocerySettings";
 import { useStoreDepartments } from "@/hooks/use-store-departments";
@@ -116,8 +118,8 @@ export const ItemsPage = ({storeId}: {storeId:string}) => {
 
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
-  const [vendorFilter, setVendorFilter] = useState("all");
-  const [deptFilter, setDeptFilter] = useState("all");
+  const [vendorFilter, setVendorFilter] = useState<string[]>([]);
+  const [deptFilter, setDeptFilter] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortBy, setSortBy] = useState("name");
 
@@ -127,13 +129,13 @@ export const ItemsPage = ({storeId}: {storeId:string}) => {
   const [form, setForm] = useState<Item | null>(null);
   const [marginPct, setMarginPct] = useState<number>(0);
 
-  const hasActiveFilters = search !== "" || categoryFilter !== "all" || vendorFilter !== "all" || deptFilter !== "all" || statusFilter !== "all";
+  const hasActiveFilters = search !== "" || categoryFilter !== "all" || vendorFilter.length > 0 || deptFilter.length > 0 || statusFilter !== "all";
 
   const clearFilters = () => {
     setSearch("");
     setCategoryFilter("all");
-    setVendorFilter("all");
-    setDeptFilter("all");
+    setVendorFilter([]);
+    setDeptFilter([]);
     setStatusFilter("all");
   };
 
@@ -151,8 +153,8 @@ export const ItemsPage = ({storeId}: {storeId:string}) => {
         item.barcode.includes(search) ||
         item.sku.toLowerCase().includes(search.toLowerCase());
       const matchCategory = categoryFilter === "all" || item.category.toLowerCase() === categoryFilter;
-      const matchVendor = vendorFilter === "all" || (item.vendorNames??[item.vendor]).includes(vendorFilter);
-      const matchDept = deptFilter === "all" || item.dept.toLowerCase() === deptFilter;
+      const matchVendor = matchesFilter(vendorFilter,item.vendorNames??[item.vendor]);
+      const matchDept = matchesFilter(deptFilter,item.dept.toLowerCase());
       const matchStatus = statusFilter === "all" || (statusFilter === "active" ? item.active : !item.active);
       return matchSearch && matchCategory && matchVendor && matchDept && matchStatus;
     })
@@ -466,17 +468,11 @@ export const ItemsPage = ({storeId}: {storeId:string}) => {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Vendor</Label>
-              <RecentFilterSelect storeId={storeId} filterType="vendor" value={vendorFilter} onValueChange={setVendorFilter}>
-                <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="All Vendors" /></SelectTrigger>
-                <RecentFilterContent>
-                  <SelectItem value="all">All Vendors</SelectItem>
-                  {vendors.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
-                </RecentFilterContent>
-              </RecentFilterSelect>
+              <SearchMultiFilter storeId={storeId} filterType="vendor" values={vendorFilter} onValuesChange={setVendorFilter} options={vendors.map(name=>({value:name,label:name}))} allLabel="All Vendors" className="h-9 text-sm" />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Department</Label>
-              <DepartmentFilter storeId={storeId} value={deptFilter} onValueChange={setDeptFilter} className="h-9 text-sm" lowercaseValues extraNames={items.map(item=>item.dept)} />
+              <DepartmentFilter storeId={storeId} values={deptFilter} onValuesChange={setDeptFilter} className="h-9 text-sm" lowercaseValues extraNames={items.map(item=>item.dept)} />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Status</Label>

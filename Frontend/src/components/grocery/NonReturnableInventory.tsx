@@ -1,3 +1,4 @@
+import { matchesFilter } from "@/lib/filterSelection";
 import { RecentFilterSelect, RecentFilterContent } from "@/components/shared/RecentFilterSelect";
 import { useStoreDepartments } from "@/hooks/use-store-departments";
 import { DepartmentFilter } from "@/components/shared/DepartmentFilter";
@@ -116,7 +117,7 @@ export const NonReturnableInventory = ({storeId}:{storeId:string}) => {
   const [date, setDate] = useState<Date>();
   const [scanCodeFilter, setScanCodeFilter] = useState("");
   const [itemNameFilter, setItemNameFilter] = useState("");
-  const [departmentFilter, setDepartmentFilter] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState<string[]>([]);
   const [reasonFilter, setReasonFilter] = useState("");
   const [requireManagerApproval, setRequireManagerApproval] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -221,13 +222,17 @@ export const NonReturnableInventory = ({storeId}:{storeId:string}) => {
   const calculateLossValue = (qty: number, cost: number) => qty * cost;
   const calculateRemainingStock = (current: number, reduce: number) => current - reduce;
 
-  const totalLossValue = inventoryItems.reduce(
+  const filteredInventory=inventoryItems.filter(item=>matchesFilter(departmentFilter,item.department)
+    && (!scanCodeFilter || item.scanCode.toLowerCase().includes(scanCodeFilter.toLowerCase()))
+    && (!itemNameFilter || item.itemName.toLowerCase().includes(itemNameFilter.toLowerCase()))
+    && (!reasonFilter || reasonFilter==='all' || item.reason===reasonFilter));
+  const totalLossValue = filteredInventory.reduce(
     (sum, item) => sum + (item.recordedLoss??0),
     0
   );
 
   const { paginated: paginatedInventory, page: invPage, totalPages: invTotalPages, totalItems: invTotalItems, pageSize: invPageSize, hasPrev: invHasPrev, hasNext: invHasNext, nextPage: invNextPage, prevPage: invPrevPage } =
-    usePagination(inventoryItems, 10);
+    usePagination(filteredInventory, 10);
 
   return (
     <div className="space-y-6">
@@ -284,7 +289,7 @@ export const NonReturnableInventory = ({storeId}:{storeId:string}) => {
 
             <div className="space-y-2">
               <Label className="text-xs">Department</Label>
-              <DepartmentFilter storeId={storeId} value={departmentFilter} onValueChange={setDepartmentFilter} allValue="all" extraNames={(approved.data?.items??[]).map(item=>String(item.department??''))} className="h-9 text-sm" />
+              <DepartmentFilter storeId={storeId} values={departmentFilter} onValuesChange={setDepartmentFilter} extraNames={(approved.data?.items??[]).map(item=>String(item.department??''))} className="h-9 text-sm" />
             </div>
 
             <div className="space-y-2">

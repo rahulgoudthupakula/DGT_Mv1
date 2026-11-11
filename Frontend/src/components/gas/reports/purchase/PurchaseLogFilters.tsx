@@ -1,3 +1,4 @@
+import { SearchMultiFilter } from "@/components/shared/SearchMultiFilter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -6,8 +7,9 @@ import { Calendar, Printer, Download, Search, X } from "lucide-react";
 interface PurchaseLogFiltersProps {
   dateRange: string;
   onDateRangeChange: (v: string) => void;
-  vendor: string;
-  onVendorChange: (v: string) => void;
+  storeId?: string;
+  vendor: string[];
+  onVendorChange: (v: string[]) => void;
   fuelType: string;
   onFuelTypeChange: (v: string) => void;
   search: string;
@@ -17,7 +19,7 @@ interface PurchaseLogFiltersProps {
 }
 
 export const PurchaseLogFilters = ({
-  dateRange, onDateRangeChange,
+  storeId="", dateRange, onDateRangeChange,
   vendor, onVendorChange,
   fuelType, onFuelTypeChange,
   search, onSearchChange,
@@ -39,15 +41,7 @@ export const PurchaseLogFilters = ({
         </Select>
       </div>
 
-      <Select value={vendor} onValueChange={onVendorChange}>
-        <SelectTrigger className="h-8 text-xs w-[150px]"><SelectValue /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Vendors</SelectItem>
-          <SelectItem value="marathon">Marathon Petroleum</SelectItem>
-          <SelectItem value="shell">Shell Supply</SelectItem>
-          <SelectItem value="bp">BP Products</SelectItem>
-        </SelectContent>
-      </Select>
+      <SearchMultiFilter storeId={storeId} filterType="vendor" values={vendor} onValuesChange={onVendorChange} allLabel="All Vendors" options={[{"value": "marathon", "label": "Marathon Petroleum"}, {"value": "shell", "label": "Shell Supply"}, {"value": "bp", "label": "BP Products"}]} className="h-8 text-xs" />
 
       <Select value={fuelType} onValueChange={onFuelTypeChange}>
         <SelectTrigger className="h-8 text-xs w-[130px]"><SelectValue /></SelectTrigger>

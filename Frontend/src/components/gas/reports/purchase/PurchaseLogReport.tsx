@@ -4,9 +4,9 @@ import { PurchaseLogSummaryCards } from "./PurchaseLogSummaryCards";
 import { PurchaseLogTable, type PurchaseLogRow } from "./PurchaseLogTable";
 import { PurchaseLogDrawer } from "./PurchaseLogDrawer";
 
-export const PurchaseLogReport = () => {
+export const PurchaseLogReport = ({storeId=""}:{storeId?:string} = {}) => {
   const [dateRange, setDateRange] = useState("this-month");
-  const [vendor, setVendor] = useState("all");
+  const [vendor, setVendor] = useState<string[]>([]);
   const [fuelType, setFuelType] = useState("all");
   const [search, setSearch] = useState("");
   const [selectedRow, setSelectedRow] = useState<PurchaseLogRow | null>(null);
@@ -19,16 +19,16 @@ export const PurchaseLogReport = () => {
 
   const clearFilters = () => {
     setDateRange("this-month");
-    setVendor("all");
+    setVendor([]);
     setFuelType("all");
     setSearch("");
   };
 
-  const hasActiveFilters = vendor !== "all" || fuelType !== "all" || search.trim() !== "";
+  const hasActiveFilters = vendor.length > 0 || fuelType !== "all" || search.trim() !== "";
 
   return (
     <div className="space-y-6">
-      <PurchaseLogFilters
+      <PurchaseLogFilters storeId={storeId}
         dateRange={dateRange} onDateRangeChange={setDateRange}
         vendor={vendor} onVendorChange={setVendor}
         fuelType={fuelType} onFuelTypeChange={setFuelType}

@@ -1,3 +1,5 @@
+import { matchesFilter } from "@/lib/filterSelection";
+import { SearchMultiFilter } from "@/components/shared/SearchMultiFilter";
 import { RecentFilterSelect, RecentFilterContent } from "@/components/shared/RecentFilterSelect";
 import { costEdit } from "@/lib/pricebook/bulk-costs";
 import { useStoreDepartments } from "@/hooks/use-store-departments";
@@ -102,20 +104,20 @@ export const BulkUpdatePage = ({storeId}:{storeId:string}) => {
 
   // Filters
   const [search, setSearch] = useState("");
-  const [deptFilter, setDeptFilter] = useState("all");
+  const [deptFilter, setDeptFilter] = useState<string[]>([]);
   const [priceGroupFilter, setPriceGroupFilter] = useState("all");
-  const [vendorFilter, setVendorFilter] = useState("all");
+  const [vendorFilter, setVendorFilter] = useState<string[]>([]);
   const [promoFilter, setPromoFilter] = useState("all");
   const [taxFilter, setTaxFilter] = useState("all");
   const [ageFilter, setAgeFilter] = useState("all");
   const [ebtFilter, setEbtFilter] = useState("all");
   const [pageSize, setPageSize] = useState(10);
 
-  const hasActiveFilters = search !== "" || deptFilter !== "all" || priceGroupFilter !== "all" || vendorFilter !== "all" || promoFilter !== "all" || taxFilter !== "all" || ageFilter !== "all" || ebtFilter !== "all";
+  const hasActiveFilters = search !== "" || deptFilter.length > 0 || priceGroupFilter !== "all" || vendorFilter.length > 0 || promoFilter !== "all" || taxFilter !== "all" || ageFilter !== "all" || ebtFilter !== "all";
 
   const clearFilters = () => {
-    setSearch(""); setDeptFilter("all"); setPriceGroupFilter("all");
-    setVendorFilter("all"); setPromoFilter("all"); setTaxFilter("all");
+    setSearch(""); setDeptFilter([]); setPriceGroupFilter("all");
+    setVendorFilter([]); setPromoFilter("all"); setTaxFilter("all");
     setAgeFilter("all"); setEbtFilter("all");
   };
 
@@ -124,9 +126,9 @@ export const BulkUpdatePage = ({storeId}:{storeId:string}) => {
   const filtered = source.filter((item) => {
     const f=isEditing?(baseline.current.find(b=>b.id===item.id)??item):item;
     const matchSearch = search === "" || f.name.toLowerCase().includes(search.toLowerCase()) || f.barcode.includes(search) || f.sku.toLowerCase().includes(search.toLowerCase());
-    const matchDept = deptFilter === "all" || f.dept === deptFilter;
+    const matchDept = matchesFilter(deptFilter,f.dept);
     const matchPG = priceGroupFilter === "all" || f.priceGroup === priceGroupFilter;
-    const matchVendor = vendorFilter === "all" || (f.vendorNames??[]).includes(vendorFilter);
+    const matchVendor = matchesFilter(vendorFilter,f.vendorNames??[]);
     const matchPromo = promoFilter === "all" || promotions.some(p=>p.name===promoFilter&&f.links?.promotionIds.includes(p.id));
     const matchTax = taxFilter === "all" || (taxFilter === "yes" ? f.taxable : !f.taxable);
     const matchAge = ageFilter === "all" || (ageFilter === "yes" ? f.ageRestricted : !f.ageRestricted);
@@ -240,7 +242,7 @@ export const BulkUpdatePage = ({storeId}:{storeId:string}) => {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Department</Label>
-              <DepartmentFilter storeId={storeId} value={deptFilter} onValueChange={setDeptFilter} className="h-9 text-sm" extraNames={(query.data?.items??[]).map(item=>item.dept)} />
+              <DepartmentFilter storeId={storeId} values={deptFilter} onValuesChange={setDeptFilter} className="h-9 text-sm" extraNames={(query.data?.items??[]).map(item=>item.dept)} />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Price Group</Label>
@@ -254,13 +256,7 @@ export const BulkUpdatePage = ({storeId}:{storeId:string}) => {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Vendor</Label>
-              <RecentFilterSelect storeId={storeId} filterType="vendor" value={vendorFilter} onValueChange={setVendorFilter}>
-                <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="All" /></SelectTrigger>
-                <RecentFilterContent>
-                  <SelectItem value="all">All Vendors</SelectItem>
-                  {vendors.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
-                </RecentFilterContent>
-              </RecentFilterSelect>
+              <SearchMultiFilter storeId={storeId} filterType="vendor" values={vendorFilter} onValuesChange={setVendorFilter} options={vendors.map(name=>({value:name,label:name}))} allLabel="All Vendors" className="h-9 text-sm" />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Promotion Name</Label>

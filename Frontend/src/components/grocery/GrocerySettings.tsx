@@ -124,7 +124,7 @@ export const GrocerySettings = ({storeId}:{storeId:string}) => {
         </TabsList>
 
         <TabsContent value="margin" className="space-y-6">
-          <SubdepartmentMargin allRows={marginRows} onChange={setMarginRows} editable={editing&&!saving} onSave={()=>handleSaveSettings(true)} />
+          <SubdepartmentMargin storeId={storeId} allRows={marginRows} onChange={setMarginRows} editable={editing&&!saving} onSave={()=>handleSaveSettings(true)} />
         </TabsContent>
 
 

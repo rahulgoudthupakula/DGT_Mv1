@@ -1,3 +1,5 @@
+import { SearchMultiFilter } from "@/components/shared/SearchMultiFilter";
+import { matchesFilter } from "@/lib/filterSelection";
 /**
  * Standalone order-guide UI uses the local PRODUCT_CATALOG and component state. The connected
  * purchase-order workflow lives in PurchaseOrdersPage.
@@ -99,17 +101,17 @@ const PRODUCT_CATALOG = [
   { scanCode: "044000032036", itemName: "Oreo Cookies 14.3oz", department: "Snacks", vendor: "McLane", casePackSize: 12, minOrderQty: 12, avgDailySales: 6 },
 ];
 
-export const OrderGuide = () => {
-  const [departmentFilter, setDepartmentFilter] = useState("");
-  const [vendorFilter, setVendorFilter] = useState("");
+export const OrderGuide = ({storeId=""}:{storeId?:string} = {}) => {
+  const [departmentFilter, setDepartmentFilter] = useState<string[]>([]);
+  const [vendorFilter, setVendorFilter] = useState<string[]>([]);
   const [includePromotions, setIncludePromotions] = useState(true);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
 
   // Add Items to Order Guide state
   const [showAddItems, setShowAddItems] = useState(false);
   const [addItemSearch, setAddItemSearch] = useState("");
-  const [addDepartment, setAddDepartment] = useState("");
-  const [addVendor, setAddVendor] = useState("");
+  const [addDepartment, setAddDepartment] = useState<string[]>([]);
+  const [addVendor, setAddVendor] = useState<string[]>([]);
   const [searchResults, setSearchResults] = useState<typeof PRODUCT_CATALOG>([]);
   const [hasSearched, setHasSearched] = useState(false);
 
@@ -305,11 +307,11 @@ export const OrderGuide = () => {
           p.scanCode.includes(query)
       );
     }
-    if (addDepartment && addDepartment !== "all") {
-      results = results.filter((p) => p.department === addDepartment);
+    if (addDepartment.length) {
+      results = results.filter((p) => matchesFilter(addDepartment,p.department));
     }
-    if (addVendor && addVendor !== "all") {
-      results = results.filter((p) => p.vendor === addVendor);
+    if (addVendor.length) {
+      results = results.filter((p) => matchesFilter(addVendor,p.vendor));
     }
     setSearchResults(results);
     setHasSearched(true);
@@ -407,8 +409,8 @@ export const OrderGuide = () => {
 
   const filteredItems = items.filter((item) => {
     if (item.isDiscontinued) return false;
-    if (departmentFilter && departmentFilter !== "all" && item.department !== departmentFilter) return false;
-    if (vendorFilter && vendorFilter !== "all" && item.vendor !== vendorFilter) return false;
+    if (!matchesFilter(departmentFilter,item.department)) return false;
+    if (!matchesFilter(vendorFilter,item.vendor)) return false;
     return true;
   });
 
@@ -463,36 +465,12 @@ export const OrderGuide = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label className="text-xs">Department</Label>
-              <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-                <SelectTrigger className="h-9 text-sm">
-                  <SelectValue placeholder="All Departments" />
-                </SelectTrigger>
-                <SelectContent className="z-50 bg-popover">
-                  <SelectItem value="all">All Departments</SelectItem>
-                  {departments.map((dept) => (
-                    <SelectItem key={dept} value={dept}>
-                      {dept}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchMultiFilter storeId={storeId} filterType="department" values={departmentFilter} onValuesChange={setDepartmentFilter} allLabel="All Departments" options={departments.map(name=>({value:name,label:name}))} className="h-9 text-sm" />
             </div>
 
             <div className="space-y-2">
               <Label className="text-xs">Vendor</Label>
-              <Select value={vendorFilter} onValueChange={setVendorFilter}>
-                <SelectTrigger className="h-9 text-sm">
-                  <SelectValue placeholder="All Vendors" />
-                </SelectTrigger>
-                <SelectContent className="z-50 bg-popover">
-                  <SelectItem value="all">All Vendors</SelectItem>
-                  {vendors.map((vendor) => (
-                    <SelectItem key={vendor} value={vendor}>
-                      {vendor}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchMultiFilter storeId={storeId} filterType="vendor" values={vendorFilter} onValuesChange={setVendorFilter} allLabel="All Vendors" options={vendors.map(name=>({value:name,label:name}))} className="h-9 text-sm" />
             </div>
 
             <div className="space-y-2">
@@ -574,8 +552,8 @@ export const OrderGuide = () => {
               setSearchResults([]);
               setHasSearched(false);
               setAddItemSearch("");
-              setAddDepartment("");
-              setAddVendor("");
+              setAddDepartment([]);
+              setAddVendor([]);
             }
           }}
         >
@@ -598,8 +576,8 @@ export const OrderGuide = () => {
                   setSearchResults([]);
                   setHasSearched(false);
                   setAddItemSearch("");
-                  setAddDepartment("");
-                  setAddVendor("");
+                  setAddDepartment([]);
+                  setAddVendor([]);
                 }}
               >
                 <X className="h-4 w-4" />
@@ -625,31 +603,11 @@ export const OrderGuide = () => {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Department</Label>
-                <Select value={addDepartment} onValueChange={setAddDepartment}>
-                  <SelectTrigger className="h-9 text-sm">
-                    <SelectValue placeholder="All Departments" />
-                  </SelectTrigger>
-                  <SelectContent className="z-50 bg-popover">
-                    <SelectItem value="all">All Departments</SelectItem>
-                    {departments.map((dept) => (
-                      <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchMultiFilter storeId={storeId} filterType="department" values={addDepartment} onValuesChange={setAddDepartment} allLabel="All Departments" options={departments.map(name=>({value:name,label:name}))} className="h-9 text-sm" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Vendor</Label>
-                <Select value={addVendor} onValueChange={setAddVendor}>
-                  <SelectTrigger className="h-9 text-sm">
-                    <SelectValue placeholder="All Vendors" />
-                  </SelectTrigger>
-                  <SelectContent className="z-50 bg-popover">
-                    <SelectItem value="all">All Vendors</SelectItem>
-                    {vendors.map((vendor) => (
-                      <SelectItem key={vendor} value={vendor}>{vendor}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchMultiFilter storeId={storeId} filterType="vendor" values={addVendor} onValuesChange={setAddVendor} allLabel="All Vendors" options={vendors.map(name=>({value:name,label:name}))} className="h-9 text-sm" />
               </div>
             </div>
 
@@ -659,8 +617,8 @@ export const OrderGuide = () => {
                 size="sm"
                 onClick={() => {
                   setAddItemSearch("");
-                  setAddDepartment("");
-                  setAddVendor("");
+                  setAddDepartment([]);
+                  setAddVendor([]);
                   setSearchResults([]);
                   setHasSearched(false);
                 }}

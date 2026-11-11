@@ -17,11 +17,12 @@ const scope = (storeId: string, filterType: string) => JSON.stringify([storeId, 
 export const filterOptionIdentity = (label: string) => label.trim().normalize("NFKC").toLowerCase();
 export const isResetFilterValue = (value: string) => ["all", "All", "All Departments", "All Vendors", "All Tax Types", "All Reasons", "All Statuses", "All Categories"].includes(value);
 
-export function groupRecentFilterOptions<T extends { value: string; label: string; disabled?: boolean }>(options: T[], recent: readonly string[]) {
-  const pinned = options.filter(option => isResetFilterValue(option.value));
-  const suggested = recent.flatMap(identity => options.filter(option => !option.disabled && !isResetFilterValue(option.value) && filterOptionIdentity(option.label) === identity));
+export function groupRecentFilterOptions<T extends { value: string; label: string; disabled?: boolean }>(options: T[], recent: readonly string[], pinResetOptions = true) {
+  const isPinned = (option: T) => pinResetOptions && isResetFilterValue(option.value);
+  const pinned = options.filter(isPinned);
+  const suggested = recent.flatMap(identity => options.filter(option => !option.disabled && !isPinned(option) && filterOptionIdentity(option.label) === identity));
   const selected = new Set(suggested);
-  return { pinned, recent: suggested, remaining: options.filter(option => !isResetFilterValue(option.value) && !selected.has(option)) };
+  return { pinned, recent: suggested, remaining: options.filter(option => !isPinned(option) && !selected.has(option)) };
 }
 
 function notify() {

@@ -1,3 +1,5 @@
+import { matchesFilter } from "@/lib/filterSelection";
+import { SearchMultiFilter } from "@/components/shared/SearchMultiFilter";
 import { RecentFilterSelect, RecentFilterContent } from "@/components/shared/RecentFilterSelect";
 import { DepartmentFilter } from "@/components/shared/DepartmentFilter";
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -45,6 +47,7 @@ interface InventoryItem {
   scanCode: string;
   itemName: string;
   vendor: string;
+  vendorNames?: string[];
   department?: string;
   currentStock: number;
   returnQty: number;
@@ -153,14 +156,14 @@ export const ReturnableInventory = ({storeId}:{storeId:string}) => {
   const [openSlipId,setOpenSlipId]=useState<string|null>(null);
   const [scanCode, setScanCode] = useState("");
   const [itemName, setItemName] = useState("");
-  const [selectedVendor, setSelectedVendor] = useState("All Vendors");
-  const [selectedDepartment, setSelectedDepartment] = useState("All Departments");
+  const [selectedVendor, setSelectedVendor] = useState<string[]>([]);
+  const [selectedDepartment, setSelectedDepartment] = useState<string[]>([]);
   const [date, setDate] = useState<Date>();
 
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
 
   useEffect(() => {
-    setInventoryItems((approved.data?.requests??[]).filter(r=>r.status==='APPROVED'&&r.route==='returnable').map(r=>{const item=approved.data?.items.find(i=>Number(i.id)===Number(r.product_id));return {id:String(r.reduction_request_id),scanCode:r.product_sku,itemName:r.product_name,vendor:item?.vendor??'',department:item?.department??'',currentStock:Number(item?.inventoryCount??0),returnQty:Number(r.quantity),netCost:Number(item?.netCost??0),reason:r.reason};}));
+    setInventoryItems((approved.data?.requests??[]).filter(r=>r.status==='APPROVED'&&r.route==='returnable').map(r=>{const item=approved.data?.items.find(i=>Number(i.id)===Number(r.product_id));return {id:String(r.reduction_request_id),scanCode:r.product_sku,itemName:r.product_name,vendor:item?.vendor??'',vendorNames:item?.vendorNames??[item?.vendor??''],department:item?.department??'',currentStock:Number(item?.inventoryCount??0),returnQty:Number(r.quantity),netCost:Number(item?.netCost??0),reason:r.reason};}));
   }, [approved.data]);
   const vendors=['All Vendors',...(slips.data?.vendors??[]).map(v=>v.vendor_name)];
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
@@ -246,8 +249,8 @@ export const ReturnableInventory = ({storeId}:{storeId:string}) => {
   const filteredItems = inventoryItems.filter((item) => {
     const matchesScanCode = !scanCode || item.scanCode.includes(scanCode);
     const matchesItemName = !itemName || item.itemName.toLowerCase().includes(itemName.toLowerCase());
-    const matchesVendor = selectedVendor === "All Vendors" || item.vendor === selectedVendor;
-    return matchesScanCode && matchesItemName && matchesVendor && (selectedDepartment === "All Departments" || item.department === selectedDepartment);
+    const matchesVendor = matchesFilter(selectedVendor,item.vendorNames??[item.vendor]);
+    return matchesScanCode && matchesItemName && matchesVendor && (matchesFilter(selectedDepartment,item.department));
   });
 
   const { paginated: paginatedReturnable, page: retPage, totalPages: retTotalPages, totalItems: retTotalItems, pageSize: retPageSize, hasPrev: retHasPrev, hasNext: retHasNext, nextPage: retNextPage, prevPage: retPrevPage } =
@@ -438,21 +441,12 @@ export const ReturnableInventory = ({storeId}:{storeId:string}) => {
               <Label className="text-xs">
                 Vendor <span className="text-destructive">*</span>
               </Label>
-              <RecentFilterSelect storeId={storeId} filterType="vendor" value={selectedVendor} onValueChange={setSelectedVendor}>
-                <SelectTrigger className="h-9 text-sm">
-                  <SelectValue placeholder="Select vendor" />
-                </SelectTrigger>
-                <RecentFilterContent>
-                  {vendors.map((vendor) => (
-                    <SelectItem key={vendor} value={vendor}>{vendor}</SelectItem>
-                  ))}
-                </RecentFilterContent>
-              </RecentFilterSelect>
+              <SearchMultiFilter storeId={storeId} filterType="vendor" values={selectedVendor} onValuesChange={setSelectedVendor} options={vendors.filter(name=>name!=="All Vendors").map(name=>({value:name,label:name}))} allLabel="All Vendors" className="h-9 text-sm" />
             </div>
 
             <div className="space-y-1.5">
               <Label className="text-xs">Department</Label>
-              <DepartmentFilter storeId={storeId} value={selectedDepartment} onValueChange={setSelectedDepartment} allValue="All Departments" extraNames={(approved.data?.items??[]).map(item=>String(item.department??''))} className="h-9 text-sm" />
+              <DepartmentFilter storeId={storeId} values={selectedDepartment} onValuesChange={setSelectedDepartment} extraNames={(approved.data?.items??[]).map(item=>String(item.department??''))} className="h-9 text-sm" />
             </div>
 
           </div>

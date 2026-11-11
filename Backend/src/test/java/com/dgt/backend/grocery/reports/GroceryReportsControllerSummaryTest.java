@@ -38,7 +38,18 @@ class GroceryReportsControllerSummaryTest {
   var a=map("vendor","A","productName","Milk","scanCode","001","receivedQty",n("2"),"extendedCost",n("4"),"netCost",n("4"),"rebate",null,"unitCost",n("2"),"prevUnitCost",n("1"));
   var b=new LinkedHashMap<>(a);b.put("vendor","B");
   c.purchaseData=map("items",List.of(a,b),"invoices",List.of());
-  var report=result(c.purchaseSummary("STORE-A",null,null,"001","A","invoiced"));assertEquals(1,((List<?>)report.get("items")).size());assertEquals(n("4"),result(report.get("itemTotals")).get("netCost"));assertNull(result(report.get("itemTotals")).get("rebate"));assertEquals(2,((List<?>)report.get("vendors")).size());
+  var filters=new org.springframework.util.LinkedMultiValueMap<String,String>();filters.add("vendor","A");
+  var report=result(c.purchaseSummary("STORE-A",null,null,"001",filters,"invoiced"));assertEquals(1,((List<?>)report.get("items")).size());assertEquals(n("4"),result(report.get("itemTotals")).get("netCost"));assertNull(result(report.get("itemTotals")).get("rebate"));assertEquals(2,((List<?>)report.get("vendors")).size());
+ }
+ @Test void purchaseSummaryCombinesSelectedVendorsAndPreservesCommas(){
+  var c=new Sources();
+  var a=map("vendor","A, Inc","productName","Milk","scanCode","001","receivedQty",n("2"),"extendedCost",n("4"),"netCost",n("4"),"rebate",null,"unitCost",n("2"),"prevUnitCost",n("1"));
+  var b=new LinkedHashMap<>(a);b.put("vendor","B");var other=new LinkedHashMap<>(a);other.put("vendor","C");
+  c.purchaseData=map("items",List.of(a,b,other),"invoices",List.of());
+  var filters=new org.springframework.util.LinkedMultiValueMap<String,String>();filters.add("vendor","A, Inc");filters.add("vendor","B");
+  var report=result(c.purchaseSummary("STORE-A",null,null,"",filters,"invoiced"));
+  assertEquals(2,((List<?>)report.get("items")).size());assertEquals(n("8"),result(report.get("itemTotals")).get("netCost"));
+  assertEquals(3,((List<?>)result(c.purchaseSummary("STORE-A",null,null,"",new org.springframework.util.LinkedMultiValueMap<>(),"invoiced")).get("items")).size());
  }
  @Test void cigaretteInvalidRangeIsRejectedBeforeReadingSources(){
   var c=new Sources();

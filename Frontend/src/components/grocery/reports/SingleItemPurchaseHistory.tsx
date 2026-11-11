@@ -1,3 +1,5 @@
+import { SearchMultiFilter } from "@/components/shared/SearchMultiFilter";
+import { matchesFilter } from "@/lib/filterSelection";
 /**
  * Loads purchase lines, then applies vendor, status and item search filters. Previous-cost
  * comparisons come from the purchase report response.
@@ -35,7 +37,7 @@ const COST_SPIKE_THRESHOLD = 3; // percent
 export const SingleItemPurchaseHistory = ({storeId}:{storeId:string}) => {
   const [startDate, setStartDate] = useState<Date | undefined>();
   const [endDate, setEndDate] = useState<Date | undefined>();
-  const [vendorFilter, setVendorFilter] = useState("all");
+  const [vendorFilter, setVendorFilter] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const query=usePurchaseReports(storeId,startDate,endDate,{vendor:vendorFilter,status:statusFilter,search:searchQuery});
@@ -110,19 +112,7 @@ export const SingleItemPurchaseHistory = ({storeId}:{storeId:string}) => {
               </PopoverContent>
             </Popover>
 
-            <Select value={vendorFilter} onValueChange={setVendorFilter}>
-              <SelectTrigger className="h-9 text-xs w-[160px]">
-                <SelectValue placeholder="All Vendors" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Vendors</SelectItem>
-                {vendors.map((v) => (
-                  <SelectItem key={v} value={v}>
-                    {v}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchMultiFilter storeId={storeId} filterType="vendor" values={vendorFilter} onValuesChange={setVendorFilter} allLabel="All Vendors" options={(query.data?.vendors??[]).map(name=>({value:name,label:name}))} className="h-9 text-sm" />
 
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="h-9 text-xs w-[150px]">
