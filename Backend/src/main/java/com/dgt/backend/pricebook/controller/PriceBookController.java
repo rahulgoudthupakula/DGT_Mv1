@@ -22,17 +22,22 @@ import lombok.extern.slf4j.Slf4j;
 @RequestMapping("/api/v1/access/stores/{store}/items")
 // Store item catalog endpoints and approval-dispatched item mutations.
 public class PriceBookController {
- private final ScopedAccess a; private final ApprovalService approvals; private final BulkItemLinks bulkLinks;
- public PriceBookController(ScopedAccess a,ApprovalService approvals,BulkItemLinks bulkLinks){this.bulkLinks=bulkLinks;this.a=a;this.approvals=approvals;}
+ private final ScopedAccess a; private final ApprovalService approvals; private final BulkItemLinks bulkLinks;private final com.dgt.backend.departments.service.StoreDepartmentCatalog departmentCatalog;
+ public PriceBookController(ScopedAccess a,ApprovalService approvals,BulkItemLinks bulkLinks,com.dgt.backend.departments.service.StoreDepartmentCatalog departmentCatalog){this.departmentCatalog=departmentCatalog;this.bulkLinks=bulkLinks;this.a=a;this.approvals=approvals;}
  public record Input(String name,String sku,String barcode,String dept,String subDept,BigDecimal retail,Boolean taxable,Boolean ebtSnap,Boolean allowReturns,Boolean active,Boolean ageRestricted,BigDecimal reorderLevel,String unitType,Integer unitsPerCase,BigDecimal purchaseGrossCost,BigDecimal purchaseDiscount,BigDecimal currentInventory,String inventoryVersion){}
  private ResponseStatusException bad(String message){return new ResponseStatusException(HttpStatus.BAD_REQUEST,message);}
  private String text(String value,int max,String name){if(value==null||value.isBlank()||value.trim().length()>max)throw bad(name+" is required (maximum "+max+" characters)");return value.trim();}
  // Load store items and department choices for the pricebook page.
- @GetMapping public Object list(@PathVariable String store){
+ @GetMapping public Object list(@PathVariable String store,@RequestParam(defaultValue="false") boolean includeDepartments){
   a.grant(a.user(),store,"PRICE_BOOK",false);
   var rows=a.db.queryForList("SELECT COALESCE((SELECT g.price_group_name FROM product_price_groups l JOIN price_groups g ON g.price_group_id=l.price_group_id AND g.dgt_id=l.dgt_id WHERE l.archived_at IS NULL AND l.product_id=p.product_id AND l.dgt_id=p.dgt_id AND l.is_active AND g.is_active),'') AS \"priceGroup\",COALESCE(linked.vendor,'') AS vendor,COALESCE(linked.names,'[]'::json) AS \"vendorNames\",p.is_age_restricted AS \"ageRestricted\",p.reorder_level AS \"reorderLevel\",lower(p.purchase_unit) AS \"unitType\",p.units_per_case AS \"unitsPerCase\",p.purchase_gross_cost AS \"purchaseGrossCost\",p.purchase_discount AS \"purchaseDiscount\",COALESCE(i.xmin::text,'0') AS \"inventoryVersion\",p.product_id AS id,p.xmin::text AS version,p.product_name AS name,p.product_sku AS sku,p.is_taxable AS taxable,p.is_ebt AS \"ebtSnap\",p.is_returnable AS \"allowReturns\",p.is_active AS active,p.updated_at AS \"lastUpdated\",sd.store_department_name AS dept,sub.store_sub_department_name AS \"subDept\",COALESCE(b.product_barcode_value,'') AS barcode,pr.retail_price AS retail,"+ItemSellingPrice.SQL+" AS \"effectiveRetail\",i.available_quantity AS \"currentInventory\" FROM products p JOIN store_sub_departments sub ON sub.store_sub_department_id=p.store_sub_department_id AND sub.dgt_id=p.dgt_id JOIN store_departments sd ON sd.store_department_id=sub.store_department_id AND sd.dgt_id=p.dgt_id LEFT JOIN LATERAL (SELECT product_barcode_value FROM product_barcodes WHERE product_barcodes.archived_at IS NULL AND product_id=p.product_id AND dgt_id=p.dgt_id ORDER BY is_primary DESC,product_barcode_id LIMIT 1) b ON true LEFT JOIN product_store_prices pr ON pr.product_id=p.product_id AND pr.dgt_id=p.dgt_id LEFT JOIN inventory i ON i.product_id=p.product_id AND i.dgt_id=p.dgt_id LEFT JOIN LATERAL (SELECT string_agg(v.vendor_name,', ' ORDER BY v.vendor_name,v.vendor_id) AS vendor,json_agg(v.vendor_name ORDER BY v.vendor_name,v.vendor_id) AS names FROM product_vendors pv JOIN vendors v ON v.vendor_id=pv.vendor_id AND v.dgt_id=pv.dgt_id WHERE pv.archived_at IS NULL AND pv.product_id=p.product_id AND pv.dgt_id=p.dgt_id) linked ON true WHERE p.dgt_id=? ORDER BY p.product_name,p.product_id",store);
   boolean edit;try{a.grant(a.user(),store,"PRICE_BOOK",true);edit=true;}catch(ResponseStatusException e){edit=false;}
-  return Map.of("items",rows.stream().map(this::details).map(com.dgt.backend.common.entity.Rows::normalize).toList(),"departments",departments(store),"canEdit",edit);
+  var response=new LinkedHashMap<String,Object>();
+  response.put("items",rows.stream().map(this::details).map(com.dgt.backend.common.entity.Rows::normalize).toList());
+  response.put("canEdit",edit);
+  // Department data is separate by default; explicit inclusion remains available for API consumers.
+  if(includeDepartments)response.put("departments",departments(store));
+  return response;
  }
  private Map<String,Object> details(Map<String,Object> row){
   for(String key:List.of("cost","itemGrossCost","itemDiscount","itemNetCost","caseGrossCost","caseDiscount","caseNetCost"))row.put(key,null);
@@ -81,10 +86,7 @@ public class PriceBookController {
   }
  }
  private List<Map<String,Object>> departments(String store){
-  var result=new ArrayList<Map<String,Object>>();
-  for(var d:a.db.queryForList("SELECT store_department_id,store_department_name FROM store_departments WHERE dgt_id=? AND is_active ORDER BY (department_id IS NULL),store_department_name",store)){
-   result.add(Map.of("name",d.get("store_department_name"),"children",a.db.queryForList("SELECT store_sub_department_name FROM store_sub_departments WHERE store_department_id=? AND dgt_id=? AND is_active ORDER BY store_sub_department_name",String.class,d.get("store_department_id"),store)));
-  }return result;
+  return departmentCatalog.options(store);
  }
  public record BulkRow(Long id,String version,Input item,BulkItemLinks.Input links){}
  @GetMapping("/bulk-options") public Object bulkOptions(@PathVariable String store){return bulkLinks.options(store);}

@@ -1,4 +1,6 @@
+import { RecentFilterSelect, RecentFilterContent } from "@/components/shared/RecentFilterSelect";
 import {useGroceryDefaults} from "@/lib/grocerySettings";
+import { useStoreDepartments } from "@/hooks/use-store-departments";
 import { useMemo, useState } from "react";
 import { differenceInDays, format, parseISO, isAfter, subDays } from "date-fns";
 import { Check, ChevronsUpDown, PackagePlus, Search, Sparkles, Boxes, DollarSign, Package, Tag, CheckCircle2, AlertTriangle } from "lucide-react";
@@ -53,13 +55,14 @@ export const NewArrivalsPage = ({storeId}:{storeId:string}) => {
   const client=useQueryClient();
   const path=`/access/stores/${encodeURIComponent(storeId)}/items`;
   const defaults=useGroceryDefaults(storeId);
-  const itemsQuery=useQuery({queryKey:['pricebook-items',storeId],queryFn:()=>request<{items:Item[];departments:{name:string;children:string[]}[];canEdit:boolean}>(path)});
+  const departmentQuery=useStoreDepartments(storeId);
+  const itemsQuery=useQuery({queryKey:['pricebook-items',storeId],queryFn:()=>request<{items:Item[];canEdit:boolean}>(path)});
   const arrivalsQuery=useQuery({queryKey:['new-arrivals',storeId],queryFn:()=>request<{arrivals:Arrival[]}>(`/access/stores/${encodeURIComponent(storeId)}/new-arrivals`)});
-  const loading=itemsQuery.isLoading||arrivalsQuery.isLoading;
+  const loading=itemsQuery.isLoading||arrivalsQuery.isLoading||departmentQuery.isPending;
   const [search,setSearch]=useState('');const [vendorFilter,setVendorFilter]=useState('all');
   const [linkTarget,setLinkTarget]=useState<Arrival|null>(null);
   const [dept,setDept]=useState('');const [subDept,setSubDept]=useState('');const [marginInput,setMarginInput]=useState('');const [saving,setSaving]=useState(false);
-  const departmentTree=(itemsQuery.data?.departments??[]).map(d=>({name:d.name,subDepartments:d.children}));
+  const departmentTree=(departmentQuery.data??[]).map(d=>({name:d.name,subDepartments:d.children}));
   const arrivals=(arrivalsQuery.data?.arrivals??[]).flatMap(a=>{const p=itemsQuery.data?.items.find(p=>p.id===a.id);return p?[{...a,sku:p.sku,itemName:p.name,barcode:p.barcode,retail:a.needsCategory?(p.effectiveRetail??p.retail):p.retail,currentStock:p.currentInventory}]:[];});
   const assignments:Record<number,Assignment>={};
   for(const a of arrivals){const p=itemsQuery.data?.items.find(p=>p.id===a.id);if(p&&!a.needsCategory)assignments[a.id]={dept:p.dept,subDept:p.subDept,retail:p.retail,margin:a.cost!=null&&p.retail?Number(((p.retail-a.cost)/p.retail*100).toFixed(2)):null};}
@@ -102,6 +105,7 @@ export const NewArrivalsPage = ({storeId}:{storeId:string}) => {
   return (
     <div className="space-y-4">
       {(itemsQuery.error||arrivalsQuery.error)&&<p role="alert" className="text-destructive">{String(itemsQuery.error||arrivalsQuery.error)}</p>}
+      {departmentQuery.isError&&<p role="alert" className="text-destructive">Couldn’t load departments. <button type="button" className="underline" onClick={()=>void departmentQuery.refetch()}>Retry</button></p>}
       {arrivals.some(a=>a.cost==null||a.unitsReceived==null)&&<p role="status">Totals exclude arrivals with unknown purchase units or missing case packs.</p>}
       <div>
         <h1 className="text-2xl font-bold text-foreground">New Arrivals</h1>
@@ -174,19 +178,19 @@ export const NewArrivalsPage = ({storeId}:{storeId:string}) => {
                   className="pl-8 h-8 text-xs w-[220px]"
                 />
               </div>
-              <Select value={vendorFilter} onValueChange={setVendorFilter}>
+              <RecentFilterSelect storeId={storeId} filterType="vendor" value={vendorFilter} onValueChange={setVendorFilter}>
                 <SelectTrigger className="h-8 text-xs w-[160px]">
                   <SelectValue placeholder="All vendors" />
                 </SelectTrigger>
-                <SelectContent>
+                <RecentFilterContent>
                   <SelectItem value="all">All vendors</SelectItem>
                   {vendors.map((v) => (
                     <SelectItem key={v} value={v}>
                       {v}
                     </SelectItem>
                   ))}
-                </SelectContent>
-              </Select>
+                </RecentFilterContent>
+              </RecentFilterSelect>
             </div>
           </div>
         </CardHeader>

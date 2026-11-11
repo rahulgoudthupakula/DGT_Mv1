@@ -78,7 +78,14 @@ class ScopedAccessIntegrationTest {
   assertThat(db.queryForObject("SELECT count(*) FROM store_sub_departments WHERE dgt_id=?",Long.class,store)).isEqualTo(beforeCount);
   assertThat(db.queryForObject("SELECT is_active FROM store_sub_departments WHERE store_sub_department_id=?",Boolean.class,Long.parseLong(childId))).isFalse();
   // An inactive child must not be offered by Price Book, even while its parent is active.
-  var options=ok(req("admin","GET",access()+"/items",null),200).path("departments");
+  var options=ok(req("admin","GET",access()+"/items?includeDepartments=true",null),200).path("departments");
+  assertThat(ok(req("admin","GET",access()+"/department-options",null),200)).isEqualTo(options);
+  assertThat(ok(req("cashier","GET",access()+"/department-options",null),200)).isEqualTo(options);
+  ok(req("other","GET",access()+"/department-options",null),403);
+  ok(req("admin","GET","/access/stores/"+foreign+"/department-options",null),403);
+  var withoutCatalog=ok(req("admin","GET",access()+"/items",null),200);
+  assertThat(withoutCatalog.has("departments")).isFalse();
+  assertThat(withoutCatalog.path("items").isArray()).isTrue();
   for(var row:options)if(row.path("name").asText().equals("Renamed "+tag))assertThat(row.path("children").toString()).doesNotContain(child.path("name").asText());
   long wrongChild=db.queryForObject("SELECT min(store_sub_department_id) FROM store_sub_departments WHERE dgt_id=?",Long.class,second);
   ok(call("admin","PUT",dept(store)+"/"+id,Map.of("name",originalName,"sub_departments",List.of(Map.of("id",Long.toString(wrongChild),"name","Foreign child","active",true))),edited.path("version").asText(),null),400);
@@ -541,7 +548,7 @@ class ScopedAccessIntegrationTest {
   return value;
  }
  @Test @Order(35) void bulkEditableLinksAndIndividualPrice() throws Exception {
-  String path=access()+"/items";var dep=ok(req("admin","GET",path,null),200).path("departments").get(0);
+  String path=access()+"/items";var dep=ok(req("admin","GET",access()+"/department-options",null),200).get(0);
   var item=new LinkedHashMap<String,Object>();item.put("name","Editable links");item.put("sku","LINKS-"+tag);item.put("dept",dep.path("name").asText());item.put("sub_dept",dep.path("children").get(0).asText());item.put("retail",3);item.put("taxable",true);item.put("ebt_snap",false);item.put("allow_returns",true);item.put("active",true);item.put("unit_type","item");item.put("purchase_gross_cost",1.49);item.put("purchase_discount",0);
   long id=ok(req("admin","POST",path,browserRecordBody(item)),200).path("id").asLong();
   long seed=db.queryForObject("SELECT product_id FROM products WHERE dgt_id=? AND product_id<>? AND is_active ORDER BY product_id DESC LIMIT 1",Long.class,store,id);
@@ -570,7 +577,7 @@ class ScopedAccessIntegrationTest {
  }
 
  @Test @Order(34) void bulkItemsReuseRulesAndRollbackEntireBatch() throws Exception {
-  String path=access()+"/items";var dep=ok(req("admin","GET",path,null),200).path("departments").get(0);
+  String path=access()+"/items";var dep=ok(req("admin","GET",access()+"/department-options",null),200).get(0);
   var in=new LinkedHashMap<String,Object>();in.put("name","Bulk A");in.put("sku","BULK-A-"+tag);in.put("dept",dep.path("name").asText());in.put("sub_dept",dep.path("children").get(0).asText());in.put("retail",3);in.put("taxable",true);in.put("ebt_snap",false);in.put("allow_returns",true);in.put("active",true);in.put("unit_type","item");in.put("purchase_gross_cost",1.49);in.put("purchase_discount",0);
   long first=ok(req("admin","POST",path,in),200).path("id").asLong();var otherIn=new LinkedHashMap<String,Object>(in);otherIn.put("name","Bulk B");otherIn.put("sku","BULK-B-"+tag);long last=ok(req("admin","POST",path,otherIn),200).path("id").asLong();
   String v1=db.queryForObject("SELECT xmin::text FROM products WHERE product_id=?",String.class,first),v2=db.queryForObject("SELECT xmin::text FROM products WHERE product_id=?",String.class,last);
@@ -671,7 +678,7 @@ class ScopedAccessIntegrationTest {
  }
 
  @Test @Order(30) void catalogCostChangesAppearInHistory() throws Exception {
-  String path=access()+"/items";var dep=ok(req("admin","GET",path,null),200).path("departments").get(0);
+  String path=access()+"/items";var dep=ok(req("admin","GET",access()+"/department-options",null),200).get(0);
   var body=new LinkedHashMap<String,Object>();body.put("name","Catalog history item");body.put("sku","HISTORY-"+tag);body.put("dept",dep.path("name").asText());body.put("sub_dept",dep.path("children").get(0).asText());body.put("retail",2.5);body.put("taxable",false);body.put("ebt_snap",false);body.put("allow_returns",true);body.put("active",true);body.put("unit_type","item");body.put("purchase_gross_cost",1.49);body.put("purchase_discount",0);
   long id=ok(req("admin","POST",path,body),200).path("id").asLong();
   String version=db.queryForObject("SELECT xmin::text FROM products WHERE product_id=?",String.class,id);
@@ -715,7 +722,7 @@ class ScopedAccessIntegrationTest {
  }
 
  @Test @Order(28) void itemDefaultsAndInventory() throws Exception {
-  String path=access()+"/items";var dep=ok(req("admin","GET",path,null),200).path("departments").get(0);
+  String path=access()+"/items";var dep=ok(req("admin","GET",access()+"/department-options",null),200).get(0);
   var body=new LinkedHashMap<String,Object>();body.put("name","Case details");body.put("sku","DETAILS-"+tag);body.put("dept",dep.path("name").asText());body.put("sub_dept",dep.path("children").get(0).asText());body.put("retail",1.50);body.put("taxable",true);body.put("ebt_snap",false);body.put("allow_returns",true);body.put("active",true);
   body.put("age_restricted",true);body.put("unit_type","case");body.put("units_per_case",24);body.put("purchase_gross_cost",24);body.put("purchase_discount",2.40);body.put("current_inventory",48);body.put("inventory_version","0");body.put("reorder_level",10);
   long id=ok(req("admin","POST",path,body),200).path("id").asLong();
@@ -732,7 +739,7 @@ class ScopedAccessIntegrationTest {
  @Test @Order(27) void priceBookPersistenceAndStoreIsolation() throws Exception {
   String path=access()+"/items";
   var initial=ok(req("admin","GET",path,null),200);
-  var dep=initial.path("departments").get(0);
+  var dep=ok(req("admin","GET",access()+"/department-options",null),200).get(0);
   assertThat(dep.path("children").size()).isGreaterThan(0);
   var body=new LinkedHashMap<String,Object>();body.put("name","Price Book test");body.put("unit_type","item");body.put("purchase_gross_cost",1.00);body.put("purchase_discount",0);body.put("sku","CODE-"+tag);body.put("barcode","24"+Long.parseUnsignedLong(tag,16));body.put("dept",dep.path("name").asText());body.put("sub_dept",dep.path("children").get(0).asText());body.put("retail",1.99);body.put("taxable",true);body.put("ebt_snap",false);body.put("allow_returns",true);body.put("active",true);
   long id=ok(req("admin","POST",path,body),200).path("id").asLong();

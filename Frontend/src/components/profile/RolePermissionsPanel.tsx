@@ -27,7 +27,7 @@ export function RolePermissionsPanel({storeId}:{storeId:string}){
  const queue=useQuery({queryKey:["approvals",storeId],queryFn:()=>request<Approval[]>(base+"/approvals"),enabled:!!storeId});
  const [busy,setBusy]=useState(false);const [error,setError]=useState("");
  async function perform(path:string,body:unknown,method="PUT"){
-  setBusy(true);setError("");try{await request(base+path,{method,body:JSON.stringify(body)});await Promise.all([client.invalidateQueries({queryKey:["permissions",storeId]}),client.invalidateQueries({queryKey:["approvals",storeId]}),client.invalidateQueries({queryKey:["store-access",storeId]}),client.invalidateQueries({queryKey:["department-access",storeId]}),client.invalidateQueries({queryKey:["backend-store",storeId]})]);}
+  setBusy(true);setError("");try{await request(base+path,{method,body:JSON.stringify(body)});await Promise.all([client.invalidateQueries({queryKey:["permissions",storeId]}),client.invalidateQueries({queryKey:["approvals",storeId]}),client.invalidateQueries({queryKey:["store-access",storeId]}),client.invalidateQueries({queryKey:["department-access",storeId]}),client.invalidateQueries({queryKey:["store-departments",storeId]}),client.invalidateQueries({queryKey:["backend-store",storeId]})]);}
   catch(e){setError(e instanceof Error?e.message:"Could not save");await client.invalidateQueries({queryKey:["permissions",storeId]});}finally{setBusy(false);}
  }
  return <>

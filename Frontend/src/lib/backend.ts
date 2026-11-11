@@ -1,4 +1,5 @@
 import axios, { AxiosHeaders } from "axios";
+import { clearRecentFilters } from "./recentFilters";
 
 const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8181/api/v1";
 export const developmentDatabase = (import.meta.env.VITE_DATA_ENV || "development") === "development";
@@ -8,7 +9,7 @@ const TOKEN_KEY   = "dgt_jwt";
 const REFRESH_KEY = "dgt_refresh";
 const getToken        = () => localStorage.getItem(TOKEN_KEY);
 const setToken        = (t: string) => localStorage.setItem(TOKEN_KEY, t);
-const clearToken      = () => localStorage.removeItem(TOKEN_KEY);
+const clearToken      = () => { localStorage.removeItem(TOKEN_KEY); clearRecentFilters(); };
 const getRefreshToken = () => localStorage.getItem(REFRESH_KEY);
 const setRefreshToken = (t: string) => localStorage.setItem(REFRESH_KEY, t);
 const clearRefreshToken = () => localStorage.removeItem(REFRESH_KEY);
@@ -114,6 +115,7 @@ export function logout() {
 }
 
 export async function login(email: string, password: string) {
+  clearRecentFilters();
   const bytes = new TextEncoder().encode(`${email.trim()}:${password}`);
   const basic = "Basic " + btoa(Array.from(bytes, b => String.fromCharCode(b)).join(""));
   try {

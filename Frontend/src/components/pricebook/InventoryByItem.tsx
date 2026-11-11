@@ -1,3 +1,5 @@
+import { RecentFilterSelect, RecentFilterContent } from "@/components/shared/RecentFilterSelect";
+import { DepartmentFilter } from "@/components/shared/DepartmentFilter";
 import { useQuery } from "@tanstack/react-query";
 import { request } from "@/lib/backend";
 import { useState } from "react";
@@ -48,7 +50,6 @@ type RiskFilter = "all" | "expiring" | "negative" | "zero-sales";
 export const InventoryByItem = ({storeId}:{storeId:string}) => {
   const query=useQuery({queryKey:['current-stock',storeId],queryFn:()=>request<{items:PricebookValuationItem[];store:{name:string;timezone:string}}>(`/access/stores/${storeId}/current-stock`),enabled:!!storeId,refetchInterval:30000});
   const items=(query.data?.items??[]).map(i=>({...i,purchaseHistory:[],movements:[]}));
-  const departments=[...new Set(items.map(i=>i.department))];
   const vendors=[...new Map(items.flatMap(i=>i.vendors).map(v=>[String(v.id),v])).values()];
 
   const [asOfDate, setAsOfDate] = useState<Date | undefined>();
@@ -114,25 +115,17 @@ export const InventoryByItem = ({storeId}:{storeId:string}) => {
               </SelectContent>
             </Select>
 
-            <Select value={department} onValueChange={setDepartment}>
-              <SelectTrigger className="h-9 text-xs">
-                <SelectValue placeholder="Department" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Departments</SelectItem>
-                {departments.map(d=><SelectItem key={d} value={d}>{d}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <DepartmentFilter storeId={storeId} value={department} onValueChange={setDepartment} allValue="all" extraNames={items.map(item=>item.department)} className="h-9 text-xs" />
 
-            <Select value={vendor} onValueChange={setVendor}>
+            <RecentFilterSelect storeId={storeId} filterType="vendor" value={vendor} onValueChange={setVendor}>
               <SelectTrigger className="h-9 text-xs">
                 <SelectValue placeholder="Vendor" />
               </SelectTrigger>
-              <SelectContent>
+              <RecentFilterContent>
                 <SelectItem value="all">All Vendors</SelectItem>
                 {vendors.map(v=><SelectItem key={v.id} value={String(v.id)}>{v.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
+              </RecentFilterContent>
+            </RecentFilterSelect>
 
             <Select value="current-cost" disabled>
               <SelectTrigger className="h-9 text-xs">

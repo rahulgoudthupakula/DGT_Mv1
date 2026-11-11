@@ -1,4 +1,7 @@
+import { RecentFilterSelect, RecentFilterContent } from "@/components/shared/RecentFilterSelect";
 import { costEdit } from "@/lib/pricebook/bulk-costs";
+import { useStoreDepartments } from "@/hooks/use-store-departments";
+import { DepartmentFilter } from "@/components/shared/DepartmentFilter";
 import { useState,useRef } from "react";
 import { useQuery,useQueryClient } from "@tanstack/react-query";
 import { request,isPendingChange } from "@/lib/backend";
@@ -80,7 +83,8 @@ const LinkChoices=({options,selected,onChange,label}:{options:Option[];selected:
 
 export const BulkUpdatePage = ({storeId}:{storeId:string}) => {
   const path=`/access/stores/${storeId}/items`,client=useQueryClient();
-  const query=useQuery({queryKey:['pricebook-items',storeId],queryFn:()=>request<{items:BulkItem[];departments:{name:string;children:string[]}[]}>(path),enabled:!!storeId});
+  const departmentQuery=useStoreDepartments(storeId);
+  const query=useQuery({queryKey:['pricebook-items',storeId],queryFn:()=>request<{items:BulkItem[]}>(path),enabled:!!storeId});
   const options=useQuery({queryKey:['bulk-item-options',storeId],queryFn:()=>request<{groups:Option[];vendors:Option[];promotions:Option[];links:({id:number}&Links)[]}>(`${path}/bulk-options`),enabled:!!storeId,refetchOnMount:'always'});
   const groups=options.data?.groups??[],vendorOptions=options.data?.vendors??[],promotions=options.data?.promotions??[];
   const items=(query.data?.items??[]).map(i=>{
@@ -88,7 +92,7 @@ export const BulkUpdatePage = ({storeId}:{storeId:string}) => {
    const links=saved?{version:saved.version,groupId:saved.groupId,vendorIds:saved.vendorIds,promotionIds:saved.promotionIds,groupVersion:groups.find(g=>g.id===saved.groupId)?.version??null,promotionVersions:Object.fromEntries(promotions.filter(p=>saved.promotionIds.includes(p.id)).map(p=>[p.id,p.version]))}:null;
    return derive({...i,links,promotionalBatch:promotions.filter(p=>saved?.promotionIds.includes(p.id)).map(p=>p.name).join(', ')});
   });
-  const departments=(query.data?.departments??[]).map(d=>d.name),priceGroups=groups.map(g=>g.name),vendors=vendorOptions.map(v=>v.name),promoOptions=promotions.map(p=>p.name);
+  const departments=(departmentQuery.data??[]).map(d=>d.name),priceGroups=groups.map(g=>g.name),vendors=vendorOptions.map(v=>v.name),promoOptions=promotions.map(p=>p.name);
   const baseline=useRef<BulkItem[]>([]),attempt=useRef({payload:'',key:''});
   const [busy,setBusy]=useState(false),[message,setMessage]=useState('');
 
@@ -236,76 +240,70 @@ export const BulkUpdatePage = ({storeId}:{storeId:string}) => {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Department</Label>
-              <Select value={deptFilter} onValueChange={setDeptFilter}>
-                <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="All" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Departments</SelectItem>
-                  {departments.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <DepartmentFilter storeId={storeId} value={deptFilter} onValueChange={setDeptFilter} className="h-9 text-sm" extraNames={(query.data?.items??[]).map(item=>item.dept)} />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Price Group</Label>
-              <Select value={priceGroupFilter} onValueChange={setPriceGroupFilter}>
+              <RecentFilterSelect storeId={storeId} filterType="price-group" value={priceGroupFilter} onValueChange={setPriceGroupFilter}>
                 <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="All" /></SelectTrigger>
-                <SelectContent>
+                <RecentFilterContent>
                   <SelectItem value="all">All Groups</SelectItem>
                   {priceGroups.map((pg) => <SelectItem key={pg} value={pg}>{pg}</SelectItem>)}
-                </SelectContent>
-              </Select>
+                </RecentFilterContent>
+              </RecentFilterSelect>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Vendor</Label>
-              <Select value={vendorFilter} onValueChange={setVendorFilter}>
+              <RecentFilterSelect storeId={storeId} filterType="vendor" value={vendorFilter} onValueChange={setVendorFilter}>
                 <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="All" /></SelectTrigger>
-                <SelectContent>
+                <RecentFilterContent>
                   <SelectItem value="all">All Vendors</SelectItem>
                   {vendors.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
-                </SelectContent>
-              </Select>
+                </RecentFilterContent>
+              </RecentFilterSelect>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Promotion Name</Label>
-              <Select value={promoFilter} onValueChange={setPromoFilter}>
+              <RecentFilterSelect storeId={storeId} filterType="promotion" value={promoFilter} onValueChange={setPromoFilter}>
                 <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="All" /></SelectTrigger>
-                <SelectContent>
+                <RecentFilterContent>
                   <SelectItem value="all">All</SelectItem>
                   {promoOptions.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                </SelectContent>
-              </Select>
+                </RecentFilterContent>
+              </RecentFilterSelect>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Tax Type</Label>
-              <Select value={taxFilter} onValueChange={setTaxFilter}>
+              <RecentFilterSelect storeId={storeId} filterType="tax" value={taxFilter} onValueChange={setTaxFilter}>
                 <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="All" /></SelectTrigger>
-                <SelectContent>
+                <RecentFilterContent>
                   <SelectItem value="all">All</SelectItem>
                   <SelectItem value="yes">Taxable</SelectItem>
                   <SelectItem value="no">Non-Taxable</SelectItem>
-                </SelectContent>
-              </Select>
+                </RecentFilterContent>
+              </RecentFilterSelect>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Age Restricted</Label>
-              <Select value={ageFilter} onValueChange={setAgeFilter}>
+              <RecentFilterSelect storeId={storeId} filterType="age-restriction" value={ageFilter} onValueChange={setAgeFilter}>
                 <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="All" /></SelectTrigger>
-                <SelectContent>
+                <RecentFilterContent>
                   <SelectItem value="all">All</SelectItem>
                   <SelectItem value="yes">Yes</SelectItem>
                   <SelectItem value="no">No</SelectItem>
-                </SelectContent>
-              </Select>
+                </RecentFilterContent>
+              </RecentFilterSelect>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">EBT / SNAP</Label>
-              <Select value={ebtFilter} onValueChange={setEbtFilter}>
+              <RecentFilterSelect storeId={storeId} filterType="ebt" value={ebtFilter} onValueChange={setEbtFilter}>
                 <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="All" /></SelectTrigger>
-                <SelectContent>
+                <RecentFilterContent>
                   <SelectItem value="all">All</SelectItem>
                   <SelectItem value="yes">Accepted</SelectItem>
                   <SelectItem value="no">Not Accepted</SelectItem>
-                </SelectContent>
-              </Select>
+                </RecentFilterContent>
+              </RecentFilterSelect>
             </div>
           </div>
           {hasActiveFilters && (
@@ -399,7 +397,7 @@ export const BulkUpdatePage = ({storeId}:{storeId:string}) => {
                           </TableCell>
 
                           {/* Sub-Department */}
-                          <TableCell>{isEditing?<Select value={item.subDept||''} onValueChange={v=>updateDraft(item.id,'subDept',v)}><SelectTrigger className="h-7 text-xs w-28"><SelectValue placeholder="Choose" /></SelectTrigger><SelectContent>{(query.data?.departments.find(d=>d.name===item.dept)?.children??[]).map(n=><SelectItem key={n} value={n}>{n}</SelectItem>)}</SelectContent></Select>:item.subDept}</TableCell>
+                          <TableCell>{isEditing?<Select value={item.subDept||''} onValueChange={v=>updateDraft(item.id,'subDept',v)}><SelectTrigger className="h-7 text-xs w-28"><SelectValue placeholder="Choose" /></SelectTrigger><SelectContent>{(departmentQuery.data?.find(d=>d.name===item.dept)?.children??[]).map(n=><SelectItem key={n} value={n}>{n}</SelectItem>)}</SelectContent></Select>:item.subDept}</TableCell>
 
                           <TableCell>{isEditing?<Select value={item.links.groupId==null?'none':String(item.links.groupId)} onValueChange={v=>changeLinks(item.id,'groupId',v==='none'?null:Number(v))}><SelectTrigger className="h-7 text-xs w-32"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">No group</SelectItem>{groups.map(g=><SelectItem key={g.id} value={String(g.id)}>{g.name}</SelectItem>)}</SelectContent></Select>:item.priceGroup}</TableCell>
                           <TableCell>{isEditing?<LinkChoices label="Choose vendors" options={vendorOptions} selected={item.links.vendorIds} onChange={ids=>changeLinks(item.id,'vendorIds',ids)}/>:item.vendor}</TableCell>
