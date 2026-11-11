@@ -14,4 +14,4 @@ fi
 exec env DB_URL=jdbc:postgresql://127.0.0.1:55439/dgt_test DB_USERNAME=dgt_test \
   DB_PASSWORD="${DGT_TEST_DB_PASSWORD:-only-test-password}" PORT=8181 APP_ENVIRONMENT=development APP_POS_SIMULATOR_ENABLED=true \
   CORS_ORIGINS=http://localhost:5173,http://localhost:5174 \
-  java -jar target/dgt-backend-0.1.0-SNAPSHOT.jar --spring.profiles.active=dev --debug=false --logging.level.root=INFO --logging.level.org.springframework=INFO
+  java -jar target/dgt-backend-0.1.0-SNAPSHOT.jar --spring.profiles.active=dev --spring.datasource.url=jdbc:postgresql://127.0.0.1:55439/dgt_test --debug=false --logging.level.root=INFO --logging.level.org.springframework=INFO

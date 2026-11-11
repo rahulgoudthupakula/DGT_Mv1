@@ -20,8 +20,8 @@ public class EmployeeDetails {
  // Optional detail section carried by the store employee form.
  public record Input(String jobTitle,String department,Deposit deposit,List<Deduction> deductions){}
  private ResponseStatusException bad(String s){return new ResponseStatusException(HttpStatus.BAD_REQUEST,s);}
- // List active custom departments and defaults not disabled by a store override.
- public List<Map<String,Object>> departments(String store){return a.db.queryForList("SELECT 'default-'||d.department_id AS id,d.department_name AS name FROM departments d WHERE d.is_default AND NOT EXISTS(SELECT 1 FROM store_departments sd WHERE sd.dgt_id=? AND sd.department_id=d.department_id AND sd.source_type='DEFAULT' AND NOT sd.is_active) UNION ALL SELECT 'store-'||store_department_id,store_department_name FROM store_departments WHERE dgt_id=? AND is_active AND (source_type<>'DEFAULT' OR department_id IS NULL) ORDER BY name",store,store);}
+ // Use store-owned names and activation while preserving existing assignment keys.
+ public List<Map<String,Object>> departments(String store){return a.db.queryForList("SELECT CASE WHEN department_id IS NOT NULL THEN 'default-'||department_id ELSE 'store-'||store_department_id END AS id,store_department_name AS name FROM store_departments WHERE dgt_id=? AND is_active ORDER BY name",store);}
  // Attach stored deposit instructions and deductions to a previously authorized employee row.
  public void enrich(Map<String,Object> row){long id=((Number)row.get("id")).longValue();var deposit=a.db.queryForList("SELECT bank_name,account_holder,account_type,account_last_four,routing_number,active,is_test FROM employee_deposit_instructions WHERE employee_id=?",id);row.put("deposit",deposit.isEmpty()?null:Rows.normalize(deposit.getFirst()));row.put("deductions",a.db.queryForList("SELECT deduction_type,calculation_type,amount,frequency,effective_from,effective_to,active FROM employee_deductions WHERE employee_id=? ORDER BY deduction_type",id).stream().map(Rows::normalize).toList());}
  // Trim required deposit text and enforce its maximum length.

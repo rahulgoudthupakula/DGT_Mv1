@@ -8,7 +8,7 @@ import com.dgt.backend.access.security.ScopedAccess;
 import com.dgt.backend.access.service.ApprovalService;
 
 
-import com.dgt.backend.departments.service.DefaultDepartmentCatalog;
+
 import org.springframework.web.bind.annotation.*;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -22,8 +22,8 @@ import lombok.extern.slf4j.Slf4j;
 @RequestMapping("/api/v1/access/stores/{store}/items")
 // Store item catalog endpoints and approval-dispatched item mutations.
 public class PriceBookController {
- private final ScopedAccess a; private final ApprovalService approvals; private final DefaultDepartmentCatalog catalog; private final BulkItemLinks bulkLinks;
- public PriceBookController(ScopedAccess a,ApprovalService approvals,DefaultDepartmentCatalog catalog,BulkItemLinks bulkLinks){this.bulkLinks=bulkLinks;this.a=a;this.approvals=approvals;this.catalog=catalog;}
+ private final ScopedAccess a; private final ApprovalService approvals; private final BulkItemLinks bulkLinks;
+ public PriceBookController(ScopedAccess a,ApprovalService approvals,BulkItemLinks bulkLinks){this.bulkLinks=bulkLinks;this.a=a;this.approvals=approvals;}
  public record Input(String name,String sku,String barcode,String dept,String subDept,BigDecimal retail,Boolean taxable,Boolean ebtSnap,Boolean allowReturns,Boolean active,Boolean ageRestricted,BigDecimal reorderLevel,String unitType,Integer unitsPerCase,BigDecimal purchaseGrossCost,BigDecimal purchaseDiscount,BigDecimal currentInventory,String inventoryVersion){}
  private ResponseStatusException bad(String message){return new ResponseStatusException(HttpStatus.BAD_REQUEST,message);}
  private String text(String value,int max,String name){if(value==null||value.isBlank()||value.trim().length()>max)throw bad(name+" is required (maximum "+max+" characters)");return value.trim();}
@@ -82,10 +82,7 @@ public class PriceBookController {
  }
  private List<Map<String,Object>> departments(String store){
   var result=new ArrayList<Map<String,Object>>();
-  for(var d:a.db.queryForList("SELECT department_name FROM departments d WHERE is_default AND NOT EXISTS(SELECT 1 FROM store_departments s WHERE s.dgt_id=? AND s.department_id=d.department_id AND NOT s.is_active) ORDER BY department_name",store)){
-   String name=(String)d.get("department_name");if(catalog.contains(name))result.add(Map.of("name",name,"children",catalog.children(name)));
-  }
-  for(var d:a.db.queryForList("SELECT store_department_id,store_department_name FROM store_departments WHERE dgt_id=? AND is_active AND (source_type<>'DEFAULT' OR department_id IS NULL)",store)){
+  for(var d:a.db.queryForList("SELECT store_department_id,store_department_name FROM store_departments WHERE dgt_id=? AND is_active ORDER BY (department_id IS NULL),store_department_name",store)){
    result.add(Map.of("name",d.get("store_department_name"),"children",a.db.queryForList("SELECT store_sub_department_name FROM store_sub_departments WHERE store_department_id=? AND dgt_id=? AND is_active ORDER BY store_sub_department_name",String.class,d.get("store_department_id"),store)));
   }return result;
  }
@@ -137,11 +134,11 @@ public class PriceBookController {
   if(!barcode.isEmpty()&&Boolean.TRUE.equals(a.db.queryForObject("SELECT EXISTS(SELECT 1 FROM product_barcodes WHERE dgt_id=? AND product_barcode_value=? AND (?::bigint IS NULL OR product_id<>?))",Boolean.class,store,barcode,id,id)))throw bad("This barcode already belongs to an item in this store");
   if(departments(store).stream().noneMatch(d->dept.equals(d.get("name"))&&((List<?>)d.get("children")).contains(sub)))throw bad("Choose an active department and subdepartment for this store");
   var depIds=a.db.queryForList("SELECT store_department_id FROM store_departments WHERE dgt_id=? AND store_department_name=? AND is_active",Long.class,store,dept);
-  long depId;
-  if(depIds.isEmpty())depId=a.db.queryForObject("INSERT INTO store_departments(dgt_id,department_id,store_department_name,source_type) SELECT ?,department_id,department_name,'DEFAULT' FROM departments WHERE department_name=? AND is_default RETURNING store_department_id",Long.class,store,dept);
-  else if(depIds.size()==1)depId=depIds.getFirst();else throw bad("Duplicate departments need review");
+  if(depIds.size()!=1)throw bad("Choose one active department for this store");
+  long depId=depIds.getFirst();
   var subs=a.db.queryForList("SELECT store_sub_department_id FROM store_sub_departments WHERE dgt_id=? AND store_department_id=? AND store_sub_department_name=? AND is_active",Long.class,store,depId,sub);
-  long subId=subs.isEmpty()?a.db.queryForObject("INSERT INTO store_sub_departments(dgt_id,store_department_id,store_sub_department_name,source_type) VALUES (?,?,?,'DEFAULT') RETURNING store_sub_department_id",Long.class,store,depId,sub):subs.getFirst();
+  if(subs.size()!=1)throw bad("Choose one active subdepartment for this store");
+  long subId=subs.getFirst();
   if(id==null)id=a.db.queryForObject("INSERT INTO products(dgt_id,store_sub_department_id,product_name,product_sku,is_taxable,is_ebt,is_returnable,is_active) VALUES (?,?,?,?,?,?,?,?) RETURNING product_id",Long.class,store,subId,name,sku,input.taxable(),input.ebtSnap(),input.allowReturns(),input.active());
   else a.db.update("UPDATE products SET store_sub_department_id=?,product_name=?,product_sku=?,is_taxable=?,is_ebt=?,is_returnable=?,is_active=?,updated_at=CURRENT_TIMESTAMP WHERE product_id=? AND dgt_id=?",subId,name,sku,input.taxable(),input.ebtSnap(),input.allowReturns(),input.active(),id,store);
   // Archive the displayed mapping; retain other barcodes and reactivate an existing identity.
