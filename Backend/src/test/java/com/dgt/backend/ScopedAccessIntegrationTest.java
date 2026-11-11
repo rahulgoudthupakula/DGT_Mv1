@@ -530,10 +530,20 @@ class ScopedAccessIntegrationTest {
   var versions=new HashMap<String,String>();for(var row:options.path("promotions"))if(promos.contains(row.path("id").asLong()))versions.put(row.path("id").asText(),row.path("version").asText());
   result.put("vendor_ids",vendors);result.put("promotion_ids",promos);result.put("promotion_versions",versions);return result;
  }
+ // Send the camelCase record payload used by the browser, preserving list and numeric map keys.
+ Object browserRecordBody(Object value){
+  if(value instanceof Map<?,?> map){var result=new LinkedHashMap<String,Object>();for(var entry:map.entrySet()){
+   String key=entry.getKey().toString();var camel=new StringBuilder();boolean upper=false;
+   for(char c:key.toCharArray()){if(c=='_'){upper=true;continue;}camel.append(upper?Character.toUpperCase(c):c);upper=false;}
+   result.put(camel.toString(),browserRecordBody(entry.getValue()));
+  }return result;}
+  if(value instanceof List<?> list)return list.stream().map(this::browserRecordBody).toList();
+  return value;
+ }
  @Test @Order(35) void bulkEditableLinksAndIndividualPrice() throws Exception {
   String path=access()+"/items";var dep=ok(req("admin","GET",path,null),200).path("departments").get(0);
   var item=new LinkedHashMap<String,Object>();item.put("name","Editable links");item.put("sku","LINKS-"+tag);item.put("dept",dep.path("name").asText());item.put("sub_dept",dep.path("children").get(0).asText());item.put("retail",3);item.put("taxable",true);item.put("ebt_snap",false);item.put("allow_returns",true);item.put("active",true);item.put("unit_type","item");item.put("purchase_gross_cost",1.49);item.put("purchase_discount",0);
-  long id=ok(req("admin","POST",path,item),200).path("id").asLong();
+  long id=ok(req("admin","POST",path,browserRecordBody(item)),200).path("id").asLong();
   long seed=db.queryForObject("SELECT product_id FROM products WHERE dgt_id=? AND product_id<>? AND is_active ORDER BY product_id DESC LIMIT 1",Long.class,store,id);
   long vendor=db.queryForObject("INSERT INTO vendors(dgt_id,vendor_name) VALUES (?,?) RETURNING vendor_id",Long.class,store,"Bulk vendor");
   var groupInput=new LinkedHashMap<String,Object>();groupInput.put("name","Override group");groupInput.put("group_price",9.99);groupInput.put("products",List.of(id));
@@ -542,7 +552,7 @@ class ScopedAccessIntegrationTest {
   long promotion=ok(req("admin","POST",access()+"/promotions",promo),200).path("id").asLong();
   item.put("name","Renamed in bulk");item.put("sku","LINKS-NEW-"+tag);item.put("barcode","21"+Long.parseUnsignedLong(tag,16));item.put("retail",4.50);
   var links=bulkLinksFor(id,group,List.of(vendor),List.of(promotion));String version=db.queryForObject("SELECT xmin::text FROM products WHERE product_id=?",String.class,id);
-  ok(req("admin","POST",path+"/bulk",Map.of("rows",List.of(Map.of("id",id,"version",version,"item",item,"links",links)))),200);
+  ok(req("admin","POST",path+"/bulk",browserRecordBody(Map.of("rows",List.of(Map.of("id",id,"version",version,"item",item,"links",links))))),200);
   assertThat(db.queryForObject("SELECT retail_price FROM product_store_prices WHERE product_id=?",java.math.BigDecimal.class,id)).isEqualByComparingTo("4.50");
   for(var row:ok(req("admin","GET",path,null),200).path("items"))if(row.path("id").asLong()==id){assertThat(row.path("retail").decimalValue()).isEqualByComparingTo("4.50");assertThat(row.path("effectiveRetail").decimalValue()).isEqualByComparingTo("9.99");}
   item.put("retail",5.25);String directVersion=db.queryForObject("SELECT xmin::text FROM products WHERE product_id=?",String.class,id);ok(call("admin","PUT",path+"/"+id,item,directVersion,null),200);
