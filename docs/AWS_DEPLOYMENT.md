@@ -16,7 +16,7 @@ Run in the EC2 SSH terminal:
 bash ~/dgt-release/activate.sh dgtinnovations.com
 ```
 
-It asks for the existing RDS `postgres` password and then the existing `dgt_app` password without displaying either. It saves a restricted backup before running Flyway V2, grants non-owner runtime permissions, verifies the application login, writes a root-controlled application credential file, and starts the service. Flyway runs separately using administrative credentials; the application has Flyway disabled and no DELETE/TRUNCATE/DDL permissions. Do not use `baseline` or `repair` to bypass migration errors.
+It asks for the existing RDS `postgres` password and then the existing `dgt_app` password without displaying either. It saves a restricted backup before running Flyway V2, grants non-owner runtime permissions, verifies the application login, writes a root-controlled application credential file, and starts the service. Flyway runs separately using administrative credentials; the application has Flyway disabled and no DELETE permissions on business tables or TRUNCATE/DDL permissions. The runtime permission script allows DELETE only on `refresh_tokens` so session renewal can consume used tokens and logout can revoke them. Do not use `baseline` or `repair` to bypass migration errors.
 
 Finally it issues an HTTPS certificate and configures renewal. If DNS is not ready, rerun only:
 

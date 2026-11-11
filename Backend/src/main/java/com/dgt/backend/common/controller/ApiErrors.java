@@ -15,6 +15,11 @@ import org.springframework.web.server.ResponseStatusException;
 @Slf4j
 @RestControllerAdvice
 public class ApiErrors {
+    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+    ResponseEntity<ProblemDetail> unreadableJson() {
+        return ResponseEntity.badRequest().body(ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
+                "Invalid request body. Check required fields and use the expected value types."));
+    }
     // Preserve the explicit status and reason supplied by application validation.
     @ExceptionHandler(ResponseStatusException.class)
     ResponseEntity<ProblemDetail> status(ResponseStatusException ex, HttpServletRequest req) {

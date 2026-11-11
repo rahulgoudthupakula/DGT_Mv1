@@ -30,5 +30,8 @@ SELECT format('GRANT CONNECT ON DATABASE %I TO %I',current_database(), :'runtime
 SELECT format('GRANT SELECT, INSERT, UPDATE ON TABLE %I.%I TO %I',schemaname,tablename, :'runtime_user')
 FROM pg_tables WHERE schemaname='public' AND tablename <> 'flyway_schema_history' \gexec
 GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO :"runtime_user";
+-- Refresh credentials are single-use secrets consumed/revoked with DELETE RETURNING.
+-- This exception grants no DELETE access to business records.
+GRANT DELETE ON TABLE public.refresh_tokens TO :"runtime_user";
 -- Apply again after later migrations create tables. Runtime never runs Flyway.
 COMMIT;
