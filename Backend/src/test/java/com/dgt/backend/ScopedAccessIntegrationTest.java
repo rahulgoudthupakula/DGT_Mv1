@@ -128,6 +128,7 @@ class ScopedAccessIntegrationTest {
   db.update("DELETE FROM rebate_claims WHERE dgt_id IN (?,?,?)",store,second,foreign);
   db.update("DELETE FROM rebate_program_items WHERE dgt_id IN (?,?,?)",store,second,foreign);
   db.update("DELETE FROM rebate_programs WHERE dgt_id IN (?,?,?)",store,second,foreign);
+  db.update("DELETE FROM sale_promotion_applications WHERE dgt_id IN (?,?,?)",store,second,foreign);
   db.update("DELETE FROM sale_discount_applications WHERE dgt_id IN (?,?,?)",store,second,foreign);
   db.update("DELETE FROM store_discounts WHERE dgt_id IN (?,?,?)",store,second,foreign);
   db.update("DELETE FROM fleet_batch_payments WHERE batch_id IN (SELECT batch_id FROM fleet_batches WHERE dgt_id IN (?,?,?))",store,second,foreign);
@@ -1706,6 +1707,38 @@ class ScopedAccessIntegrationTest {
   assertThat(ok(req("admin","GET",path,null),200).get("reasons").get(0).get("active").asBoolean()).isFalse();
   assertThat(call("admin","PUT","/access/stores/"+second+"/discounts/"+id,input,version,null).code()).isEqualTo(409);
  }
+ @Test @Order(1001) void checkoutPromotionsChooseBestAndApplyWithGuards() throws Exception {
+  String path=access()+"/checkout-promotions";
+  long employee=db.queryForObject("SELECT employee_id FROM employees WHERE user_id=?",Long.class,users.get("cashier"));
+  long terminal=db.queryForObject("INSERT INTO pos_terminals(store_id,terminal_code) VALUES (?,'PROMOTIONS') RETURNING terminal_id",Long.class,store);
+  long product=db.queryForObject("INSERT INTO products(dgt_id,product_name,product_sku,unit_of_measure,is_active,is_taxable,store_sub_department_id) VALUES (?,'Promotion pricing',?,'ITEM',true,true,(SELECT min(store_sub_department_id) FROM store_sub_departments WHERE dgt_id=?)) RETURNING product_id",Long.class,store,"PROMO-"+tag,store);
+  var promo=new LinkedHashMap<String,Object>();promo.put("name","Pricing percent");promo.put("type","% Discount");promo.put("discount_value",10);promo.put("products",List.of(Map.of("product_id",product,"quantity",1)));promo.put("start",java.time.LocalDate.now().minusDays(1).toString());promo.put("end",java.time.LocalDate.now().plusDays(1).toString());
+  ok(req("admin","POST",access()+"/promotions",promo),200);
+  promo.put("name","Pricing fixed");promo.put("type","Fixed Price");promo.put("discount_value",8);ok(req("admin","POST",access()+"/promotions",promo),200);
+  promo.put("name","Pricing buy get");promo.put("type","Buy X Get Y");promo.remove("discount_value");promo.put("buy_qty",2);promo.put("free_qty",1);long buyGet=ok(req("admin","POST",access()+"/promotions",promo),200).path("id").asLong();
+  java.util.function.Supplier<Long> ticket=()->{String ref=UUID.randomUUID().toString();long sale=db.queryForObject("INSERT INTO sales(store_id,cashier_id,terminal_id,receipt_no,transaction_id,transaction_type,sale_status,sale_datetime,subtotal,taxable_amount,tax_amount,discount_amount,total_amount,total_items) VALUES (?,?,?,?,?,'SALE','OPEN',now(),30,30,2.1,0,32.1,1) RETURNING sale_id",Long.class,store,employee,terminal,ref,ref);db.update("INSERT INTO sales_items(sale_id,product_id,quantity,catalog_price,unit_price,gross_amount,discount_amount,taxable_amount,tax_amount,line_total) VALUES (?,?,3,10,10,30,0,30,2.1,32.1)",sale,product);return sale;};
+  long sale=ticket.get();var input=new LinkedHashMap<String,Object>();input.put("sale_id",sale);
+  var preview=ok(req("cashier","POST",path+"/preview",input),200);assertThat(preview.path("net").decimalValue()).isEqualByComparingTo("20");assertThat(preview.path("total").decimalValue()).isEqualByComparingTo("21.4");
+  assertThat(db.queryForObject("SELECT discount_amount FROM sales WHERE sale_id=?",java.math.BigDecimal.class,sale)).isEqualByComparingTo("0");
+  input.put("quote_version",preview.path("quoteVersion").asText());String key=UUID.randomUUID().toString();var applied=ok(call("cashier","POST",path,input,null,key),200);
+  assertThat(ok(call("cashier","POST",path,input,null,key),200)).isEqualTo(applied);
+  assertThat(db.queryForObject("SELECT discount_amount FROM sales WHERE sale_id=?",java.math.BigDecimal.class,sale)).isEqualByComparingTo("10");assertThat(db.queryForObject("SELECT total_amount FROM sales WHERE sale_id=?",java.math.BigDecimal.class,sale)).isEqualByComparingTo("21.4");
+  ok(req("cashier","POST",path,input),409);ok(req("cashier","POST",path+"/preview",input),409);
+  long next=ticket.get();input.put("sale_id",next);preview=ok(req("cashier","POST",path+"/preview",input),200);input.put("quote_version",preview.path("quoteVersion").asText());ok(call("cashier","POST",path,input,null,key),409);
+  db.update("UPDATE promotions SET is_active=false WHERE promotion_id=?",buyGet);ok(req("cashier","POST",path,input),409);
+  preview=ok(req("cashier","POST",path+"/preview",input),200);assertThat(preview.path("net").decimalValue()).isEqualByComparingTo("24");
+  input.put("quote_version",preview.path("quoteVersion").asText());db.update("UPDATE promotions SET is_active=true,start_date=now()+interval '1 day' WHERE promotion_id=?",buyGet);
+  assertThat(ok(req("cashier","POST",path+"/preview",input),200).path("net").decimalValue()).isEqualByComparingTo("24");
+  db.update("UPDATE promotions SET start_date=now()-interval '2 day',end_date=now()-interval '1 day' WHERE promotion_id=?",buyGet);
+  assertThat(ok(req("cashier","POST",path+"/preview",input),200).path("net").decimalValue()).isEqualByComparingTo("24");
+  ok(req("other","POST",path+"/preview",input),403);ok(req("accountant","POST",path+"/preview",input),403);
+  ok(req("admin","POST","/access/stores/"+second+"/checkout-promotions/preview",input),409);
+  db.update("UPDATE sales SET sale_status='COMPLETED' WHERE sale_id=?",next);ok(req("cashier","POST",path+"/preview",input),409);
+  long paid=ticket.get();db.update("INSERT INTO sale_payments(sale_id,tender_type_id,payment_amount,payment_status) SELECT ?,tender_type_id,1,'COMPLETED' FROM tender_types WHERE tender_code='CASH'",paid);input.put("sale_id",paid);ok(req("cashier","POST",path+"/preview",input),409);
+  long discounted=ticket.get();db.update("UPDATE sales_items SET discount_amount=1 WHERE sale_id=?",discounted);input.put("sale_id",discounted);ok(req("cashier","POST",path+"/preview",input),409);
+  long changed=ticket.get();input.put("sale_id",changed);preview=ok(req("cashier","POST",path+"/preview",input),200);input.put("quote_version",preview.path("quoteVersion").asText());db.update("UPDATE sales_items SET quantity=2,gross_amount=20,taxable_amount=20,tax_amount=1.4,line_total=21.4 WHERE sale_id=?",changed);db.update("UPDATE sales SET subtotal=20,taxable_amount=20,tax_amount=1.4,total_amount=21.4 WHERE sale_id=?",changed);ok(req("cashier","POST",path,input),409);
+ }
+
  @Test @Order(1000) void checkoutDiscountCalculationApprovalAndGuards() throws Exception {
   String path="/access/stores/"+store+"/checkout-discounts";
   long employee=db.queryForObject("SELECT employee_id FROM employees WHERE user_id=?",Long.class,users.get("cashier"));
