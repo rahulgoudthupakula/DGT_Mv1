@@ -1792,7 +1792,8 @@ class ScopedAccessIntegrationTest {
   db.update("UPDATE store_discounts SET manager_approval=false,value=10 WHERE discount_id=?",discount);
   input.put("sale_id",ticket.get());input.put("employee_id",offline);
   assertThat(ok(req("cashier","POST",path,input),200).get("status").asText()).isEqualTo("APPLIED");
-  db.update("UPDATE employees SET termination_date=CURRENT_DATE WHERE employee_id=?",offline);input.put("sale_id",ticket.get());assertThat(req("cashier","POST",path,input).code()).isEqualTo(400);
+  // Match checkout eligibility to the store business date even when CI runs in UTC.
+  db.update("UPDATE employees SET termination_date=(SELECT (CURRENT_TIMESTAMP AT TIME ZONE timezone)::date FROM stores WHERE dgt_id=?) WHERE employee_id=?",store,offline);input.put("sale_id",ticket.get());assertThat(req("cashier","POST",path,input).code()).isEqualTo(400);
   // Fixed amount cannot exceed the eligible net amount; tax also reaches zero.
   db.update("UPDATE store_discounts SET eligibility_type='NONE',discount_type_id=(SELECT discount_type_id FROM discount_type WHERE code='AMOUNT'),value=100 WHERE discount_id=?",discount);
   input.remove("employee_id");long free=ticket.get();input.put("sale_id",free);
