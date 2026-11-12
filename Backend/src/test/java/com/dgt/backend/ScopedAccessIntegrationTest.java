@@ -1707,6 +1707,28 @@ class ScopedAccessIntegrationTest {
   assertThat(ok(req("admin","GET",path,null),200).get("reasons").get(0).get("active").asBoolean()).isFalse();
   assertThat(call("admin","PUT","/access/stores/"+second+"/discounts/"+id,input,version,null).code()).isEqualTo(409);
  }
+ @Test @Order(1002) void vendorItemPagesAndProductOptionsAreSmallSearchableAndScoped() throws Exception {
+  String path=access()+"/vendors";long vendor=ok(req("admin","POST",path,Map.of("name","Picker vendor "+tag,"phone","+12025550123","active",true)),200).path("id").asLong();
+  String base=path+"/"+vendor;var ids=new ArrayList<Long>();
+  for(int i=0;i<29;i++)ids.add(db.queryForObject("INSERT INTO products(dgt_id,product_name,product_sku,is_active,store_sub_department_id,purchase_unit,units_per_case,purchase_gross_cost,purchase_discount) VALUES (?,?,?,?,(SELECT min(store_sub_department_id) FROM store_sub_departments WHERE dgt_id=?),'CASE',24,48,6) RETURNING product_id",Long.class,store,String.format("Picker %s %02d",tag,i),"PICK-"+i+"-"+tag,i!=28,store));
+  for(int i=0;i<2;i++)ok(req("admin","POST",base+"/items",Map.of("product_id",ids.get(i),"unit_cost",1.75,"unit_type","ITEM")),200);
+  String query="?search="+java.net.URLEncoder.encode("Picker "+tag,StandardCharsets.UTF_8);
+  var first=ok(req("admin","GET",base+"/product-options"+query,null),200);assertThat(first.path("items").size()).isEqualTo(25);assertThat(first.path("hasMore").asBoolean()).isTrue();
+  var option=first.path("items").get(0);assertThat(option.path("id").asLong()).isEqualTo(ids.get(2));assertThat(option.path("cost").decimalValue()).isEqualByComparingTo("1.75");assertThat(option.path("unitsPerCase").asInt()).isEqualTo(24);assertThat(option.size()).isEqualTo(5);
+  var last=ok(req("admin","GET",base+"/product-options"+query+"&page=1",null),200);assertThat(last.path("items").size()).isEqualTo(1);assertThat(last.path("hasMore").asBoolean()).isFalse();assertThat(last.path("items").get(0).path("id").asLong()).isEqualTo(ids.get(27));
+  String barcode="VENDOR-"+tag;db.update("INSERT INTO product_barcodes(dgt_id,product_id,product_barcode_type,product_barcode_value,is_primary) VALUES (?,?,'OTHER',?,false)",store,ids.get(2),barcode);
+  for(String search:List.of("picker "+tag+" 02","pick-2-"+tag,barcode.toLowerCase())){var found=ok(req("admin","GET",base+"/product-options?search="+java.net.URLEncoder.encode(search,StandardCharsets.UTF_8),null),200).path("items");assertThat(found.size()).isEqualTo(1);assertThat(found.get(0).path("id").asLong()).isEqualTo(ids.get(2));}
+  assertThat(ok(req("admin","GET",base+"/product-options?search=%25",null),200).path("items").isEmpty()).isTrue();
+  for(String invalid:List.of("page=-1","limit=0","limit=101","search="+"a".repeat(201)))ok(req("admin","GET",base+"/product-options?"+invalid,null),400);
+  ok(req("other","GET",base+"/product-options",null),403);ok(req("cashier","GET",base+"/product-options",null),403);ok(req("admin","GET","/access/stores/"+second+"/vendors/"+vendor+"/product-options",null),404);
+  var page=ok(req("admin","GET",base+"/items?page=0&limit=1",null),200);assertThat(page.path("total").asInt()).isEqualTo(2);assertThat(page.path("items").size()).isEqualTo(1);assertThat(page.path("hasMore").asBoolean()).isTrue();
+  var next=ok(req("admin","GET",base+"/items?page=1&limit=1",null),200);assertThat(next.path("items").get(0).path("id").asLong()).isEqualTo(ids.get(1));assertThat(next.path("hasMore").asBoolean()).isFalse();
+  ok(req("admin","GET",base+"/items?page=-1",null),400);ok(req("admin","GET",base+"/items?page=0&limit=101",null),400);
+  var link=page.path("items").get(0);ok(call("admin","DELETE",base+"/items/"+ids.get(0),null,link.path("version").asText(),null),200);
+  var unlinked=ok(req("admin","GET",base+"/product-options?search=PICK-0-"+tag,null),200).path("items");assertThat(unlinked.size()).isEqualTo(1);assertThat(unlinked.get(0).path("id").asLong()).isEqualTo(ids.get(0));
+  db.update("UPDATE products SET purchase_gross_cost=NULL,purchase_discount=NULL WHERE product_id=?",ids.get(0));assertThat(ok(req("admin","GET",base+"/product-options?search=PICK-0-"+tag,null),200).path("items").get(0).path("cost").isNull()).isTrue();
+ }
+
  @Test @Order(1001) void checkoutPromotionsChooseBestAndApplyWithGuards() throws Exception {
   String path=access()+"/checkout-promotions";
   long employee=db.queryForObject("SELECT employee_id FROM employees WHERE user_id=?",Long.class,users.get("cashier"));
