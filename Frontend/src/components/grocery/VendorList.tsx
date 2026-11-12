@@ -2,6 +2,7 @@
  * Manages store vendors and vendor-product links. Removing a link preserves the Price Book
  * product; successful mutations refresh related vendor, cost and audit caches.
  */
+import { VendorProductPicker, type VendorProductOption } from "./VendorProductPicker";
 import {VendorPricing} from "./VendorPricing";
 import {VendorAudit} from "./VendorAudit";
 import {VendorContracts} from "./VendorContracts";
@@ -13,8 +14,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePagination } from "@/hooks/use-pagination";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -58,7 +57,6 @@ import {
   FileText,
   ChevronRight,
   ArrowUpDown,
-  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAppNavigation } from "@/contexts/NavigationContext";
@@ -232,8 +230,8 @@ export const VendorList = ({storeId}:{storeId:string}) => {
   const vendors=query.data??[];
   const [phoneCountry,setPhoneCountry]=useState<CountryCode>('US');
   const countryCode = '+' + getCountryCallingCode(phoneCountry);
-  const [itemSearch,setItemSearch]=useState("");
-  const [itemPickerOpen,setItemPickerOpen]=useState(false);
+  const [selectedItem,setSelectedItem]=useState<VendorProductOption|null>(null);
+  const [itemPage,setItemPage]=useState(0);
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[editing,setEditing]=useState<Vendor|null>(null);
   const [linkOpen,setLinkOpen]=useState(false),[productId,setProductId]=useState(''),[unitCost,setUnitCost]=useState(''),[unitType,setUnitType]=useState('ITEM');
 
@@ -254,17 +252,15 @@ export const VendorList = ({storeId}:{storeId:string}) => {
 
 
 
-  const linked=useQuery({queryKey:['vendor-items',storeId,selectedVendor?.id],queryFn:()=>request<VendorItem[]>(`${path}/${selectedVendor?.id}/items`),enabled:!!selectedVendor});
-  const available=useQuery({queryKey:['vendor-available-items',storeId],queryFn:()=>request<{items:{id:number;name:string;sku:string;barcode?:string;active:boolean;unitsPerCase?:number|null;cost:number|null}[]}>(`/access/stores/${encodeURIComponent(storeId)}/items`),enabled:linkOpen});
-  const selectedItem=available.data?.items.find(item=>item.id===Number(productId));
+  const linked=useQuery({queryKey:['vendor-items',storeId,selectedVendor?.id,itemPage],queryFn:({signal})=>request<{items:VendorItem[];total:number;page:number;hasMore:boolean}>(`${path}/${selectedVendor?.id}/items?page=${itemPage}&limit=25`,{signal}),enabled:!!selectedVendor&&showVendorItems&&activeTab==='vendors',staleTime:60000,refetchOnWindowFocus:false});
   const packQuantity=Number(casePack);
   const catalogCost=selectedItem?.cost;
   const linkedCost=editLink?unitCost:catalogCost==null||!Number.isFinite(catalogCost)||(unitType==='CASE'&&(!Number.isInteger(packQuantity)||packQuantity<=0))?'':(catalogCost*(unitType==='CASE'?packQuantity:1)).toFixed(2);
   const handleAddVendor=async()=>{const phone = parsePhoneNumberFromString(newVendorForm.phone, phoneCountry);
     if(!/^[0-9]+$/.test(newVendorForm.phone) || !phone?.isValid() || phone.country !== phoneCountry){setError(`Enter a valid phone number for ${countryNames.of(phoneCountry)} with the correct number of digits.`);return;}setBusy(true);setError('');try{await request(editing?`${path}/${editing.id}`:path,{method:editing?'PUT':'POST',headers:editing?{'If-Match':editing.version??''}:{},body:JSON.stringify({name:newVendorForm.name,contactName:newVendorForm.contactName,email:newVendorForm.email,phone:phone.number,phoneCountry,paymentTerms:newVendorForm.paymentTerms,leadTime:newVendorForm.leadTime===''?null:Number(newVendorForm.leadTime),active:editing?.active??true})});setShowAddVendor(false);setEditing(null);await Promise.all(['vendors','pricebook-items'].map(key=>client.invalidateQueries({queryKey:[key,storeId]})));}catch(e){setError(e instanceof Error?e.message:'Could not save vendor');}finally{setBusy(false);}};
-  async function refreshLinks(){await Promise.all(['vendor-items','vendors','vendor-pricing','vendor-cost-items','vendor-audit','pricebook-items'].map(key=>client.invalidateQueries({queryKey:[key,storeId]})));}
+  async function refreshLinks(){await Promise.all(['vendor-items','vendor-product-options','vendors','vendor-pricing','vendor-cost-items','vendor-audit','pricebook-items'].map(key=>client.invalidateQueries({queryKey:key==='vendor-items'||key==='vendor-product-options'?[key,storeId,selectedVendor?.id]:[key,storeId]})));}
   async function link(){setBusy(true);setError('');try{await request(`${path}/${selectedVendor?.id}/items${editLink?`/${editLink.id}`:''}`,{method:editLink?'PUT':'POST',headers:editLink?{'If-Match':editLink.version}:{},body:JSON.stringify({productId:Number(productId),unitCost:Number(linkedCost),unitType,vendorSku:editLink?.vendorSku??null,casePackSize:casePack===''?null:Number(casePack),moq:moq===''?null:Number(moq)})});setLinkOpen(false);await refreshLinks();}catch(e){setError(e instanceof Error?e.message:'Could not save vendor item');}finally{setBusy(false);}}
-  async function unlink(item:VendorItem){if(!window.confirm(`Remove ${item.name} from this vendor? The Price Book item and history will be kept.`))return;setBusy(true);setError('');try{await request(`${path}/${selectedVendor?.id}/items/${item.id}`,{method:'DELETE',headers:{'If-Match':item.version}});await refreshLinks();}catch(e){setError(e instanceof Error?e.message:'Could not remove vendor link');}finally{setBusy(false);}}
+  async function unlink(item:VendorItem){if(!window.confirm(`Remove ${item.name} from this vendor? The Price Book item and history will be kept.`))return;setBusy(true);setError('');try{await request(`${path}/${selectedVendor?.id}/items/${item.id}`,{method:'DELETE',headers:{'If-Match':item.version}});if((linked.data?.items.length??0)===1&&itemPage>0)setItemPage(p=>p-1);await refreshLinks();}catch(e){setError(e instanceof Error?e.message:'Could not remove vendor link');}finally{setBusy(false);}}
   const getContractStatusBadge = (status: string) => {
     switch (status) {
       case "Active":
@@ -284,13 +280,7 @@ export const VendorList = ({storeId}:{storeId:string}) => {
     return matchesSearch && matchesStatus;
   });
 
-  const vendorItemsForSelected = linked.data??[];
-  const unlinkedItems = (available.data?.items ?? []).filter(item =>
-    item.active && !vendorItemsForSelected.some(link => Number(link.id) === item.id));
-  const matchingItems = unlinkedItems.filter(item =>
-    `${item.name} ${item.sku} ${item.barcode ?? ''}`.toLowerCase().includes(itemSearch.trim().toLowerCase()));
-
-
+  const vendorItemsForSelected = linked.data?.items??[];
 
   const { paginated: paginatedVendors, page: pageVendors, totalPages: totalPagesVendors, totalItems: totalItemsVendors, hasPrev: hasPrevVendors, hasNext: hasNextVendors, prevPage: prevVendors, nextPage: nextVendors } = usePagination(filteredVendors, pageSizeVendors);
   
@@ -298,38 +288,14 @@ export const VendorList = ({storeId}:{storeId:string}) => {
   return (
     <div className="space-y-6">
       {query.isPending&&<p>Loading vendors…</p>}{query.error&&<p role="alert">{query.error.message}</p>}{error&&<p role="alert" className="text-sm text-red-600">{error}</p>}
-      <Dialog open={linkOpen} onOpenChange={v=>{if(!busy){setLinkOpen(v);if(!v)setItemPickerOpen(false);}}}><DialogContent><DialogHeader><DialogTitle>{editLink?'Edit Vendor Item':'Link Item'}</DialogTitle></DialogHeader>
+      <Dialog open={linkOpen} onOpenChange={v=>{if(!busy){setLinkOpen(v);}}}><DialogContent><DialogHeader><DialogTitle>{editLink?'Edit Vendor Item':'Link Item'}</DialogTitle></DialogHeader>
       <div className="space-y-2">
         <Label htmlFor="vendor-item-picker">{editLink ? 'Item' : 'Available item'}</Label>
-        {editLink ? <Input id="vendor-item-picker" value={editLink.name} disabled /> :
-          <Popover open={itemPickerOpen} onOpenChange={open=>{setItemPickerOpen(open);if(open)setItemSearch('');}}>
-            <PopoverTrigger asChild>
-              <Button id="vendor-item-picker" type="button" variant="outline" aria-haspopup="listbox" aria-expanded={itemPickerOpen} disabled={busy} className="w-full justify-between font-normal">
-                <span className="truncate">{selectedItem ? `${selectedItem.name} — ${selectedItem.sku}` : 'Select item'}</span>
-                <ChevronRight className="ml-2 h-4 w-4 shrink-0 rotate-90" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-0">
-              <Command shouldFilter={false}>
-                <CommandInput aria-label="Search available items" placeholder="Search by item name, SKU or barcode" value={itemSearch} onValueChange={setItemSearch}/>
-                <CommandList>
-                  <CommandEmpty>{available.isPending ? 'Loading items…' : available.error ? 'Could not load items.' : 'No matching items.'}</CommandEmpty>
-                  <CommandGroup>
-                    {matchingItems.map(item=><CommandItem key={item.id} value={String(item.id)} onSelect={()=>{
-                      setProductId(String(item.id));
-                      setCasePack(item.unitsPerCase==null?'':String(item.unitsPerCase));
-                      setItemPickerOpen(false);
-                    }}>
-                      <Check className={`mr-2 h-4 w-4 shrink-0 ${productId===String(item.id)?'opacity-100':'opacity-0'}`}/>
-                      <span>{item.name} — {item.sku}</span>
-                    </CommandItem>)}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>}
+        {editLink ? <Input id="vendor-item-picker" value={editLink.name} disabled /> : linkOpen&&selectedVendor ?
+          <VendorProductPicker storeId={storeId} vendorId={selectedVendor.id} value={selectedItem} disabled={busy} onChange={item=>{setSelectedItem(item);setProductId(String(item.id));setCasePack(item.unitsPerCase==null?'':String(item.unitsPerCase));}} /> : null}
+
       </div>
-      {available.error&&<p role="alert">{available.error.message}</p>}
+
       <Label>Purchase unit<select disabled={busy} className="w-full border rounded p-2 bg-background" value={unitType} onChange={e=>setUnitType(e.target.value)}><option value="ITEM">Item</option><option value="CASE">Case</option></select></Label>
       <Label>Case Pack (items per case)<Input disabled={busy} type="number" min="1" step="1" value={casePack} onChange={e=>setCasePack(e.target.value)}/></Label>
       <Label>MOQ — Minimum Order Quantity ({unitType==='CASE'?'cases':'items'})<Input disabled={busy} type="number" min="0.001" step="0.001" value={moq} onChange={e=>setMoq(e.target.value)}/></Label>
@@ -538,7 +504,7 @@ export const VendorList = ({storeId}:{storeId:string}) => {
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
                             <Button variant="ghost" size="sm" onClick={()=>{const parsedPhone=parsePhoneNumberFromString(vendor.phone??'');setPhoneCountry(parsedPhone?.country??'US');setEditing(vendor);setError('');setNewVendorForm({name:vendor.name,type:'',leadTime:vendor.leadTime==null?'':String(vendor.leadTime),paymentTerms:vendor.paymentTerms??'',contactName:vendor.contactName??'',phone:parsedPhone?.nationalNumber??(vendor.phone??'').replace(/[^0-9]/g,''),email:vendor.email??''});setShowAddVendor(true);}}><Edit className="h-4 w-4"/><span className="sr-only">Edit vendor</span></Button>
-                            <Button variant="ghost" size="sm" onClick={() => { setSelectedVendor(vendor); setShowVendorItems(true); }}>
+                            <Button variant="ghost" size="sm" onClick={() => { setSelectedVendor(vendor); setItemPage(0); setShowVendorItems(true); }}>
                               <Eye className="h-4 w-4 mr-1" /> Items
                             </Button>
                             
@@ -582,10 +548,10 @@ export const VendorList = ({storeId}:{storeId:string}) => {
                     <div>
                       <CardTitle className="text-lg">Items from {selectedVendor?.name}</CardTitle>
                       <p className="text-sm text-muted-foreground">
-                        {vendorItemsForSelected.length} items linked to this vendor
+                        {linked.data?.total??selectedVendor?.activeItems??0} items linked to this vendor
                       </p>
                     </div>
-                    <Button size="sm" onClick={()=>{setEditLink(null);setProductId('');setUnitCost('');setUnitType('ITEM');setCasePack('');setMoq('');setError('');setItemSearch('');setLinkOpen(true);}}>
+                    <Button size="sm" onClick={()=>{setEditLink(null);setProductId('');setUnitCost('');setUnitType('ITEM');setCasePack('');setMoq('');setError('');setSelectedItem(null);setLinkOpen(true);}}>
                       <Plus className="h-4 w-4 mr-2" />
                       Link Item
                     </Button>
@@ -607,6 +573,9 @@ export const VendorList = ({storeId}:{storeId:string}) => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
+                    {linked.isPending&&<TableRow><TableCell colSpan={11} className="text-center py-6">Loading linked items…</TableCell></TableRow>}
+                    {linked.isError&&<TableRow><TableCell colSpan={11} className="text-center py-6" role="alert">Could not load linked items. <button className="underline" onClick={()=>void linked.refetch()}>Retry</button></TableCell></TableRow>}
+                    {linked.isSuccess&&vendorItemsForSelected.length===0&&<TableRow><TableCell colSpan={11} className="text-center py-6">No linked items on this page.</TableCell></TableRow>}
                     {vendorItemsForSelected.map((item) => (
                       <TableRow key={item.id}>
                         <TableCell className="font-medium">{item.name}</TableCell>
@@ -629,11 +598,12 @@ export const VendorList = ({storeId}:{storeId:string}) => {
                             <Badge variant="secondary">Inactive</Badge>
                           )}
                         </TableCell>
-                        <TableCell><div className="flex gap-2"><Button variant="outline" size="sm" disabled={busy} onClick={()=>{setEditLink(item);setProductId(String(item.id));setUnitCost(String(item.unitCost));setUnitType(item.unitType??'ITEM');setCasePack(item.casePackSize==null?'':String(item.casePackSize));setMoq(item.moq==null?'':String(item.moq));setError('');setItemSearch('');setLinkOpen(true);}}>Edit</Button><Button variant="outline" size="sm" disabled={busy} onClick={()=>unlink(item)}>Delete</Button></div></TableCell>
+                        <TableCell><div className="flex gap-2"><Button variant="outline" size="sm" disabled={busy} onClick={()=>{setEditLink(item);setProductId(String(item.id));setUnitCost(String(item.unitCost));setUnitType(item.unitType??'ITEM');setCasePack(item.casePackSize==null?'':String(item.casePackSize));setMoq(item.moq==null?'':String(item.moq));setError('');setSelectedItem(null);setLinkOpen(true);}}>Edit</Button><Button variant="outline" size="sm" disabled={busy} onClick={()=>unlink(item)}>Delete</Button></div></TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
+                <TablePagination page={itemPage+1} totalPages={Math.max(1,Math.ceil((linked.data?.total??0)/25))} totalItems={linked.data?.total??0} pageSize={25} hasPrev={itemPage>0&&!linked.isFetching} hasNext={!!linked.data?.hasMore&&!linked.isFetching} onPrev={()=>setItemPage(p=>Math.max(0,p-1))} onNext={()=>setItemPage(p=>p+1)} />
               </Card>
             </>
           )}
