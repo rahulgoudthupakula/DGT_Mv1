@@ -1,3 +1,4 @@
+import { stockRefreshOptions, refreshStock } from "@/lib/stockRefresh";
 import { matchesFilter } from "@/lib/filterSelection";
 import { SearchMultiFilter } from "@/components/shared/SearchMultiFilter";
 import { RecentFilterSelect, RecentFilterContent } from "@/components/shared/RecentFilterSelect";
@@ -105,7 +106,7 @@ export const ItemsPage = ({storeId}: {storeId:string}) => {
   const defaults=useGroceryDefaults(storeId);
   const client=useQueryClient(),path=`/access/stores/${encodeURIComponent(storeId)}/items`;
   const departmentQuery=useStoreDepartments(storeId);
-  const query=useQuery({queryKey:['pricebook-items',storeId],queryFn:()=>request<{items:Item[];canEdit:boolean}>(path),enabled:!!storeId});
+  const query=useQuery({queryKey:['pricebook-items',storeId],...stockRefreshOptions,queryFn:()=>request<{items:Item[];canEdit:boolean}>(path),enabled:!!storeId});
   const items=(query.data?.items??[]).map(i=>({...emptyItem,...i,unitType:i.unitType??"item"}));
   const [busy,setBusy]=useState(false),[message,setMessage]=useState('');
   const [attempted,setAttempted]=useState(false);
@@ -113,7 +114,7 @@ export const ItemsPage = ({storeId}: {storeId:string}) => {
   async function save(){if(!form)return;setAttempted(true);if(Object.keys(fieldErrors).length){setMessage('Please correct the highlighted fields.');return;}if(marginPct>=100){setMessage('Margin must be less than 100%.');return;}setBusy(true);setMessage('');try{
     const body={name:form.name,sku:form.sku,barcode:form.barcode,dept:form.dept,subDept:form.subDept,retail:form.retail,taxable:form.taxable,ebtSnap:form.ebtSnap,allowReturns:form.allowReturns,active:form.active,ageRestricted:form.ageRestricted,reorderLevel:form.reorderLevel,unitType:form.unitType,unitsPerCase:form.unitsPerCase??null,purchaseGrossCost:form.unitType==='case'?form.caseGrossCost:form.itemGrossCost,purchaseDiscount:form.unitType==='case'?form.caseDiscount:form.itemDiscount,currentInventory:form.currentInventory??null,inventoryVersion:isAdd?'0':form.inventoryVersion??'0'};
     const result=await request(isAdd?path:`${path}/${editItem?.id}`,{method:isAdd?'POST':'PUT',headers:isAdd?{}:{'If-Match':editItem?.version??''},body:JSON.stringify(body)});
-    setMessage(isPendingChange(result)?'Submitted for approval.':'Item saved.');setDrawerOpen(false);await Promise.all(['pricebook-items','vendor-pricing','vendor-available-items','price-groups','current-stock','stock-movements'].map(key=>client.invalidateQueries({queryKey:[key,storeId]})));
+    setMessage(isPendingChange(result)?'Submitted for approval.':'Item saved.');setDrawerOpen(false);await Promise.all([refreshStock(client,storeId),...['vendor-pricing','vendor-available-items','price-groups'].map(key=>client.invalidateQueries({queryKey:[key,storeId]}))]);
   }catch(e){setMessage(e instanceof Error?e.message:'Could not save item');}finally{setBusy(false);}}
 
   const [search, setSearch] = useState("");
@@ -163,6 +164,14 @@ export const ItemsPage = ({storeId}: {storeId:string}) => {
         case "name": return a.name.localeCompare(b.name);
         case "retail_asc": return a.retail - b.retail;
         case "retail_desc": return b.retail - a.retail;
+        case "stock_asc":
+        case "stock_desc": {
+          const aKnown = typeof a.currentInventory === "number" && Number.isFinite(a.currentInventory);
+          const bKnown = typeof b.currentInventory === "number" && Number.isFinite(b.currentInventory);
+          if (aKnown !== bKnown) return aKnown ? -1 : 1;
+          const difference = aKnown && bKnown ? a.currentInventory! - b.currentInventory! : 0;
+          return (sortBy === "stock_asc" ? difference : -difference) || a.name.localeCompare(b.name);
+        }
         case "margin": {
           const mA = a.retail > 0 ? (a.retail - a.cost) / a.retail : 0;
           const mB = b.retail > 0 ? (b.retail - b.cost) / b.retail : 0;
@@ -493,6 +502,8 @@ export const ItemsPage = ({storeId}: {storeId:string}) => {
                   <SelectItem value="name">Product Name</SelectItem>
                   <SelectItem value="retail_asc">Price: Low → High</SelectItem>
                   <SelectItem value="retail_desc">Price: High → Low</SelectItem>
+                  <SelectItem value="stock_asc">Stock: Low → High</SelectItem>
+                  <SelectItem value="stock_desc">Stock: High → Low</SelectItem>
                   <SelectItem value="margin">Margin (High)</SelectItem>
                   <SelectItem value="last_updated">Last Updated</SelectItem>
                 </RecentFilterContent>

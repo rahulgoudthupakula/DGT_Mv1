@@ -13,16 +13,17 @@ import { usePagination } from "@/hooks/use-pagination";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { request, logout } from "@/lib/backend";
+import { useStoreDepartments } from "@/hooks/use-store-departments";
 import { useStoreAccess } from "@/lib/store-access";
 
 type Deposit={bank_name:string;account_holder:string;account_type:string;account_last_four:string;routing_number:string;active:boolean};
 type Deduction={deduction_type:string;amount:number;effective_from:string;effective_to:string|null;active:boolean};
 type Employee={job_title:string|null;department_key:string;deposit:Deposit|null;deductions:Deduction[];store_count:number;id:number;user_id:number|null;email:string;first_name:string;last_name:string;name:string;role:string;dept:string;payType:string;rate:number;status:string;hire_date:string;employee_type:string;version:string};
 type User={user_id:number;role_type_id:number;first_name:string;last_name:string;email:string;role_type_name:string};
-type Data={departments:{id:string;name:string}[];signInAgain?:boolean;employees:(Omit<Employee,'name'|'payType'>&{pay_type:string})[];users:User[];today:string};
+type Data={signInAgain?:boolean;employees:(Omit<Employee,'name'|'payType'>&{pay_type:string})[];users:User[];today:string};
 
 const emptyForm = {
-  userKey:"",email:"",password:"",employeeCode:"",hireDate:"",employeeType:"Full-time", firstName: "", lastName: "", role: "", dept: "", payType: "", rate: "", status: "Active",
+  userKey:"",email:"",password:"",employeeCode:"",hireDate:"",employeeType:"Full-time", firstName: "", lastName: "", role: "NO_ACCESS", dept: "", payType: "", rate: "", status: "Active",
   filingStatus: "", allowances: "", additionalWithholding: "",
   jobTitle:"",accountHolder:"",accountType:"Checking",depositActive:true,healthActive:true,retirementActive:true,healthStart:"",healthEnd:"",retirementStart:"",retirementEnd:"", bankName: "", accountNumber: "", routingNumber: "",
   healthInsurance: "", retirement: "",
@@ -40,6 +41,8 @@ export const PayrollEmployees = ({storeId}:{storeId:string}) => {
   const [editingEmployee, setEditingEmployee] = useState<typeof employees[0] | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [pageSize, setPageSize] = useState(10);
+  const departments=useStoreDepartments(storeId,addOpen&&access.data?.admin===true);
+  const roles=useQuery({queryKey:['employee-account-roles',storeId],queryFn:({signal})=>request<{id:number;name:string}[]>(path+'/account-roles',{signal}),enabled:addOpen&&!editingEmployee&&access.data?.admin===true,staleTime:60000,refetchOnWindowFocus:false});
 
   const filtered = employees.filter((e) =>
     e.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -80,11 +83,15 @@ export const PayrollEmployees = ({storeId}:{storeId:string}) => {
   };
 
   const handleSubmit = async () => {
-    setBusy(true);setError('');
+    setError('');
+    if(!editingEmployee&&!form.jobTitle.trim()){setError('Job role is required.');return;}
+    const websiteAccess=!editingEmployee&&form.role!=='NO_ACCESS';
+    if(websiteAccess&&!roles.data?.some(role=>String(role.id)===form.role)){setError('Choose an available account role.');return;}
+    if(websiteAccess&&(!form.email.trim()||form.password.length<12||new TextEncoder().encode(form.password).length>72)){setError('Enter an email and a password of at least 12 characters and at most 72 bytes.');return;}
+    setBusy(true);
     try{
-      const user=query.data?.users.find(u=>`${u.user_id}:${u.role_type_id}`===form.userKey);
       
-      const data=await request<Data>(path+(editingEmployee?`/${editingEmployee.id}`:''),{method:editingEmployee?'PUT':'POST',body:JSON.stringify({withoutAccess:!editingEmployee,userId:user?.user_id??null,roleTypeId:user?.role_type_id??null,firstName:form.firstName,lastName:form.lastName,email:form.email,password:form.password,employeeCode:form.employeeCode,hireDate:form.hireDate,employeeType:form.employeeType,payType:form.payType,rate:form.rate===''?null:Number(form.rate),status:form.status,version:editingEmployee?.version,details:{jobTitle:form.jobTitle,department:form.dept,deposit:form.bankName||form.accountNumber||form.routingNumber||form.accountHolder?{bankName:form.bankName,accountHolder:form.accountHolder,accountType:form.accountType,accountLastFour:form.accountNumber,routingNumber:form.routingNumber,active:form.depositActive}:null,deductions:[...(form.healthInsurance!==''?[{type:'HEALTH_INSURANCE',calculation:'FIXED',amount:Number(form.healthInsurance),effectiveFrom:form.healthStart||query.data?.today,effectiveTo:form.healthEnd||null,active:form.healthActive}]:[]),...(form.retirement!==''?[{type:'RETIREMENT',calculation:'PERCENT',amount:Number(form.retirement),effectiveFrom:form.retirementStart||query.data?.today,effectiveTo:form.retirementEnd||null,active:form.retirementActive}]:[])]}})});
+      const data=await request<Data>(path+(editingEmployee?`/${editingEmployee.id}`:''),{method:editingEmployee?'PUT':'POST',body:JSON.stringify({withoutAccess:!editingEmployee&&!websiteAccess,userId:null,roleTypeId:websiteAccess?Number(form.role):null,firstName:form.firstName,lastName:form.lastName,email:websiteAccess||editingEmployee?.user_id?form.email:null,password:websiteAccess?form.password:null,employeeCode:form.employeeCode,hireDate:form.hireDate,employeeType:form.employeeType,payType:form.payType,rate:form.rate===''?null:Number(form.rate),status:form.status,version:editingEmployee?.version,details:{jobTitle:form.jobTitle,department:form.dept,deposit:form.bankName||form.accountNumber||form.routingNumber||form.accountHolder?{bankName:form.bankName,accountHolder:form.accountHolder,accountType:form.accountType,accountLastFour:form.accountNumber,routingNumber:form.routingNumber,active:form.depositActive}:null,deductions:[...(form.healthInsurance!==''?[{type:'HEALTH_INSURANCE',calculation:'FIXED',amount:Number(form.healthInsurance),effectiveFrom:form.healthStart||query.data?.today,effectiveTo:form.healthEnd||null,active:form.healthActive}]:[]),...(form.retirement!==''?[{type:'RETIREMENT',calculation:'PERCENT',amount:Number(form.retirement),effectiveFrom:form.retirementStart||query.data?.today,effectiveTo:form.retirementEnd||null,active:form.retirementActive}]:[])]}})});
       if(data.signInAgain){logout();client.clear();window.location.assign('/login');return;}
       client.setQueryData(['workweek-employees',storeId],data);await client.invalidateQueries({queryKey:['workweek-employees']});setAddOpen(false);setEditingEmployee(null);setForm(emptyForm);
     }catch(e){setError(e instanceof Error?e.message:'Could not save employee');}finally{setBusy(false);}
@@ -207,7 +214,6 @@ export const PayrollEmployees = ({storeId}:{storeId:string}) => {
 
             {/* Basic Info */}
             <TabsContent value="basic" className="space-y-4 mt-4">
-              {!editingEmployee&&<p className="text-sm text-muted-foreground">This creates an employee without website access. Set their email, password and website role later in Roles &amp; Access.</p>}
               {editingEmployee?.user_id&&<><Label>Login Email</Label><Input type="email" value={form.email} onChange={e=>handleField('email',e.target.value)}/></>}
               <Label>Hire Date</Label><Input type="date" value={form.hireDate} onChange={e=>handleField('hireDate',e.target.value)}/>
               <label className="block">Employee Type<select className="border rounded p-2 w-full bg-background" value={form.employeeType} onChange={e=>handleField('employeeType',e.target.value)}>{['Full-time','Part-time','Temporary'].map(t=><option key={t}>{t}</option>)}</select></label>
@@ -222,12 +228,26 @@ export const PayrollEmployees = ({storeId}:{storeId:string}) => {
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs">Account Role</Label>
-                <Input disabled placeholder="" value={form.role} onChange={(e) => handleField("role", e.target.value)} />
+                <Label className="text-xs" htmlFor="employee-account-role">Account Role</Label>
+                {editingEmployee?<Input id="employee-account-role" disabled value={form.role} />:<>
+                  <select id="employee-account-role" className="border rounded p-2 w-full bg-background" disabled={busy} value={form.role} onChange={e=>{const role=e.target.value;setForm(f=>({...f,role,email:role==='NO_ACCESS'?'':f.email,password:''}));}}>
+                    <option value="NO_ACCESS">N/A / No access</option>
+                    {(roles.data??[]).map(role=><option key={role.id} value={String(role.id)}>{role.name.charAt(0)+role.name.slice(1).toLowerCase()}</option>)}
+                  </select>
+                  {roles.isPending&&<p role="status" className="text-xs text-muted-foreground">Loading account roles…</p>}
+                  {roles.isError&&<p role="alert" className="text-sm text-destructive">Could not load account roles. <button type="button" className="underline" onClick={()=>void roles.refetch()}>Retry</button></p>}
+                  {form.role==='NO_ACCESS'?<p className="text-sm text-muted-foreground">This employee will not have website access. You can add it later in Roles &amp; Access.</p>:<>
+                    <Label htmlFor="employee-login-email">Login Email</Label><Input id="employee-login-email" type="email" autoComplete="off" required disabled={busy} value={form.email} onChange={e=>handleField('email',e.target.value)} />
+                    <Label htmlFor="employee-login-password">Password</Label><Input id="employee-login-password" type="password" autoComplete="new-password" minLength={12} required disabled={busy} value={form.password} onChange={e=>handleField('password',e.target.value)} />
+                    <p className="text-xs text-muted-foreground">Use at least 12 characters and at most 72 bytes. The employee signs in with this email and password.</p>
+                  </>}
+                </>}
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs">Job Title</Label><Input value={form.jobTitle} maxLength={100} onChange={e=>handleField("jobTitle",e.target.value)}/><Label className="text-xs">Department</Label>
-                <select className="border rounded p-2 w-full bg-background" value={form.dept} onChange={e=>handleField('dept',e.target.value)}><option value="">No department</option>{query.data?.departments.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select>
+                <Label className="text-xs" htmlFor="employee-job-role">Job Role{!editingEmployee&&" *"}</Label><Input id="employee-job-role" required={!editingEmployee} value={form.jobTitle} maxLength={100} onChange={e=>handleField("jobTitle",e.target.value)}/><Label className="text-xs">Department</Label>
+                <select disabled={busy||departments.isPending||departments.isError} className="border rounded p-2 w-full bg-background" value={form.dept} onChange={e=>handleField('dept',e.target.value)}><option value="">No department</option>{(departments.data??[]).map(d=><option key={d.id} value={d.id}>{d.name}</option>)}{form.dept&&!departments.data?.some(d=>d.id===form.dept)&&<option value={form.dept}>{editingEmployee?.dept||form.dept} (currently assigned)</option>}</select>
+                {departments.isPending&&<p role="status" className="text-xs text-muted-foreground">Loading departments…</p>}
+                {departments.isError&&<p role="alert" className="text-sm text-destructive">Could not load departments. <button type="button" className="underline" onClick={()=>void departments.refetch()}>Retry</button></p>}
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Status</Label>

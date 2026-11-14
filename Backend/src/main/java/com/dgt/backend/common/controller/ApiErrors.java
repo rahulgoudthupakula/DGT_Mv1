@@ -66,6 +66,12 @@ public class ApiErrors {
         return ResponseEntity.badRequest().body(ProblemDetail.forStatusAndDetail(
                 HttpStatus.BAD_REQUEST, "Choose a receipt file."));
     }
+    @ExceptionHandler({org.springframework.web.servlet.resource.NoResourceFoundException.class,
+            org.springframework.web.servlet.NoHandlerFoundException.class})
+    ResponseEntity<ProblemDetail> missingRoute() {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ProblemDetail.forStatusAndDetail(
+                HttpStatus.NOT_FOUND, "The requested endpoint was not found."));
+    }
     // Log unexpected failures and send a generic HTTP 500 response.
     @ExceptionHandler(Exception.class)
     ResponseEntity<ProblemDetail> handleGeneric(Exception ex, HttpServletRequest req) {

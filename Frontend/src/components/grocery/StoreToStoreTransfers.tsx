@@ -1,9 +1,11 @@
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { stockRefreshOptions, refreshStock } from "@/lib/stockRefresh";
 /**
  * Shows incoming and outgoing transfers for the selected store. Receiving sends the destination
  * product and cumulative totalReceived to the backend, then reloads transfer state.
  */
 import {request} from '@/lib/backend';
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -48,8 +50,7 @@ interface StoreTransferRow {
 
 export const StoreToStoreTransfers = ({storeId}:{storeId:string}) => {
   const { toast } = useToast();
-  const [records, setRecords] = useState<StoreTransferRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const client=useQueryClient();
   const [query, setQuery] = useState("");
   const [direction, setDirection] = useState<"all" | "sent" | "received">("all");
   const [confirmTarget, setConfirmTarget] = useState<StoreTransferRow | null>(null);
@@ -59,19 +60,16 @@ export const StoreToStoreTransfers = ({storeId}:{storeId:string}) => {
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkNotes, setBulkNotes] = useState("");
 
-  const [items,setItems]=useState<{product_id:number;product_name:string;product_sku:string}[]>([]),[canReceive,setCanReceive]=useState(false);
   const [targetProduct,setTargetProduct]=useState(''),[totalReceived,setTotalReceived]=useState('');
   const path=`/access/stores/${encodeURIComponent(storeId)}/reductions/transfers`;
-  const fetchRecords = async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    try{const data=await request<{transfers:any[];items:typeof items;canReceive:boolean}>(path);setItems(data.items);setCanReceive(data.canReceive);setRecords(data.transfers.map(r=>({id:String(r.reduction_request_id),item_name:r.product_name,scan_code:r.product_sku,quantity:Number(r.quantity),received:Number(r.qty_received),destinationProduct:r.destination_product_id,notes:null,direction:r.destination===storeId?'received':'sent',counterparty_store:r.destination===storeId?r.dgt_id:r.destination,status:r.transfer_status==='COMPLETED'?'confirmed':r.destination===storeId?'pending':'sent',transferred_at:r.updated_at,confirmed_at:null})));}catch(e){toast({title:'Could not load records',description:String(e),variant:'destructive'});}finally{setLoading(false);}
-  };
-  useEffect(()=>{fetchRecords();},[storeId]);
+  const transfers=useQuery({queryKey:['inventory-transfers',storeId],...stockRefreshOptions,enabled:!!storeId,queryFn:({signal})=>request<{transfers:{reduction_request_id:number;product_name:string;product_sku:string;quantity:number;qty_received:number;destination_product_id:number|null;destination:string;dgt_id:string;transfer_status:string;updated_at:string}[];items:{product_id:number;product_name:string;product_sku:string}[];canReceive:boolean}>(path,{signal})});
+  const items=transfers.data?.items??[],canReceive=transfers.data?.canReceive??false,loading=transfers.isPending;
+  const records:StoreTransferRow[]=(transfers.data?.transfers??[]).map(r=>({id:String(r.reduction_request_id),item_name:r.product_name,scan_code:r.product_sku,quantity:Number(r.quantity),received:Number(r.qty_received),destinationProduct:r.destination_product_id,notes:null,direction:r.destination===storeId?'received':'sent',counterparty_store:r.destination===storeId?r.dgt_id:r.destination,status:r.transfer_status==='COMPLETED'?'confirmed':r.destination===storeId?'pending':'sent',transferred_at:r.updated_at,confirmed_at:null}));
 
 
   const toggleSelect = (id:string) => setSelectedIds(prev=>{const next=new Set(prev);if(next.has(id))next.delete(id);else next.add(id);return next;});
   // Send the cumulative received quantity, not a new quantity to add on every retry.
-  const handleConfirmReceipt = async () => {if(!confirmTarget||confirming)return;setConfirming(true);try{await request(`${path}/${confirmTarget.id}/receive`,{method:'POST',body:JSON.stringify({productId:Number(targetProduct),totalReceived:Number(totalReceived)})});await fetchRecords();setConfirmTarget(null);toast({title:'Receipt recorded'});}catch(e){toast({title:'Could not receive',description:String(e),variant:'destructive'});}finally{setConfirming(false);}};
+  const handleConfirmReceipt = async () => {if(!confirmTarget||confirming)return;setConfirming(true);try{await request(`${path}/${confirmTarget.id}/receive`,{method:'POST',body:JSON.stringify({productId:Number(targetProduct),totalReceived:Number(totalReceived)})});await refreshStock(client,storeId,confirmTarget.counterparty_store);setConfirmTarget(null);toast({title:'Receipt recorded'});}catch(e){toast({title:'Could not receive',description:String(e),variant:'destructive'});}finally{setConfirming(false);}};
   const handleBulkConfirm = () => {};
 
   const filtered = records.filter(r => {
@@ -109,6 +107,7 @@ export const StoreToStoreTransfers = ({storeId}:{storeId:string}) => {
 
   return (
     <div className="space-y-4">
+      {transfers.isError&&<p role="alert">Could not refresh transfers. <Button variant="outline" onClick={()=>void transfers.refetch()}>Retry</Button></p>}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
           <div>

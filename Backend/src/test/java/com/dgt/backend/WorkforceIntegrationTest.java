@@ -11,7 +11,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import tools.jackson.databind.*;
 import static org.assertj.core.api.Assertions.*;
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={
- "app.workforce.enabled=true","app.workforce.shift-changes.enabled=true","app.workweek.enabled=true","app.billing.enabled=true","app.profile.enabled=true","app.profile.rate-limit.max=1000","spring.datasource.url=jdbc:postgresql://127.0.0.1:55439/dgt_test","spring.datasource.username=dgt_test","spring.datasource.password=only-test-password","spring.flyway.enabled=true","logging.level.root=WARN","debug=false"})
+ "app.workforce.enabled=true","app.workforce.shift-changes.enabled=true","app.workweek.enabled=true","app.billing.enabled=true","app.profile.enabled=true","app.profile.rate-limit.max=1000","spring.datasource.url=jdbc:postgresql://127.0.0.1:${DGT_TEST_PORT:55439}/dgt_test","spring.datasource.username=dgt_test","spring.datasource.password=only-test-password","spring.flyway.enabled=true","logging.level.root=WARN","debug=false"})
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class WorkforceIntegrationTest {
@@ -81,7 +81,7 @@ class WorkforceIntegrationTest {
  long shiftAs(String who,long employee,String start,String end)throws Exception{return ok(req(who,"POST",wf()+"/shifts",shiftBody(employee,start,end)),200).path("id").asLong();}
  long employee(String role)throws Exception{
   long rt=db.queryForObject("SELECT role_type_id FROM role_types WHERE role_type_name=?",Long.class,role.toUpperCase());
-  ok(req("admin","POST",access()+"/employees",Map.of("user_id",users.get(role),"role_type_id",rt,"hire_date","2026-01-01","employee_type","Full-time","pay_type","Hourly","rate",18,"status","Active")),200);
+  ok(req("admin","POST",access()+"/employees",Map.of("user_id",users.get(role),"role_type_id",rt,"hire_date","2026-01-01","employee_type","Full-time","pay_type","Hourly","rate",18,"status","Active","details",Map.of("job_title",role))),200);
   return db.queryForObject("SELECT employee_id FROM employees WHERE user_id=?",Long.class,users.get(role));
  }
  Map<String,Object> leave(long employee,String date){return new HashMap<>(Map.of("kind","TIME_OFF","employee_id",employee,"start_date",date,"end_date",date,"leave_type","Personal Day","reason","Private reason"));}

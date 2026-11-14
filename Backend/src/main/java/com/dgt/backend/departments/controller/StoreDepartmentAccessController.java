@@ -30,8 +30,6 @@ public class StoreDepartmentAccessController {
   var children=db.queryForList("SELECT store_department_id,store_sub_department_id::text AS id,store_sub_department_name AS name,is_active AS active FROM store_sub_departments WHERE dgt_id=? ORDER BY store_sub_department_name",dgtId);
   for(var row:rows){
    var subs=children.stream().filter(c->Objects.equals(c.get("store_department_id"),row.get("store_department_id"))).map(c->Map.of("id",c.get("id"),"name",c.get("name"),"active",c.get("active"))).toList();
-   // Retain the names array for older clients while exposing editable child records separately.
-   row.put("subDepartments",subs.stream().map(c->c.get("name")).toList());
    row.put("subDepartmentDetails",subs);
    row.remove("store_department_id");
   }

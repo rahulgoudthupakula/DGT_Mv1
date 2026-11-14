@@ -1,3 +1,4 @@
+import { refreshStock } from "@/lib/stockRefresh";
 import { matchesFilter } from "@/lib/filterSelection";
 import { SearchMultiFilter } from "@/components/shared/SearchMultiFilter";
 import { RecentFilterSelect, RecentFilterContent } from "@/components/shared/RecentFilterSelect";
@@ -174,7 +175,7 @@ export const BulkUpdatePage = ({storeId}:{storeId:string}) => {
     if(changed.length>200){setMessage('Save at most 200 changed items at a time.');return;}
     const payload=JSON.stringify({rows:changed.map(i=>({id:i.id,version:i.version,item:body(i),links:i.links}))});
     if(attempt.current.payload!==payload)attempt.current={payload,key:crypto.randomUUID()};
-    setBusy(true);setMessage('');try{const result=await request(`${path}/bulk`,{method:'POST',headers:{'Idempotency-Key':attempt.current.key},body:payload});await Promise.all(['pricebook-items','bulk-item-options','vendors','vendor-items','vendor-audit','vendor-cost-items','vendor-pricing','vendor-available-items','price-groups','promotions','current-stock','stock-movements'].map(k=>client.invalidateQueries({queryKey:[k,storeId]})));setMessage(isPendingChange(result)?'Submitted for approval.':`${changed.length} items saved.`);setIsEditing(false);attempt.current={payload:'',key:''};}catch(e){setMessage(e instanceof Error?e.message:'Could not save items');}finally{setBusy(false);}
+    setBusy(true);setMessage('');try{const result=await request(`${path}/bulk`,{method:'POST',headers:{'Idempotency-Key':attempt.current.key},body:payload});await Promise.all([refreshStock(client,storeId),...['bulk-item-options','vendors','vendor-items','vendor-audit','vendor-cost-items','vendor-pricing','vendor-available-items','price-groups','promotions'].map(k=>client.invalidateQueries({queryKey:[k,storeId]}))]);setMessage(isPendingChange(result)?'Submitted for approval.':`${changed.length} items saved.`);setIsEditing(false);attempt.current={payload:'',key:''};}catch(e){setMessage(e instanceof Error?e.message:'Could not save items');}finally{setBusy(false);}
   };
   const exportCsv=()=>{
     const rows=filtered.filter(i=>selected.size===0||selected.has(String(i.id)));

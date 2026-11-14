@@ -1,3 +1,4 @@
+import { stockRefreshOptions } from "@/lib/stockRefresh";
 import { matchesFilter } from "@/lib/filterSelection";
 import { SearchMultiFilter } from "@/components/shared/SearchMultiFilter";
 import { RecentFilterSelect, RecentFilterContent } from "@/components/shared/RecentFilterSelect";
@@ -149,9 +150,9 @@ const loadApprovedReturnables = (): InventoryItem[] =>
     }));
 
 export const ReturnableInventory = ({storeId}:{storeId:string}) => {
-  const approved=useQuery({queryKey:['reductions',storeId],queryFn:()=>request<{requests:any[];items:any[]}>(`/access/stores/${encodeURIComponent(storeId)}/reductions`)});
+  const approved=useQuery({queryKey:['reductions',storeId],...stockRefreshOptions,queryFn:()=>request<{requests:any[];items:any[]}>(`/access/stores/${encodeURIComponent(storeId)}/reductions`)});
   const slipPath=`/access/stores/${encodeURIComponent(storeId)}/reductions/return-slips`;
-  const slips=useQuery({queryKey:['return-slips',storeId],queryFn:()=>request<{returns:any[];vendors:{vendor_id:number;vendor_name:string}[];canManage:boolean}>(slipPath)});
+  const slips=useQuery({queryKey:['return-slips',storeId],...stockRefreshOptions,queryFn:()=>request<{returns:any[];vendors:{vendor_id:number;vendor_name:string}[];canManage:boolean}>(slipPath)});
   const [saving,setSaving]=useState(false),[error,setError]=useState('');
   const [openSlipId,setOpenSlipId]=useState<string|null>(null);
   const [scanCode, setScanCode] = useState("");

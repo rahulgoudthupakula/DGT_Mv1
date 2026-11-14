@@ -1,9 +1,11 @@
+import { useQuery } from "@tanstack/react-query";
+import { stockRefreshOptions } from "@/lib/stockRefresh";
 /**
  * Reads approved shrinkage reductions and their recorded costs. Current stock is looked up
  * separately from the request quantity; this view does not deduct stock again.
  */
 import {request} from '@/lib/backend';
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -16,7 +18,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, PackageX, AlertTriangle, Loader2, ShieldAlert, Trash2, Calculator } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
 
 interface ShrinkageRow {
   id: string;
@@ -41,17 +42,13 @@ const REASON_META: Record<string, { label: string; icon: typeof PackageX; cls: s
 const reasonLabel = (key: string) => REASON_META[key]?.label ?? key;
 
 export const InventoryShrinkageWaste = ({storeId}:{storeId:string}) => {
-  const { toast } = useToast();
-  const [records, setRecords] = useState<ShrinkageRow[]>([]);
-  const [loading, setLoading] = useState(true);
+
   const [query, setQuery] = useState("");
   const [reason, setReason] = useState<"all" | keyof typeof REASON_META>("all");
 
-  const fetchRecords = async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    try{const data=await request<{requests:any[];items:any[]}>(`/access/stores/${encodeURIComponent(storeId)}/reductions`);setRecords(data.requests.filter(r=>r.status==='APPROVED'&&r.route==='shrinkage').map(r=>({id:String(r.reduction_request_id),item_name:r.product_name,scan_code:r.barcode??'',quantity:Number(r.quantity),current_stock:data.items.find(i=>Number(i.id)===Number(r.product_id))?.inventoryCount??null,net_cost:r.recorded_unit_cost==null?null:Number(r.recorded_unit_cost),recorded_loss:r.recorded_loss==null?null:Number(r.recorded_loss),reason:r.reason,notes:r.notes,recorded_at:r.updated_at,})));}catch(e){toast({title:'Could not load records',description:String(e),variant:'destructive'});}finally{setLoading(false);}
-  };
-  useEffect(()=>{fetchRecords();},[storeId]);
+  const reductions=useQuery({queryKey:['reductions',storeId],...stockRefreshOptions,enabled:!!storeId,queryFn:({signal})=>request<{requests:{status:string;route:string;reduction_request_id:number;product_name:string;barcode:string|null;quantity:number;product_id:number;recorded_unit_cost:number|null;recorded_loss:number|null;reason:string;notes:string|null;updated_at:string}[];items:{id:number;inventoryCount:number|null}[]}>(`/access/stores/${encodeURIComponent(storeId)}/reductions`,{signal})});
+  const loading=reductions.isPending;
+  const records:ShrinkageRow[]=(reductions.data?.requests??[]).filter(r=>r.status==='APPROVED'&&r.route==='shrinkage').map(r=>({id:String(r.reduction_request_id),item_name:r.product_name,scan_code:r.barcode??'',quantity:Number(r.quantity),current_stock:reductions.data?.items.find(i=>Number(i.id)===Number(r.product_id))?.inventoryCount??null,net_cost:r.recorded_unit_cost==null?null:Number(r.recorded_unit_cost),recorded_loss:r.recorded_loss==null?null:Number(r.recorded_loss),reason:r.reason,notes:r.notes,recorded_at:r.updated_at}));
 
 
   const filtered = records.filter(r => {
@@ -73,6 +70,7 @@ export const InventoryShrinkageWaste = ({storeId}:{storeId:string}) => {
 
   return (
     <div className="space-y-4">
+      {reductions.isError&&<p role="alert">Could not refresh shrinkage records. <button className="underline" onClick={()=>void reductions.refetch()}>Retry</button></p>}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
           <div>

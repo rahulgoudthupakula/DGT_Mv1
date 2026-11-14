@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { request } from "@/lib/backend";
 
-export interface StoreDepartmentOption { name: string; children: string[]; }
+export interface StoreDepartmentOption { id: string; name: string; children: string[]; }
 export const storeDepartmentsKey = (storeId: string) => ["store-departments", storeId] as const;
 
 /** One catalog per store for this login. Department changes invalidate it; logout clears it. */
@@ -17,6 +17,6 @@ export function storeDepartmentQueryOptions(storeId: string) {
   };
 }
 
-export function useStoreDepartments(storeId: string) {
-  return useQuery(storeDepartmentQueryOptions(storeId));
+export function useStoreDepartments(storeId: string, enabled = true) {
+  return useQuery({ ...storeDepartmentQueryOptions(storeId), enabled: !!storeId && enabled });
 }

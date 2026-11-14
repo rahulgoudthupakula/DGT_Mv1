@@ -1,3 +1,4 @@
+import { stockRefreshOptions } from "@/lib/stockRefresh";
 import { matchesFilter } from "@/lib/filterSelection";
 import { SearchMultiFilter } from "@/components/shared/SearchMultiFilter";
 import { RecentFilterSelect, RecentFilterContent } from "@/components/shared/RecentFilterSelect";
@@ -50,7 +51,7 @@ const fmt = (n: number) =>
 type RiskFilter = "all" | "expiring" | "negative" | "zero-sales";
 
 export const InventoryByItem = ({storeId}:{storeId:string}) => {
-  const query=useQuery({queryKey:['current-stock',storeId],queryFn:()=>request<{items:PricebookValuationItem[];store:{name:string;timezone:string}}>(`/access/stores/${storeId}/current-stock`),enabled:!!storeId,refetchInterval:30000});
+  const query=useQuery({queryKey:['current-stock',storeId],...stockRefreshOptions,queryFn:()=>request<{items:PricebookValuationItem[];store:{name:string;timezone:string}}>(`/access/stores/${storeId}/current-stock`),enabled:!!storeId});
   const items=(query.data?.items??[]).map(i=>({...i,purchaseHistory:[],movements:[]}));
   const vendors=[...new Map(items.flatMap(i=>i.vendors).map(v=>[String(v.id),v])).values()];
 
@@ -197,7 +198,7 @@ export const InventoryByItem = ({storeId}:{storeId:string}) => {
       </div>
 
       <InventoryByItemTable items={filteredItems} onItemClick={setSelectedItem} />
-      <InventoryByItemDrawer storeId={storeId} timezone={query.data?.store.timezone} item={selectedItem} onClose={() => setSelectedItem(null)} />
+      <InventoryByItemDrawer storeId={storeId} timezone={query.data?.store.timezone} item={items.find(item=>item.id===selectedItem?.id)??null} onClose={() => setSelectedItem(null)} />
     </div>
   );
 };

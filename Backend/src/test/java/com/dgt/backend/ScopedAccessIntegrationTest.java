@@ -80,6 +80,7 @@ class ScopedAccessIntegrationTest {
   // An inactive child must not be offered by Price Book, even while its parent is active.
   var options=ok(req("admin","GET",access()+"/items?includeDepartments=true",null),200).path("departments");
   assertThat(ok(req("admin","GET",access()+"/department-options",null),200)).isEqualTo(options);
+  for(var option:options)assertThat(option.path("id").asText()).matches("(?:default|store)-[0-9]+");
   assertThat(ok(req("cashier","GET",access()+"/department-options",null),200)).isEqualTo(options);
   ok(req("other","GET",access()+"/department-options",null),403);
   ok(req("admin","GET","/access/stores/"+foreign+"/department-options",null),403);
@@ -464,7 +465,7 @@ class ScopedAccessIntegrationTest {
   String path=access()+"/employees";
   ok(req("manager","GET",path,null),403);ok(req("other","GET",path,null),403);
   long role=db.queryForObject("SELECT role_type_id FROM role_types WHERE role_type_name='CASHIER'",Long.class);
-  var body=new HashMap<String,Object>();body.put("user_id",users.get("cashier"));body.put("role_type_id",role);body.put("hire_date","2026-01-01");body.put("employee_type","Full-time");body.put("pay_type","Hourly");body.put("rate",18.50);body.put("status","Active");
+  var body=new HashMap<String,Object>();body.put("user_id",users.get("cashier"));body.put("role_type_id",role);body.put("hire_date","2026-01-01");body.put("employee_type","Full-time");body.put("pay_type","Hourly");body.put("rate",18.50);body.put("status","Active");body.put("details",Map.of("job_title","Cashier"));
   var created=ok(req("admin","POST",path,body),200);var employee=created.path("employees").get(0);long id=employee.path("id").asLong();
   assertThat(employee.path("rate").decimalValue()).isEqualByComparingTo("18.50");
   assertThat(ok(req("admin","GET","/access/stores/"+second+"/employees",null),200).path("employees").size()).isZero();
@@ -503,12 +504,14 @@ class ScopedAccessIntegrationTest {
   ok(req("admin","PUT",access()+"/employees/"+id,body),409);
  }
  @Test @Order(25) void employeeDetailsRoundTripValidationAndStoreDepartmentScope() throws Exception {
-  JsonNode employee=null;for(var row:ok(req("admin","GET",access()+"/employees",null),200).path("employees"))if(row.path("email").asText().equals("renamed-"+tag+"@example.test"))employee=row;
+  var employeePage=ok(req("admin","GET",access()+"/employees",null),200);assertThat(employeePage.has("departments")).isFalse();
+  JsonNode employee=null;for(var row:employeePage.path("employees"))if(row.path("email").asText().equals("renamed-"+tag+"@example.test"))employee=row;
   assertThat(employee).isNotNull();long id=employee.path("id").asLong();
   var body=new HashMap<String,Object>();body.put("hire_date","2026-01-01");body.put("employee_type","Full-time");body.put("pay_type","Hourly");body.put("rate",20);body.put("status","Active");body.put("version",employee.path("version").asText());
-  String department="default-"+db.queryForObject("SELECT min(department_id) FROM departments WHERE is_default",Long.class);
+  String department=ok(req("admin","GET",access()+"/department-options",null),200).get(0).path("id").asText();
   var detail=new HashMap<String,Object>();detail.put("job_title","Deli Cook");detail.put("department",department);detail.put("deposit",Map.of("bank_name","Sample Bank","account_holder","Sample Employee","account_type","Checking","account_last_four","1234","routing_number","000000000","active",true));detail.put("deductions",List.of(Map.of("type","RETIREMENT","calculation","PERCENT","amount",3,"effective_from","2026-01-01","active",true)));body.put("details",detail);
   var result=ok(req("admin","PUT",access()+"/employees/"+id,body),200);for(var row:result.path("employees"))if(row.path("id").asLong()==id)employee=row;
+  assertThat(result.has("departments")).isFalse();
   assertThat(employee.path("job_title").asText()).isEqualTo("Deli Cook");assertThat(employee.path("department_key").asText()).isEqualTo(department);assertThat(employee.path("deposit").path("account_last_four").asText()).isEqualTo("1234");assertThat(employee.path("deductions").get(0).path("amount").decimalValue()).isEqualByComparingTo("3");
   body.put("version",employee.path("version").asText());detail.put("department","store-999999999");ok(req("admin","PUT",access()+"/employees/"+id,body),400);
   detail.put("department",department);detail.put("deductions",List.of(Map.of("type","RETIREMENT","calculation","PERCENT","amount",101,"effective_from","2026-01-01","active",true)));ok(req("admin","PUT",access()+"/employees/"+id,body),400);
@@ -516,6 +519,7 @@ class ScopedAccessIntegrationTest {
  }
  @Test @Order(26) void employeeCanExistBeforeWebsiteAccess() throws Exception {
   var body=new HashMap<String,Object>();body.put("without_access",true);body.put("first_name","Standalone");body.put("last_name",tag);body.put("hire_date","2026-01-01");body.put("employee_type","Full-time");body.put("pay_type","Hourly");body.put("rate",18);body.put("status","Active");
+  ok(req("admin","POST",access()+"/employees",body),400);body.put("details",Map.of("job_title","   "));ok(req("admin","POST",access()+"/employees",body),400);body.put("details",Map.of("job_title","Store associate"));
   var created=ok(req("admin","POST",access()+"/employees",body),200);JsonNode employee=null;for(var row:created.path("employees"))if(row.path("last_name").asText().equals(tag))employee=row;
   assertThat(employee).isNotNull();assertThat(employee.path("user_id").isNull()).isTrue();long id=employee.path("id").asLong();
   body.put("version",employee.path("version").asText());body.put("first_name","Standalone edited");ok(req("admin","PUT",access()+"/employees/"+id,body),200);
@@ -1707,6 +1711,29 @@ class ScopedAccessIntegrationTest {
   assertThat(ok(req("admin","GET",path,null),200).get("reasons").get(0).get("active").asBoolean()).isFalse();
   assertThat(call("admin","PUT","/access/stores/"+second+"/discounts/"+id,input,version,null).code()).isEqualTo(409);
  }
+ @Test @Order(1003) void employeeAccountRoleSelectionAndNoAccessValidation() throws Exception {
+  String path=access()+"/employees";var available=ok(req("admin","GET",path+"/account-roles",null),200);var roles=new HashMap<String,Long>();available.forEach(r->roles.put(r.path("name").asText(),r.path("id").asLong()));assertThat(roles.keySet()).containsExactlyInAnyOrder("CASHIER","MANAGER","ACCOUNTANT");
+  ok(req("manager","GET",path+"/account-roles",null),403);ok(req("other","GET",path+"/account-roles",null),403);
+  var body=new HashMap<String,Object>();body.put("first_name","New employee");body.put("last_name",tag);body.put("hire_date","2026-01-01");body.put("employee_type","Full-time");body.put("pay_type","Hourly");body.put("rate",18);body.put("status","Active");body.put("without_access",false);body.put("details",Map.of("job_title","Staff"));
+  for(String role:List.of("CASHIER","MANAGER","ACCOUNTANT")){
+   String email="role-"+role.toLowerCase()+"-"+tag+"@example.test";body.put("email",email);body.put("password",password);body.put("role_type_id",roles.get(role));
+   var created=ok(req("admin","POST",path,body),200);JsonNode employee=null;for(var row:created.path("employees"))if(row.path("email").asText().equals(email))employee=row;
+   assertThat(employee).isNotNull();assertThat(employee.path("role").asText()).isEqualTo(role);long uid=employee.path("user_id").asLong();
+   assertThat(db.queryForObject("SELECT role_type_id FROM employee_store_assignments WHERE employee_id=? AND dgt_id=?",Long.class,employee.path("id").asLong(),store)).isEqualTo(roles.get(role));
+   assertThat(db.queryForObject("SELECT role_type_id FROM user_roles WHERE user_id=? AND dgt_id=?",Long.class,uid,store)).isEqualTo(roles.get(role));
+   assertThat(db.queryForObject("SELECT employee_id FROM users WHERE user_id=?",String.class,uid)).isEqualTo(employee.path("id").asText());
+   assertThat(new BCryptPasswordEncoder().matches(password,db.queryForObject("SELECT password_hash FROM users WHERE user_id=?",String.class,uid))).isTrue();assertThat(created.toString()).doesNotContain(password,"password_hash");
+   ok(req("admin","POST",path,body),409);
+  }
+  body.put("email","invalid-role-"+tag+"@example.test");body.put("role_type_id",999999999L);ok(req("admin","POST",path,body),400);body.put("role_type_id",roles.get("MANAGER"));
+  body.put("password","short");ok(req("admin","POST",path,body),400);body.put("password",password);body.remove("email");ok(req("admin","POST",path,body),400);
+  body.put("email","bad-details-"+tag+"@example.test");body.put("details",Map.of("job_title","Staff","department","store-999999999"));ok(req("admin","POST",path,body),400);assertThat(db.queryForObject("SELECT count(*) FROM users WHERE email=?",Integer.class,body.get("email"))).isZero();body.put("details",Map.of("job_title","Staff"));
+  body.put("without_access",true);ok(req("admin","POST",path,body),400);body.remove("role_type_id");body.remove("email");body.remove("password");long before=db.queryForObject("SELECT count(*) FROM users WHERE dgt_id=?",Long.class,store);
+  var noAccess=ok(req("admin","POST",path,body),200);assertThat(db.queryForObject("SELECT count(*) FROM users WHERE dgt_id=?",Long.class,store)).isEqualTo(before);assertThat(noAccess.path("employees").findValues("role").stream().anyMatch(r->r.asText().equals("No website access"))).isTrue();
+  long accountant=roles.get("ACCOUNTANT");db.update("UPDATE role_types SET is_active=false WHERE role_type_id=?",accountant);
+  try{body.put("without_access",false);body.put("role_type_id",accountant);body.put("email","inactive-role-"+tag+"@example.test");body.put("password",password);ok(req("admin","POST",path,body),400);assertThat(ok(req("admin","GET",path+"/account-roles",null),200).toString()).doesNotContain("ACCOUNTANT");}finally{db.update("UPDATE role_types SET is_active=true WHERE role_type_id=?",accountant);}
+ }
+
  @Test @Order(1002) void vendorItemPagesAndProductOptionsAreSmallSearchableAndScoped() throws Exception {
   String path=access()+"/vendors";long vendor=ok(req("admin","POST",path,Map.of("name","Picker vendor "+tag,"phone","+12025550123","active",true)),200).path("id").asLong();
   String base=path+"/"+vendor;var ids=new ArrayList<Long>();

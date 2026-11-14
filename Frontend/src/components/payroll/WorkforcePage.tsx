@@ -36,7 +36,7 @@ const defaultRequest={kind:'TIME_OFF',employeeId:'',startDate:'',endDate:'',week
 export function WorkforcePage({storeId,view='schedule'}:{storeId:string;view?:'schedule'|'requests'|'approvals'}){
  const client=useQueryClient();const [week,setWeek]=useState(''),[tab,setTab]=useState('schedule');
  const path=`/access/stores/${encodeURIComponent(storeId)}/workforce`;
- const query=useQuery({queryKey:['workforce',storeId,week],queryFn:()=>request<Data>(path+(week?`?week=${week}`:'')),enabled:!!storeId,placeholderData:keepPreviousData,refetchInterval:30000});
+ const query=useQuery({queryKey:['workforce',storeId,week],queryFn:({signal})=>request<Data>(path+(week?`?week=${week}`:''),{signal}),enabled:!!storeId,placeholderData:keepPreviousData,refetchInterval:30000});
  const data=query.data;const [busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');
  const [shiftOpen,setShiftOpen]=useState(false),[editing,setEditing]=useState<Shift|null>(null),[shiftForm,setShiftForm]=useState(defaultShift);
  const [requestOpen,setRequestOpen]=useState(false),[form,setForm]=useState(defaultRequest),[key,setKey]=useState('');
