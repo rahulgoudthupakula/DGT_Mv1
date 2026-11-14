@@ -1,3 +1,4 @@
+import { stockRefreshOptions } from "@/lib/stockRefresh";
 import { useQuery } from "@tanstack/react-query";
 import { request } from "@/lib/backend";
 import {
@@ -21,7 +22,7 @@ const fmt = (n: number) =>
   n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export const InventoryByItemDrawer = ({ item, onClose, storeId, timezone }: Props) => {
-  const query=useQuery({queryKey:['stock-movements',storeId,item?.id],queryFn:()=>request<{movements:{id:number;date:string;type:string;qty:number;reference:number|null}[]}>(`/access/stores/${storeId}/current-stock/${item!.id}/movements`),enabled:!!item});
+  const query=useQuery({queryKey:['stock-movements',storeId,item?.id],...stockRefreshOptions,queryFn:()=>request<{movements:{id:number;date:string;type:string;qty:number;reference:number|null}[]}>(`/access/stores/${storeId}/current-stock/${item!.id}/movements`),enabled:!!item});
   if (!item) return null;
   const date=(value:string)=>new Intl.DateTimeFormat('en-US',{timeZone:timezone||'UTC',dateStyle:'short',timeStyle:'short'}).format(new Date(value));
   return (

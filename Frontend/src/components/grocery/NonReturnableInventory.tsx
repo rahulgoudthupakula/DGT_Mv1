@@ -1,3 +1,4 @@
+import { stockRefreshOptions } from "@/lib/stockRefresh";
 import { matchesFilter } from "@/lib/filterSelection";
 import { RecentFilterSelect, RecentFilterContent } from "@/components/shared/RecentFilterSelect";
 import { useStoreDepartments } from "@/hooks/use-store-departments";
@@ -113,7 +114,7 @@ export const NonReturnableInventory = ({storeId}:{storeId:string}) => {
   const departmentQuery=useStoreDepartments(storeId);
   const departments=(departmentQuery.data??[]).map(department=>department.name);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const approved=useQuery({queryKey:['reductions',storeId],queryFn:()=>request<{requests:any[];items:any[]}>(`/access/stores/${encodeURIComponent(storeId)}/reductions`)});
+  const approved=useQuery({queryKey:['reductions',storeId],...stockRefreshOptions,queryFn:()=>request<{requests:any[];items:any[]}>(`/access/stores/${encodeURIComponent(storeId)}/reductions`)});
   const [date, setDate] = useState<Date>();
   const [scanCodeFilter, setScanCodeFilter] = useState("");
   const [itemNameFilter, setItemNameFilter] = useState("");

@@ -1,3 +1,4 @@
+import { stockRefreshOptions, refreshStock } from "@/lib/stockRefresh";
 import { matchesFilter } from "@/lib/filterSelection";
 import { SearchMultiFilter } from "@/components/shared/SearchMultiFilter";
 import { RecentFilterSelect, RecentFilterContent } from "@/components/shared/RecentFilterSelect";
@@ -252,7 +253,7 @@ const initialInventoryData: InventoryItem[] = [
 
 export const StockAdjustments = ({storeId}:{storeId:string}) => {
   const client=useQueryClient();const path=`/access/stores/${encodeURIComponent(storeId)}/reductions`;
-  const query=useQuery({queryKey:['reductions',storeId],queryFn:()=>request<{items:(InventoryItem&{taxable:boolean})[];canSubmit:boolean;stores:{dgt_id:string;store_name:string}[]}>(path)});
+  const query=useQuery({queryKey:['reductions',storeId],...stockRefreshOptions,queryFn:()=>request<{items:(InventoryItem&{taxable:boolean})[];canSubmit:boolean;stores:{dgt_id:string;store_name:string}[]}>(path)});
   const inventoryData=(query.data?.items??[]).map(i=>({...i,taxType:i.taxable?'Taxable':'Non-Taxable',reason:'',rebate:null,marginAfterRebate:null}));
   const vendors=['All Vendors',...new Set(inventoryData.flatMap(i=>i.vendorNames??[i.vendor]).filter(Boolean))];
   const transferStoreOptions=(query.data?.stores??[]).map(s=>s.dgt_id);
@@ -360,7 +361,7 @@ export const StockAdjustments = ({storeId}:{storeId:string}) => {
   const handleSubmitReduceRequest = async () => {
     if(saving)return;setSaving(true);
     try{const results=await request<{pending:boolean}[]>(`${path}/batch`,{method:'POST',body:JSON.stringify(reduceRows.map(r=>({productId:r.id,quantity:r.currentCount-r.updatedCount,reason:r.reason,destination:r.reason==='store-to-store-transfer'?r.transferStore:null})))});
-      await Promise.all(['reductions','pricebook-items','current-stock','stock-movements'].map(key=>client.invalidateQueries({queryKey:[key,storeId]})));const approved=results.every(r=>!r.pending);toast({title:approved?'Adjustment approved':'Sent for approval',description:approved?'Movement recorded and stock updated.':'Stock stays unchanged until approval.'});setShowReduceModal(false);setIsEditMode(false);setSelectedIds(new Set());
+      await refreshStock(client,storeId,...reduceRows.map(row=>row.transferStore));const approved=results.every(r=>!r.pending);toast({title:approved?'Adjustment approved':'Sent for approval',description:approved?'Movement recorded and stock updated.':'Stock stays unchanged until approval.'});setShowReduceModal(false);setIsEditMode(false);setSelectedIds(new Set());
     }catch(e){toast({title:'Could not submit',description:e instanceof Error?e.message:'Try again',variant:'destructive'});}finally{setSaving(false);}
   };
 

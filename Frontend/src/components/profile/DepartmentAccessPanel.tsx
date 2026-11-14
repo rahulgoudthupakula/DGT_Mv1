@@ -15,22 +15,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 interface Subdepartment { id?: string; name: string; active: boolean; }
 interface Department { id: string; name: string; active: boolean; version: string; subDepartmentDetails: Subdepartment[]; }
 
-type DepartmentResponse = Omit<Department, "subDepartmentDetails"> & { subDepartmentDetails?: Subdepartment[]; subDepartments?: string[] };
-
 /** Store-owned hierarchy; the server validates names, permissions, approvals and versions. */
 export function DepartmentAccessPanel({ storeId }: { storeId: string }) {
   const access = useStoreAccess(storeId);
   const client = useQueryClient();
   const canEdit = access.data?.modules.DEPARTMENTS.edit === true;
   const path = `/stores/${encodeURIComponent(storeId)}/department-access`;
-  const query = useQuery({ queryKey: ["department-access", storeId], queryFn: () => request<DepartmentResponse[]>(path), enabled: !!storeId && access.data?.modules.DEPARTMENTS.view === true });
-  // A running older backend (or cached query) can still return only child names.
-  // Display those names, but do not submit edits without persisted child identities.
-  const hierarchyReady = query.isSuccess && query.data.every(department => Array.isArray(department.subDepartmentDetails));
-  const departments: Department[] = (query.data ?? []).map(department => ({
-    ...department,
-    subDepartmentDetails: department.subDepartmentDetails ?? (department.subDepartments ?? []).map(name => ({ name, active: true })),
-  }));
+  const query = useQuery({ queryKey: ["department-access", storeId], queryFn: () => request<Department[]>(path), enabled: !!storeId && access.data?.modules.DEPARTMENTS.view === true });
+  const departments = query.data ?? [];
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Department | null>(null);
   const [name, setName] = useState("");
@@ -81,10 +73,9 @@ export function DepartmentAccessPanel({ storeId }: { storeId: string }) {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-lg">Department Access</CardTitle>
-        <Button disabled={!canEdit || busy || !hierarchyReady} onClick={() => beginEdit(null)}>Add Department</Button>
+        <Button disabled={!canEdit || busy || !query.isSuccess} onClick={() => beginEdit(null)}>Add Department</Button>
       </CardHeader>
       <CardContent>
-        {query.isSuccess && !hierarchyReady && <p role="alert" className="mb-4 text-destructive">The running backend needs the department update. Restart the backend with migration V19 enabled, then reload this page. Editing is unavailable until the update is applied.</p>}
         {!storeId ? <p>Select a store first.</p> : !access.isPending && !access.data?.modules.DEPARTMENTS.view ? <p>Department access is not granted.</p> : query.isPending ? <p>Loading departments…</p> : query.error ? <p role="alert" className="text-destructive">{query.error.message} <Button variant="outline" onClick={() => query.refetch()}>Retry</Button></p> : <Table>
           <TableHeader><TableRow><TableHead>Department / Subdepartment</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
           <TableBody>{departments.map(department => <TableRow key={department.id}>
@@ -92,15 +83,15 @@ export function DepartmentAccessPanel({ storeId }: { storeId: string }) {
               <div className="flex items-center gap-4 p-4">
                 <span className="flex-1 font-medium">{department.name}</span>
                 <Badge variant={department.active ? "default" : "secondary"}>{department.active ? "Active" : "Inactive"}</Badge>
-                <Button variant="outline" size="sm" disabled={!canEdit || busy || !hierarchyReady} onClick={() => beginEdit(department)} aria-label={`Edit ${department.name}`}>Edit</Button>
-                <Switch checked={department.active} disabled={!canEdit || busy || !hierarchyReady} onCheckedChange={active => toggle(department, active)} aria-label={`${department.name} status`} />
+                <Button variant="outline" size="sm" disabled={!canEdit || busy || !query.isSuccess} onClick={() => beginEdit(department)} aria-label={`Edit ${department.name}`}>Edit</Button>
+                <Switch checked={department.active} disabled={!canEdit || busy || !query.isSuccess} onCheckedChange={active => toggle(department, active)} aria-label={`${department.name} status`} />
               </div>
               {!!department.subDepartmentDetails.length && <details className="mx-4 mb-4 rounded-md border bg-muted/30 p-3">
                 <summary className="cursor-pointer text-sm">Subdepartments ({department.subDepartmentDetails.length})</summary>
                 <ul className="mt-2 divide-y">{department.subDepartmentDetails.map(child => <li key={child.id ?? child.name} className="flex items-center gap-4 py-3 pl-3">
                   <span className="flex-1 text-sm">{child.name}</span>
                   <Badge variant={child.active && department.active ? "default" : "secondary"}>{!child.active ? "Inactive" : !department.active ? "Parent inactive" : "Active"}</Badge>
-                  <Switch checked={child.active} disabled={!canEdit || busy || !hierarchyReady} onCheckedChange={active => toggle(department, active, child.id)} aria-label={`${department.name} / ${child.name} status`} />
+                  <Switch checked={child.active} disabled={!canEdit || busy || !query.isSuccess} onCheckedChange={active => toggle(department, active, child.id)} aria-label={`${department.name} / ${child.name} status`} />
                 </li>)}</ul>
               </details>}
             </TableCell>

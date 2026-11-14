@@ -35,7 +35,9 @@ public class StoreEmployeesController {
  // Combine identity, assignment, current compensation, and details; xmin values form the edit version.
  private List<Map<String,Object>> rows(String store){LocalDate day=today(store);return a.db.queryForList("SELECT e.employee_id AS id,(SELECT count(*) FROM employee_store_assignments shared WHERE shared.employee_id=e.employee_id) AS store_count,e.user_id,e.hire_date,e.employee_type,coalesce(u.first_name,e.first_name) AS first_name,coalesce(u.last_name,e.last_name) AS last_name,u.email,coalesce(rt.role_type_name,'No website access') AS role,esa.job_title,CASE WHEN esa.department_id IS NOT NULL THEN 'default-'||esa.department_id WHEN esa.store_department_id IS NOT NULL THEN 'store-'||esa.store_department_id ELSE '' END AS department_key,coalesce((SELECT store_department_name FROM store_departments WHERE department_id=esa.department_id AND dgt_id=esa.dgt_id),(SELECT store_department_name FROM store_departments WHERE store_department_id=esa.store_department_id),'') AS dept,c.pay_type,coalesce(c.hourly_rate,c.annual_salary) AS rate,CASE WHEN esa.effective_from<=? AND (esa.effective_to IS NULL OR esa.effective_to>=?) AND (e.termination_date IS NULL OR e.termination_date>?) THEN 'Active' ELSE 'Inactive' END AS status,coalesce(u.xmin::text,'0') || ':' || e.xmin::text || ':' || esa.xmin::text || ':' || coalesce(c.xmin::text,'0') AS version FROM employees e LEFT JOIN users u USING(user_id) JOIN employee_store_assignments esa ON esa.employee_id=e.employee_id LEFT JOIN role_types rt ON rt.role_type_id=esa.role_type_id LEFT JOIN LATERAL (SELECT ec.*,ec.xmin FROM employee_compensation ec WHERE ec.archived_at IS NULL AND ec.employee_id=e.employee_id AND ec.effective_from<=? AND (ec.effective_to IS NULL OR ec.effective_to>=?) ORDER BY ec.effective_from DESC,ec.compensation_id DESC LIMIT 1) c ON true WHERE esa.dgt_id=? ORDER BY u.first_name,e.employee_id",day,day,day,day,day,store).stream().map(Rows::normalize).peek(details::enrich).toList();}
  // Return the admin employee page data and store-local date.
- @GetMapping public Object list(@PathVariable String store){a.requireAdmin(store);return Map.of("employees",rows(store),"users",candidates(store),"today",today(store),"departments",details.departments(store));}
+ @GetMapping public Object list(@PathVariable String store){a.requireAdmin(store);return Map.of("employees",rows(store),"users",candidates(store),"today",today(store));}
+ // Small lookup used only by the Add Employee form; company admins grant these store roles.
+ @GetMapping("/account-roles") public Object accountRoles(@PathVariable String store){a.requireAdmin(store);return a.db.queryForList("SELECT role_type_id AS id,role_type_name AS name FROM role_types WHERE is_active AND role_type_name IN ('CASHIER','MANAGER','ACCOUNTANT') ORDER BY role_type_name");}
  // Employee form values; withoutAccess permits an employee without a website user account.
  public record Input(Long userId,Long roleTypeId,String firstName,String lastName,String email,String password,String employeeCode,LocalDate hireDate,String employeeType,String payType,BigDecimal rate,String status,String version,EmployeeDetails.Input details,Boolean withoutAccess){}
  // Create the employee and related records within one transaction.
@@ -46,26 +48,33 @@ public class StoreEmployeesController {
  private Object save(String store,Long id,Input in){
   a.requireAdmin(store);a.db.queryForList("SELECT company_id FROM companies WHERE company_id=? FOR UPDATE",a.company(store));a.requireAdmin(store);
   LocalDate day=today(store);
+  if(id==null&&(in.details()==null||in.details().jobTitle()==null||in.details().jobTitle().isBlank()))throw bad("Job role is required");
   if(in.hireDate()==null||in.hireDate().isAfter(day))throw bad("Hire date must be today or earlier");
   if(!Set.of("Full-time","Part-time","Temporary").contains(in.employeeType()==null?"":in.employeeType()))throw bad("Choose an employee type");
   if(!Set.of("Hourly","Salary").contains(in.payType()==null?"":in.payType())||in.rate()==null||in.rate().signum()<0||in.rate().scale()>2||in.rate().compareTo(new BigDecimal("9999999999.99"))>0)throw bad("Choose pay type and a nonnegative rate with at most two decimals");
   if(!Set.of("Active","Inactive").contains(in.status()==null?"":in.status()))throw bad("Choose a valid status");
   if(in.status().equals("Inactive")&&!in.hireDate().isBefore(day))throw bad("An inactive employee's hire date must be before today");
-  Long uid;Long role;Map<String,Object> identity=null;String first=null,last=null,email=null;
+  Long uid;Long role;Long reservedEmployeeId=null;Map<String,Object> identity=null;String first=null,last=null,email=null;
   if(id==null){
    // A payroll-only employee keeps names on the employee record and has no user or website role.
    if(Boolean.TRUE.equals(in.withoutAccess())){
+    if(in.userId()!=null||in.roleTypeId()!=null||in.email()!=null&&!in.email().isBlank()||in.password()!=null&&!in.password().isBlank())throw bad("No-access employees must not include login credentials or a website role");
     if(in.firstName()==null||in.firstName().isBlank()||in.firstName().length()>100||in.lastName()==null||in.lastName().isBlank()||in.lastName().length()>100)throw bad("First and last name required, maximum 100 characters each");
     uid=null;role=null;
-   // New website accounts initially receive the active CASHIER role.
+   // Preserve the legacy default while honoring an explicitly selected, active staff role.
    }else if(in.userId()==null||(in.email()!=null&&in.password()!=null)){
-    role=a.db.queryForObject("SELECT role_type_id FROM role_types WHERE role_type_name='CASHIER' AND is_active",Long.class);
-    var created=(Map<?,?>)accounts.createUser(store,new com.dgt.backend.access.dto.CreateAccessUserRequest(in.firstName(),in.lastName(),in.employeeCode(),in.email(),in.password(),role,List.of(store),List.of()));uid=((Number)created.get("userId")).longValue();
+    var roles=in.roleTypeId()==null?a.db.queryForList("SELECT role_type_id FROM role_types WHERE role_type_name='CASHIER' AND is_active",Long.class):a.db.queryForList("SELECT role_type_id FROM role_types WHERE role_type_id=? AND is_active AND role_type_name IN ('CASHIER','MANAGER','ACCOUNTANT')",Long.class,in.roleTypeId());
+    if(roles.size()!=1)throw bad("Choose an active Cashier, Manager, or Accountant role");role=roles.getFirst();
+    // Reserve the employee ID so accounts use the same identifier without asking for another code.
+    reservedEmployeeId=a.db.queryForObject("SELECT nextval(pg_get_serial_sequence('public.employees','employee_id'))",Long.class);
+    String code=in.employeeCode()==null||in.employeeCode().isBlank()?reservedEmployeeId.toString():in.employeeCode();
+    var created=(Map<?,?>)accounts.createUser(store,new com.dgt.backend.access.dto.CreateAccessUserRequest(in.firstName(),in.lastName(),code,in.email(),in.password(),role,List.of(store),List.of()));uid=((Number)created.get("userId")).longValue();
    }else{uid=in.userId();var choices=candidates(store).stream().filter(r->((Number)r.get("user_id")).longValue()==uid.longValue()&&Objects.equals(r.get("role_type_id"),in.roleTypeId())).toList();if(choices.isEmpty())throw a.denied();role=((Number)choices.getFirst().get("role_type_id")).longValue();}
    a.db.queryForList("SELECT user_id FROM users WHERE user_id=? FOR UPDATE",uid);
    var existing=a.db.queryForList("SELECT employee_id FROM employees WHERE user_id=?",Long.class,uid);
    if(!existing.isEmpty())throw new ResponseStatusException(HttpStatus.CONFLICT,"This user already has an employee record. Multi-store employee assignment needs a separate workflow.");
-   id=a.db.queryForObject("INSERT INTO employees(user_id,hire_date,employee_type,first_name,last_name) VALUES (?,?,?,?,?) RETURNING employee_id",Long.class,uid,in.hireDate(),in.employeeType(),uid==null?in.firstName().strip():null,uid==null?in.lastName().strip():null);
+   if(reservedEmployeeId!=null)id=a.db.queryForObject("INSERT INTO employees(employee_id,user_id,hire_date,employee_type) VALUES (?,?,?,?) RETURNING employee_id",Long.class,reservedEmployeeId,uid,in.hireDate(),in.employeeType());
+   else id=a.db.queryForObject("INSERT INTO employees(user_id,hire_date,employee_type,first_name,last_name) VALUES (?,?,?,?,?) RETURNING employee_id",Long.class,uid,in.hireDate(),in.employeeType(),uid==null?in.firstName().strip():null,uid==null?in.lastName().strip():null);
    a.db.update("INSERT INTO employee_store_assignments(employee_id,dgt_id,is_primary,effective_from,effective_to,role_type_id) VALUES (?,?,true,?,?,?)",id,store,in.hireDate(),in.status().equals("Inactive")?day.minusDays(1):null,role);
   }else{
    a.db.queryForList("SELECT employee_id FROM employees WHERE employee_id=? FOR UPDATE",id);
@@ -120,6 +129,6 @@ public class StoreEmployeesController {
    // Revoke stored user_sessions after an email change; this is not a blanket JWT revocation.
    if(changedEmail)a.db.update("UPDATE user_sessions SET revoked_at=CURRENT_TIMESTAMP WHERE user_id=? AND revoked_at IS NULL",uid);
   }
-  return Map.of("employees",rows(store),"users",candidates(store),"today",day,"signInAgain",signInAgain,"departments",details.departments(store));
+  return Map.of("employees",rows(store),"users",candidates(store),"today",day,"signInAgain",signInAgain);
  }
 }

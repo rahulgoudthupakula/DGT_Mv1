@@ -31,6 +31,13 @@ class ApiErrorsTest {
     @MockitoBean PagePermissions pagePermissions;
 
     @Test
+    void missingEndpointReturns404InsteadOfGeneric500() throws Exception {
+        mockMvc.perform(get("/api/v1/missing-endpoint"))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.detail").value("The requested endpoint was not found."));
+    }
+
+    @Test
     void responseStatusException_4xx_returns4xxStatus() throws Exception {
         when(inventoryService.get(1L)).thenThrow(
             new ResponseStatusException(HttpStatus.NOT_FOUND, "Record not found"));
