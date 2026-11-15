@@ -36,7 +36,7 @@ public class WorkforceService {
  private Map<String,Object> employee(String store,long id){var rows=a.db.queryForList("SELECT e.* FROM employees e WHERE e.employee_id=? AND EXISTS(SELECT 1 FROM employee_store_assignments es WHERE es.employee_id=e.employee_id AND es.dgt_id=?)",id,store);if(rows.size()!=1)throw a.denied();return rows.getFirst();}
  private boolean own(String store,long id){var u=employee(store,id).get("user_id");return u!=null&&number(u)==a.user();}
  private void subject(String store,long id){a.assigned(store);employee(store,id);if(!manager(store)&&!own(store,id))throw a.denied();}
- private void employed(String store,long id,LocalDate from,LocalDate to){employee(store,id);if(!Boolean.TRUE.equals(a.db.queryForObject("SELECT EXISTS(SELECT 1 FROM employee_store_assignments es JOIN employees e USING(employee_id) WHERE es.employee_id=? AND es.dgt_id=? AND es.effective_from<=? AND (es.effective_to IS NULL OR es.effective_to>=?) AND e.hire_date<=? AND (e.termination_date IS NULL OR e.termination_date>?))",Boolean.class,id,store,from,to,from,to)))throw bad("Employee is not actively assigned for these dates");}
+ private void employed(String store,long id,LocalDate from,LocalDate to){employee(store,id);if(!Boolean.TRUE.equals(a.db.queryForObject("SELECT EXISTS(SELECT 1 FROM employee_store_assignments es JOIN employees e USING(employee_id) WHERE es.employee_id=? AND es.dgt_id=? AND es.effective_from<=? AND (es.effective_to IS NULL OR es.effective_to>=?) AND e.hire_date<=? AND (e.termination_date IS NULL OR e.termination_date>?))",Boolean.class,id,store,from,to,from,to)))throw bad("This employee is not assigned to this store for the selected dates. Choose another employee or update their assignment.");}
  private boolean senior(String store,long id){var e=employee(store,id);Object uid=e.get("user_id");if(uid!=null&&a.admin(number(uid),a.company(store)))return true;return Boolean.TRUE.equals(a.db.queryForObject("SELECT EXISTS(SELECT 1 FROM employee_store_assignments es JOIN role_types rt USING(role_type_id) WHERE es.employee_id=? AND es.dgt_id=? AND rt.role_type_name IN ('ADMIN','MANAGER')) OR EXISTS(SELECT 1 FROM user_roles ur JOIN role_types rt USING(role_type_id) WHERE ur.user_id=? AND ur.dgt_id=? AND ur.is_active AND rt.role_type_name='MANAGER')",Boolean.class,id,store,uid,store));}
  private boolean reviewer(String store,Map<String,Object> r){if(a.admin(a.user(),a.company(store)))return true;if(!manager(store)||number(r.get("submitted_by"))==a.user()||own(store,number(r.get("employee_id"))))return false;Object target=r.get("target_employee_id");if(target!=null&&own(store,number(target)))return false;boolean needsAdmin=senior(store,number(r.get("employee_id")))||(target!=null&&senior(store,number(target)));return !needsAdmin||a.admin(a.user(),a.company(store));}
  private Map<String,Object> shift(String store,long id){var rows=a.db.queryForList("SELECT *,xmin::text AS version FROM employee_schedules WHERE schedule_id=? AND dgt_id=?",id,store);if(rows.size()!=1)throw a.denied();return rows.getFirst();}
@@ -61,16 +61,17 @@ public class WorkforceService {
  }
  private boolean covers(Map<String,Object> r,LocalDate anchor,LocalDateTime start,LocalDateTime end){if(Boolean.TRUE.equals(r.get("unavailable")))return false;LocalTime from=((java.sql.Time)r.get("start_time")).toLocalTime(),to=((java.sql.Time)r.get("end_time")).toLocalTime();LocalDateTime lo=anchor.atTime(from),hi=anchor.plusDays(Boolean.TRUE.equals(r.get("overnight"))?1:0).atTime(to);return !start.isBefore(lo)&&!end.isAfter(hi);}
  private void eligible(String store,long employee,OffsetDateTime start,OffsetDateTime end,Set<Long> excluding,String override){
-  employed(store,employee,start.atZoneSameInstant(zone(store)).toLocalDate(),end.minusNanos(1).atZoneSameInstant(zone(store)).toLocalDate());
   a.db.queryForList("SELECT employee_id FROM employees WHERE employee_id=? FOR UPDATE",employee);
+  employed(store,employee,today(store),today(store));
+  employed(store,employee,start.atZoneSameInstant(zone(store)).toLocalDate(),end.minusNanos(1).atZoneSameInstant(zone(store)).toLocalDate());
   for(var r:a.db.queryForList("SELECT schedule_id FROM employee_schedules WHERE employee_id=? AND status IN ('DRAFT','PUBLISHED') AND schedule_start<? AND schedule_end>?",employee,end,start))if(!excluding.contains(number(r.get("schedule_id"))))throw conflict("Employee already has an overlapping shift, possibly at another store");
   LocalDate workDate=start.atZoneSameInstant(zone(store)).toLocalDate();
-  if(Boolean.TRUE.equals(a.db.queryForObject("SELECT EXISTS(SELECT 1 FROM workforce_requests WHERE dgt_id=? AND employee_id=? AND kind='TIME_OFF' AND status='APPROVED' AND (((payload->>'shift_id') IS NULL AND (payload->>'start_date')::date<=? AND (payload->>'end_date')::date>=?) OR EXISTS(SELECT 1 FROM workforce_leave_shifts ls WHERE ls.request_id=workforce_requests.request_id AND ls.start_at<? AND ls.end_at>?)))",Boolean.class,store,employee,workDate,workDate,end,start)))throw conflict("Employee has approved time off for this shift date");
+  if(Boolean.TRUE.equals(a.db.queryForObject("SELECT EXISTS(SELECT 1 FROM workforce_requests WHERE dgt_id=? AND employee_id=? AND kind='TIME_OFF' AND status='APPROVED' AND (((payload->>'shift_id') IS NULL AND (payload->>'start_date')::date<=? AND (payload->>'end_date')::date>=?) OR EXISTS(SELECT 1 FROM workforce_leave_shifts ls WHERE ls.request_id=workforce_requests.request_id AND ls.start_at<? AND ls.end_at>?)))",Boolean.class,store,employee,end.minusNanos(1).atZoneSameInstant(zone(store)).toLocalDate(),workDate,end,start)))throw conflict("This employee is on approved leave during this shift. Choose another day or employee.");
   for(LocalDate d=start.atZoneSameInstant(zone(store)).toLocalDate();!d.isAfter(end.minusNanos(1).atZoneSameInstant(zone(store)).toLocalDate());d=d.plusDays(1)){
    var exception=a.db.queryForList("SELECT unavailable FROM workforce_availability WHERE dgt_id=? AND employee_id=? AND kind='EXCEPTION' AND start_date<=? AND end_date>=? ORDER BY availability_id DESC LIMIT 1",store,employee,d,d);
-   if(!exception.isEmpty()&&Boolean.TRUE.equals(exception.getFirst().get("unavailable"))&&(override==null||override.isBlank()))throw conflict("Shift overlaps an unavailable date; manager override reason required");
+   if(!exception.isEmpty()&&Boolean.TRUE.equals(exception.getFirst().get("unavailable"))&&(override==null||override.isBlank()))throw conflict("This employee is marked unavailable on this date. Choose another day or employee, or enter a manager override reason to continue.");
   }
-  String warning=availabilityConflict(store,employee,start,end);if(warning!=null&&(override==null||override.isBlank()))throw conflict(warning+"; a manager override reason is required");
+  String warning=availabilityConflict(store,employee,start,end);if(warning!=null&&(override==null||override.isBlank()))throw conflict("This shift is outside the employee’s available hours. Choose another time or enter a manager override reason to continue.");
  }
  @Transactional public Object saveShift(String store,Long id,ShiftInput in){log.info("Saving shift store={} id={}", store, id);lock(store);manage(store);if(in.employeeId()==null)throw bad("Choose an employee");OffsetDateTime start=local(store,in.start(),in.startOffset()),end=local(store,in.end(),in.endOffset());if(!end.isAfter(start)||Duration.between(start,end).compareTo(Duration.ofHours(26))>0)throw bad("Shift end must follow start, within 26 hours");if(!start.toInstant().isAfter(Instant.now()))throw bad("Create future shifts only");if(!Set.of("DRAFT","PUBLISHED").contains(in.status()==null?"":in.status()))throw bad("Choose Draft or Published");bounded(in.notes(),500,"Notes");bounded(in.jobTitle(),100,"Job title");bounded(in.overrideReason(),500,"Override reason");
   if(id!=null){var old=shift(store,id);future(old);if(!Objects.equals(in.version(),old.get("version")))throw conflict("Shift changed; reopen before saving");if(!Set.of("DRAFT","PUBLISHED").contains(old.get("status")))throw bad("Use coverage requests for a shift needing coverage");}
@@ -78,6 +79,22 @@ public class WorkforceService {
   if(id==null)id=a.db.queryForObject("INSERT INTO employee_schedules(employee_id,dgt_id,work_date,schedule_start,schedule_end,status,notes,created_by,job_title,override_reason,published_at) VALUES (?,?,?,?,?,?,?,?,?,?,CASE WHEN ?='PUBLISHED' THEN CURRENT_TIMESTAMP ELSE NULL END) RETURNING schedule_id",Long.class,in.employeeId(),store,in.start().toLocalDate(),start,end,in.status(),in.notes(),a.user(),in.jobTitle(),in.overrideReason(),in.status());
   else a.db.update("UPDATE employee_schedules SET employee_id=?,work_date=?,schedule_start=?,schedule_end=?,status=?,notes=?,job_title=?,override_reason=?,published_at=CASE WHEN ?='PUBLISHED' THEN CURRENT_TIMESTAMP ELSE NULL END,updated_at=CURRENT_TIMESTAMP WHERE schedule_id=?",in.employeeId(),in.start().toLocalDate(),start,end,in.status(),in.notes(),in.jobTitle(),in.overrideReason(),in.status(),id);
   a.audit(store,"SHIFT_SAVED",id.toString(),"{}");return Map.of("id",id);
+ }
+ public record ShiftBatchInput(List<ShiftInput> shifts){}
+ // One transaction prevents partial weeks if any selected day conflicts.
+ @Transactional public Object saveShiftBatch(String store,ShiftBatchInput input){
+  lock(store);manage(store);
+  if(input.shifts()==null||input.shifts().isEmpty()||input.shifts().size()>7)throw bad("Choose between one and seven days in the same week");
+  Long employee=input.shifts().getFirst()==null?null:input.shifts().getFirst().employeeId();
+  LocalDate week=null;var dates=new HashSet<LocalDate>();var ids=new ArrayList<Object>();
+  for(var shift:input.shifts()){
+   if(shift==null||shift.start()==null||!Objects.equals(employee,shift.employeeId()))throw bad("Choose one employee and valid dates for the selected days");
+   LocalDate date=shift.start().toLocalDate(),monday=date.with(java.time.DayOfWeek.MONDAY);
+   if(week==null)week=monday;
+   if(!week.equals(monday)||!dates.add(date))throw bad("Choose distinct days within one Monday–Sunday week");
+   ids.add(saveShift(store,null,shift));
+  }
+  return Map.of("count",ids.size());
  }
  @Transactional public Object cancelShift(String store,long id,String version){log.info("Cancelling shift store={} id={}", store, id);lock(store);manage(store);var old=shift(store,id);future(old);if(!Objects.equals(version,old.get("version")))throw conflict("Shift changed");a.db.update("UPDATE employee_schedules SET status='CANCELLED',updated_at=CURRENT_TIMESTAMP WHERE schedule_id=?",id);a.audit(store,"SHIFT_CANCELLED",Long.toString(id),"{}");return Map.of("id",id);}
  public record WeekAction(LocalDate week,String action){}
@@ -176,7 +193,7 @@ public class WorkforceService {
  }
  public Object read(String store,LocalDate week){log.debug("Reading workforce schedule store={} week={}", store, week);a.assigned(store);boolean manager=manager(store);ZoneId tz=zone(store);if(week==null)week=LocalDate.now(tz).with(java.time.DayOfWeek.MONDAY);long uid=a.user();
   LocalDate weekEnd=week.plusDays(6);
-  var employees=a.db.queryForList("SELECT DISTINCT e.employee_id,coalesce(u.first_name,e.first_name)||' '||coalesce(u.last_name,e.last_name) AS name,coalesce(esa.job_title,'') AS job_title,(e.user_id=?) AS own FROM employees e JOIN employee_store_assignments esa ON esa.employee_id=e.employee_id LEFT JOIN users u ON u.user_id=e.user_id WHERE esa.dgt_id=? ORDER BY name",uid,store);
+  var employees=a.db.queryForList("SELECT DISTINCT e.employee_id,coalesce(u.first_name,e.first_name)||' '||coalesce(u.last_name,e.last_name) AS name,coalesce(esa.job_title,'') AS job_title,(e.user_id=?) AS own,(esa.effective_from<=? AND (esa.effective_to IS NULL OR esa.effective_to>=?) AND e.hire_date<=? AND (e.termination_date IS NULL OR e.termination_date>?)) AS active FROM employees e JOIN employee_store_assignments esa ON esa.employee_id=e.employee_id LEFT JOIN users u ON u.user_id=e.user_id WHERE esa.dgt_id=? ORDER BY name",uid,LocalDate.now(tz),LocalDate.now(tz),LocalDate.now(tz),LocalDate.now(tz),store);
   var shiftRows=a.db.queryForList("SELECT *,xmin::text AS version FROM employee_schedules WHERE dgt_id=? AND work_date BETWEEN ? AND ? AND status<>'CANCELLED' AND (? OR status<>'DRAFT') ORDER BY schedule_start,schedule_id",store,week,weekEnd,manager);
   var empIds=shiftRows.stream().map(s->number(s.get("employee_id"))).collect(java.util.stream.Collectors.toSet());
   var availByEmp=new HashMap<Long,List<Map<String,Object>>>();

@@ -33,13 +33,50 @@ public class StoreEmployeesController {
  // List active store account/role combinations available for linking an employee.
  private List<Map<String,Object>> candidates(String store){return a.db.queryForList("SELECT u.user_id,u.first_name,u.last_name,u.email,rt.role_type_id,rt.role_type_name FROM users u JOIN user_roles ur USING(user_id) JOIN role_types rt USING(role_type_id) WHERE ur.dgt_id=? AND ur.is_active AND rt.is_active AND u.account_status='ACTIVE' ORDER BY u.first_name,u.user_id,rt.role_type_id",store);}
  // Combine identity, assignment, current compensation, and details; xmin values form the edit version.
- private List<Map<String,Object>> rows(String store){LocalDate day=today(store);return a.db.queryForList("SELECT e.employee_id AS id,(SELECT count(*) FROM employee_store_assignments shared WHERE shared.employee_id=e.employee_id) AS store_count,e.user_id,e.hire_date,e.employee_type,coalesce(u.first_name,e.first_name) AS first_name,coalesce(u.last_name,e.last_name) AS last_name,u.email,coalesce(rt.role_type_name,'No website access') AS role,esa.job_title,CASE WHEN esa.department_id IS NOT NULL THEN 'default-'||esa.department_id WHEN esa.store_department_id IS NOT NULL THEN 'store-'||esa.store_department_id ELSE '' END AS department_key,coalesce((SELECT store_department_name FROM store_departments WHERE department_id=esa.department_id AND dgt_id=esa.dgt_id),(SELECT store_department_name FROM store_departments WHERE store_department_id=esa.store_department_id),'') AS dept,c.pay_type,coalesce(c.hourly_rate,c.annual_salary) AS rate,CASE WHEN esa.effective_from<=? AND (esa.effective_to IS NULL OR esa.effective_to>=?) AND (e.termination_date IS NULL OR e.termination_date>?) THEN 'Active' ELSE 'Inactive' END AS status,coalesce(u.xmin::text,'0') || ':' || e.xmin::text || ':' || esa.xmin::text || ':' || coalesce(c.xmin::text,'0') AS version FROM employees e LEFT JOIN users u USING(user_id) JOIN employee_store_assignments esa ON esa.employee_id=e.employee_id LEFT JOIN role_types rt ON rt.role_type_id=esa.role_type_id LEFT JOIN LATERAL (SELECT ec.*,ec.xmin FROM employee_compensation ec WHERE ec.archived_at IS NULL AND ec.employee_id=e.employee_id AND ec.effective_from<=? AND (ec.effective_to IS NULL OR ec.effective_to>=?) ORDER BY ec.effective_from DESC,ec.compensation_id DESC LIMIT 1) c ON true WHERE esa.dgt_id=? ORDER BY u.first_name,e.employee_id",day,day,day,day,day,store).stream().map(Rows::normalize).peek(details::enrich).toList();}
+ private List<Map<String,Object>> rows(String store){LocalDate day=today(store);return a.db.queryForList("SELECT e.employee_id AS id,(SELECT count(*) FROM employee_store_assignments shared WHERE shared.employee_id=e.employee_id) AS store_count,e.user_id,e.hire_date,e.employee_type,esa.effective_to AS last_working_date,coalesce(u.first_name,e.first_name) AS first_name,coalesce(u.last_name,e.last_name) AS last_name,u.email,coalesce(rt.role_type_name,'No website access') AS role,esa.job_title,CASE WHEN esa.department_id IS NOT NULL THEN 'default-'||esa.department_id WHEN esa.store_department_id IS NOT NULL THEN 'store-'||esa.store_department_id ELSE '' END AS department_key,coalesce((SELECT store_department_name FROM store_departments WHERE department_id=esa.department_id AND dgt_id=esa.dgt_id),(SELECT store_department_name FROM store_departments WHERE store_department_id=esa.store_department_id),'') AS dept,c.pay_type,coalesce(c.hourly_rate,c.annual_salary) AS rate,CASE WHEN esa.effective_from<=? AND (esa.effective_to IS NULL OR esa.effective_to>=?) AND (e.termination_date IS NULL OR e.termination_date>?) THEN 'Active' ELSE 'Inactive' END AS status,coalesce(u.xmin::text,'0') || ':' || e.xmin::text || ':' || esa.xmin::text || ':' || coalesce(c.xmin::text,'0') AS version FROM employees e LEFT JOIN users u USING(user_id) JOIN employee_store_assignments esa ON esa.employee_id=e.employee_id LEFT JOIN role_types rt ON rt.role_type_id=esa.role_type_id LEFT JOIN LATERAL (SELECT ec.*,ec.xmin FROM employee_compensation ec WHERE ec.archived_at IS NULL AND ec.employee_id=e.employee_id AND ec.effective_from<=? AND (ec.effective_to IS NULL OR ec.effective_to>=?) ORDER BY ec.effective_from DESC,ec.compensation_id DESC LIMIT 1) c ON true WHERE esa.dgt_id=? ORDER BY u.first_name,e.employee_id",day,day,day,day,day,store).stream().map(Rows::normalize).peek(details::enrich).toList();}
  // Return the admin employee page data and store-local date.
  @GetMapping public Object list(@PathVariable String store){a.requireAdmin(store);return Map.of("employees",rows(store),"users",candidates(store),"today",today(store));}
  // Small lookup used only by the Add Employee form; company admins grant these store roles.
  @GetMapping("/account-roles") public Object accountRoles(@PathVariable String store){a.requireAdmin(store);return a.db.queryForList("SELECT role_type_id AS id,role_type_name AS name FROM role_types WHERE is_active AND role_type_name IN ('CASHIER','MANAGER','ACCOUNTANT') ORDER BY role_type_name");}
+ // Count live shifts extending beyond the chosen last day; never cancel them implicitly.
+ private int futureShifts(String store,long id,LocalDate lastDay){
+  String timezone=a.db.queryForObject("SELECT timezone FROM stores WHERE dgt_id=?",String.class,store);
+  var cutoff=lastDay.plusDays(1).atStartOfDay(ZoneId.of(timezone)).toOffsetDateTime();
+  return a.db.queryForObject("SELECT count(*) FROM employee_schedules WHERE dgt_id=? AND employee_id=? AND status IN ('DRAFT','PUBLISHED','NEEDS_COVERAGE') AND schedule_end>? AND schedule_end>CURRENT_TIMESTAMP",Integer.class,store,id,cutoff);
+ }
+ @GetMapping("/{id}/inactivation-preview") public Object inactivationPreview(@PathVariable String store,@PathVariable long id,@RequestParam LocalDate lastWorkingDate){
+  a.requireAdmin(store);
+  if(!Boolean.TRUE.equals(a.db.queryForObject("SELECT EXISTS(SELECT 1 FROM employee_store_assignments WHERE employee_id=? AND dgt_id=?)",Boolean.class,id,store)))throw a.denied();
+  return Map.of("futureShiftCount",futureShifts(store,id,lastWorkingDate),"inactiveFrom",lastWorkingDate.plusDays(1));
+ }
+ public record AssignmentInput(Boolean reactivate,LocalDate lastWorkingDate,Boolean disableWebsiteAccess,Boolean acknowledgeFutureShifts,String version){}
+ // Change only this store assignment; shared identity and compensation remain untouched.
+ @PutMapping("/{id}/assignment") @Transactional public Object assignment(@PathVariable String store,@PathVariable long id,@RequestBody AssignmentInput in){
+  a.requireAdmin(store);a.db.queryForList("SELECT company_id FROM companies WHERE company_id=? FOR UPDATE",a.company(store));a.requireAdmin(store);
+  a.db.queryForList("SELECT employee_id FROM employees WHERE employee_id=? FOR UPDATE",id);
+  var current=rows(store).stream().filter(r->((Number)r.get("id")).longValue()==id).findFirst().orElseThrow(a::denied);
+  if(!Objects.equals(in.version(),current.get("version")))throw new ResponseStatusException(HttpStatus.CONFLICT,"Employee changed; close and reopen before saving");
+  var employee=a.db.queryForMap("SELECT * FROM employees WHERE employee_id=?",id);
+  if(Boolean.TRUE.equals(in.reactivate())){
+   if(Boolean.TRUE.equals(in.disableWebsiteAccess()))throw bad("Reactivation does not change website access");
+   var termination=(java.sql.Date)employee.get("termination_date");
+   if(termination!=null&&!termination.toLocalDate().isAfter(today(store)))throw bad("Employment has a termination date; review it before reactivating this store assignment");
+  }else{
+   LocalDate hire=((java.sql.Date)employee.get("hire_date")).toLocalDate();
+   if(in.lastWorkingDate()==null||in.lastWorkingDate().isBefore(hire))throw bad("Choose a last working date on or after the hire date");
+   if(futureShifts(store,id,in.lastWorkingDate())>0&&!Boolean.TRUE.equals(in.acknowledgeFutureShifts()))throw bad("Confirm that shifts after the last working date must be reviewed separately");
+   if(Boolean.TRUE.equals(in.disableWebsiteAccess())){
+    Long uid=(Long)employee.get("user_id");if(uid==null)throw bad("This employee has no website account");
+    if(a.admin(uid,a.company(store)))throw bad("Company admin access is managed through company ownership");
+    a.db.update("UPDATE user_roles SET is_active=false,updated_at=CURRENT_TIMESTAMP WHERE user_id=? AND dgt_id=?",uid,store);
+    a.audit(store,"EMPLOYEE_WEBSITE_ACCESS_DISABLED",Long.toString(id),"{}");
+   }
+  }
+  a.db.update("UPDATE employee_store_assignments SET effective_to=?,updated_at=CURRENT_TIMESTAMP WHERE employee_id=? AND dgt_id=?",Boolean.TRUE.equals(in.reactivate())?null:in.lastWorkingDate(),id,store);
+  a.audit(store,Boolean.TRUE.equals(in.reactivate())?"EMPLOYEE_ASSIGNMENT_REACTIVATED":"EMPLOYEE_ASSIGNMENT_ENDED",Long.toString(id),"{}");return list(store);
+ }
  // Employee form values; withoutAccess permits an employee without a website user account.
- public record Input(Long userId,Long roleTypeId,String firstName,String lastName,String email,String password,String employeeCode,LocalDate hireDate,String employeeType,String payType,BigDecimal rate,String status,String version,EmployeeDetails.Input details,Boolean withoutAccess){}
+ public record Input(Long userId,Long roleTypeId,String firstName,String lastName,String email,String password,String employeeCode,LocalDate hireDate,String employeeType,String payType,BigDecimal rate,String status,String version,EmployeeDetails.Input details,Boolean withoutAccess,LocalDate lastWorkingDate,Boolean disableWebsiteAccess,Boolean acknowledgeFutureShifts){}
  // Create the employee and related records within one transaction.
  @PostMapping @Transactional public Object create(@PathVariable String store,@RequestBody Input in){return save(store,null,in);}
  // Update an employee through the same transactional validation workflow.
@@ -52,8 +89,11 @@ public class StoreEmployeesController {
   if(in.hireDate()==null||in.hireDate().isAfter(day))throw bad("Hire date must be today or earlier");
   if(!Set.of("Full-time","Part-time","Temporary").contains(in.employeeType()==null?"":in.employeeType()))throw bad("Choose an employee type");
   if(!Set.of("Hourly","Salary").contains(in.payType()==null?"":in.payType())||in.rate()==null||in.rate().signum()<0||in.rate().scale()>2||in.rate().compareTo(new BigDecimal("9999999999.99"))>0)throw bad("Choose pay type and a nonnegative rate with at most two decimals");
-  if(!Set.of("Active","Inactive").contains(in.status()==null?"":in.status()))throw bad("Choose a valid status");
-  if(in.status().equals("Inactive")&&!in.hireDate().isBefore(day))throw bad("An inactive employee's hire date must be before today");
+  String status=id==null?"Active":in.status();
+  if(!Set.of("Active","Inactive").contains(status==null?"":status))throw bad("Choose a valid status");
+  LocalDate lastDay=status.equals("Inactive")?in.lastWorkingDate():null;
+  if(status.equals("Inactive")&&(lastDay==null||lastDay.isBefore(in.hireDate())))throw bad("Choose a last working date on or after the hire date");
+  if(Boolean.TRUE.equals(in.disableWebsiteAccess())&&(id==null||!status.equals("Inactive")))throw bad("Website access can only be disabled while ending an existing assignment");
   Long uid;Long role;Long reservedEmployeeId=null;Map<String,Object> identity=null;String first=null,last=null,email=null;
   if(id==null){
    // A payroll-only employee keeps names on the employee record and has no user or website role.
@@ -75,7 +115,7 @@ public class StoreEmployeesController {
    if(!existing.isEmpty())throw new ResponseStatusException(HttpStatus.CONFLICT,"This user already has an employee record. Multi-store employee assignment needs a separate workflow.");
    if(reservedEmployeeId!=null)id=a.db.queryForObject("INSERT INTO employees(employee_id,user_id,hire_date,employee_type) VALUES (?,?,?,?) RETURNING employee_id",Long.class,reservedEmployeeId,uid,in.hireDate(),in.employeeType());
    else id=a.db.queryForObject("INSERT INTO employees(user_id,hire_date,employee_type,first_name,last_name) VALUES (?,?,?,?,?) RETURNING employee_id",Long.class,uid,in.hireDate(),in.employeeType(),uid==null?in.firstName().strip():null,uid==null?in.lastName().strip():null);
-   a.db.update("INSERT INTO employee_store_assignments(employee_id,dgt_id,is_primary,effective_from,effective_to,role_type_id) VALUES (?,?,true,?,?,?)",id,store,in.hireDate(),in.status().equals("Inactive")?day.minusDays(1):null,role);
+   a.db.update("INSERT INTO employee_store_assignments(employee_id,dgt_id,is_primary,effective_from,effective_to,role_type_id) VALUES (?,?,true,?,?,?)",id,store,in.hireDate(),lastDay,role);
   }else{
    a.db.queryForList("SELECT employee_id FROM employees WHERE employee_id=? FOR UPDATE",id);
    uid=a.db.queryForObject("SELECT user_id FROM employees WHERE employee_id=?",Long.class,id);
@@ -83,6 +123,13 @@ public class StoreEmployeesController {
    long employee=id;var found=rows(store).stream().filter(r->((Number)r.get("id")).longValue()==employee).toList();if(found.size()!=1)throw a.denied();var current=found.getFirst();
    // Reject concurrent changes to identity, employee, assignment, or current compensation.
    if(!Objects.equals(in.version(),current.get("version")))throw new ResponseStatusException(HttpStatus.CONFLICT,"Employee changed; close and reopen before saving");
+   if(lastDay!=null&&!lastDay.toString().equals(Objects.toString(current.get("last_working_date"),""))&&futureShifts(store,id,lastDay)>0&&!Boolean.TRUE.equals(in.acknowledgeFutureShifts()))throw bad("Confirm that shifts after the last working date must be reviewed separately");
+   if(Boolean.TRUE.equals(in.disableWebsiteAccess())){
+    if(uid==null)throw bad("This employee has no website account");
+    if(a.admin(uid,a.company(store)))throw bad("Company admin access is managed through company ownership");
+    a.db.update("UPDATE user_roles SET is_active=false,updated_at=CURRENT_TIMESTAMP WHERE user_id=? AND dgt_id=?",uid,store);
+    a.audit(store,"EMPLOYEE_WEBSITE_ACCESS_DISABLED",id.toString(),"{}");
+   }
    // Shared employee changes require admin rights for every assignment in the same company.
    for(var target:a.db.queryForList("SELECT dgt_id FROM employee_store_assignments WHERE employee_id=?",String.class,id)){
     if(a.company(target)!=a.company(store))throw bad("Employee belongs to another company; contact support before editing");
@@ -106,7 +153,7 @@ public class StoreEmployeesController {
    }
    if(Boolean.TRUE.equals(a.db.queryForObject("SELECT EXISTS(SELECT 1 FROM employee_compensation WHERE employee_compensation.archived_at IS NULL AND employee_id=? AND effective_from>?)",Boolean.class,id,day)))throw bad("Future pay changes already exist; review them before editing");
    a.db.update("UPDATE employees SET hire_date=?,employee_type=?,updated_at=CURRENT_TIMESTAMP WHERE employee_id=?",in.hireDate(),in.employeeType(),id);
-   a.db.update("UPDATE employee_store_assignments SET effective_from=?,effective_to=?,updated_at=CURRENT_TIMESTAMP WHERE employee_id=? AND dgt_id=?",in.hireDate(),in.status().equals("Inactive")?day.minusDays(1):null,id,store);
+   a.db.update("UPDATE employee_store_assignments SET effective_from=?,effective_to=?,updated_at=CURRENT_TIMESTAMP WHERE employee_id=? AND dgt_id=?",in.hireDate(),lastDay,id,store);
   }
   // Find effective pay records for today; overlapping records require manual review.
   var pay=a.db.queryForList("SELECT * FROM employee_compensation WHERE employee_compensation.archived_at IS NULL AND employee_id=? AND effective_from<=? AND (effective_to IS NULL OR effective_to>=?) ORDER BY effective_from DESC,compensation_id DESC",id,day,day);

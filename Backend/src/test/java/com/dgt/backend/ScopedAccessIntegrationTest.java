@@ -180,6 +180,7 @@ class ScopedAccessIntegrationTest {
   db.update("DELETE FROM invoices WHERE dgt_id IN (?,?,?)",store,second,foreign);
   for(String table:List.of("inventory_movements","product_barcodes","product_store_prices","inventory","product_vendors","products","vendor_contacts","vendors","store_sub_departments"))db.update("DELETE FROM "+table+" WHERE dgt_id IN (?,?,?)",store,second,foreign);
   db.update("DELETE FROM employee_compensation WHERE employee_id IN (SELECT employee_id FROM employees WHERE user_id IN (SELECT user_id FROM users WHERE dgt_id IN (?,?,?)))",store,second,foreign);
+  db.update("DELETE FROM employee_schedules WHERE dgt_id IN (?,?,?)",store,second,foreign);
   db.update("DELETE FROM employee_store_assignments WHERE dgt_id IN (?,?,?)",store,second,foreign);
   db.update("DELETE FROM employees WHERE first_name=? AND last_name='Discount fixture'",tag);
   db.update("DELETE FROM employees WHERE user_id IN (SELECT user_id FROM users WHERE dgt_id IN (?,?,?))",store,second,foreign);
@@ -470,7 +471,7 @@ class ScopedAccessIntegrationTest {
   assertThat(employee.path("rate").decimalValue()).isEqualByComparingTo("18.50");
   assertThat(ok(req("admin","GET","/access/stores/"+second+"/employees",null),200).path("employees").size()).isZero();
   ok(req("admin","POST",path,body),409);
-  body.put("version",employee.path("version").asText());body.put("rate",20);body.put("status","Inactive");var updated=ok(req("admin","PUT",path+"/"+id,body),200);assertThat(updated.path("employees").get(0).path("status").asText()).isEqualTo("Inactive");
+  body.put("version",employee.path("version").asText());body.put("rate",20);body.put("status","Inactive");body.put("last_working_date",db.queryForObject("SELECT ((CURRENT_TIMESTAMP AT TIME ZONE timezone)::date-1)::text FROM stores WHERE dgt_id=?",String.class,store));var updated=ok(req("admin","PUT",path+"/"+id,body),200);assertThat(updated.path("employees").get(0).path("status").asText()).isEqualTo("Inactive");
   ok(req("admin","PUT",path+"/"+id,body),409);ok(req("other","PUT",path+"/"+id,body),403);
   body.remove("userId");body.put("status","Active");body.put("first_name","New");body.put("last_name","Employee");body.put("employee_code","EMP-"+tag);body.put("email","employee-"+tag+"@example.test");body.put("password",password);
   var two=ok(req("admin","POST",path,body),200);assertThat(two.path("employees").size()).isEqualTo(2);
@@ -482,7 +483,7 @@ class ScopedAccessIntegrationTest {
   db.update("INSERT INTO employee_store_assignments(employee_id,dgt_id,is_primary,effective_from,role_type_id) VALUES (?,?,false,'2026-01-01',?)",id,second,role);
   var employee=ok(req("admin","GET",access()+"/employees",null),200).path("employees").get(0);
   for(var row:ok(req("admin","GET",access()+"/employees",null),200).path("employees"))if(row.path("id").asLong()==id)employee=row;
-  var body=new HashMap<String,Object>();body.put("hire_date","2026-01-01");body.put("employee_type","Part-time");body.put("pay_type","Hourly");body.put("rate",27);body.put("status","Inactive");body.put("version",employee.path("version").asText());
+  var body=new HashMap<String,Object>();body.put("hire_date","2026-01-01");body.put("employee_type","Part-time");body.put("pay_type","Hourly");body.put("rate",27);body.put("status","Inactive");body.put("last_working_date",db.queryForObject("SELECT ((CURRENT_TIMESTAMP AT TIME ZONE timezone)::date-1)::text FROM stores WHERE dgt_id=?",String.class,store));body.put("version",employee.path("version").asText());
   ok(req("admin","PUT",access()+"/employees/"+id,body),200);
   var other=ok(req("admin","GET","/access/stores/"+second+"/employees",null),200).path("employees").get(0);
   assertThat(other.path("rate").decimalValue()).isEqualByComparingTo("27");assertThat(other.path("status").asText()).isEqualTo("Active");assertThat(other.path("store_count").asInt()).isEqualTo(2);
@@ -2429,6 +2430,44 @@ ok(call("admin","PUT",path+"/programs/"+id,form,program.get("version").asText(),
   long role=db.queryForObject("SELECT role_type_id FROM role_types WHERE role_type_name='MANAGER'",Long.class);
   db.update("UPDATE store_role_permissions SET allowed=false WHERE dgt_id=? AND role_type_id=? AND permission_code='MODULE_GROCERY'",child,role);
   assertThat(db.queryForObject("SELECT allowed FROM store_role_permissions WHERE dgt_id=? AND role_type_id=? AND permission_code='MODULE_GROCERY'",Boolean.class,store,role)).isTrue();
+ }
+
+ @Test @Order(221) void employeeLastWorkingDateAndStoreAccessAreExplicit() throws Exception {
+  String path=access()+"/employees",mail="end-assignment-"+tag+"@example.test";
+  long role=db.queryForObject("SELECT role_type_id FROM role_types WHERE role_type_name='CASHIER'",Long.class);
+  var body=new HashMap<String,Object>();body.put("first_name","Assignment");body.put("last_name",tag);body.put("email",mail);body.put("password",password);body.put("role_type_id",role);body.put("hire_date","2026-01-01");body.put("employee_type","Full-time");body.put("pay_type","Hourly");body.put("rate",18);body.put("details",Map.of("job_title","Cashier"));
+  // No status is needed on creation; it always starts active.
+  var created=ok(req("admin","POST",path,body),200);JsonNode row=null;
+  for(var r:created.path("employees"))if(mail.equals(r.path("email").asText()))row=r;
+  assertThat(row).isNotNull();assertThat(row.path("status").asText()).isEqualTo("Active");
+  long id=row.path("id").asLong(),uid=row.path("user_id").asLong();
+  db.update("INSERT INTO user_roles(user_id,role_type_id,dgt_id,is_active) VALUES (?,?,?,true)",uid,role,second);
+  var day=java.time.LocalDate.parse(created.path("today").asText());
+  var start=day.plusDays(2).atTime(10,0).atZone(java.time.ZoneId.of("Asia/Kolkata")).toOffsetDateTime();
+  long shift=db.queryForObject("INSERT INTO employee_schedules(employee_id,dgt_id,work_date,schedule_start,schedule_end,status,created_by) VALUES (?,?,?,?,?,'PUBLISHED',?) RETURNING schedule_id",Long.class,id,store,day.plusDays(2),start,start.plusHours(2),users.get("admin"));
+  String preview=path+"/"+id+"/inactivation-preview?lastWorkingDate="+day;
+  ok(req("other","GET",preview,null),403);
+  assertThat(ok(req("admin","GET",preview,null),200).path("futureShiftCount").asInt()).isEqualTo(1);
+  body=new HashMap<>();body.put("version",row.path("version").asText());
+  ok(req("admin","PUT",path+"/"+id+"/assignment",body),400);
+  body.put("last_working_date",day.toString());
+  ok(req("admin","PUT",path+"/"+id+"/assignment",body),400); // Unacknowledged future shift.
+  body.put("acknowledge_future_shifts",true);body.put("disable_website_access",true);
+  var saved=ok(req("admin","PUT",path+"/"+id+"/assignment",body),200);
+  for(var r:saved.path("employees"))if(r.path("id").asLong()==id)row=r;
+  assertThat(row.path("status").asText()).isEqualTo("Active"); // Last day is inclusive.
+  assertThat(row.path("last_working_date").asText()).isEqualTo(day.toString());
+  assertThat(db.queryForObject("SELECT is_active FROM user_roles WHERE user_id=? AND dgt_id=?",Boolean.class,uid,store)).isFalse();
+  assertThat(db.queryForObject("SELECT is_active FROM user_roles WHERE user_id=? AND dgt_id=?",Boolean.class,uid,second)).isTrue();
+  assertThat(db.queryForObject("SELECT status FROM employee_schedules WHERE schedule_id=?",String.class,shift)).isEqualTo("PUBLISHED");
+  // Ending employment alone retains access; reactivation does not silently regrant it.
+  body.put("version",row.path("version").asText());body.put("disable_website_access",false);body.put("last_working_date",day.minusDays(1).toString());
+  saved=ok(req("admin","PUT",path+"/"+id+"/assignment",body),200);
+  for(var r:saved.path("employees"))if(r.path("id").asLong()==id)row=r;
+  assertThat(row.path("status").asText()).isEqualTo("Inactive");
+  body.put("version",row.path("version").asText());body.put("reactivate",true);
+  ok(req("admin","PUT",path+"/"+id+"/assignment",body),200);
+  assertThat(db.queryForObject("SELECT is_active FROM user_roles WHERE user_id=? AND dgt_id=?",Boolean.class,uid,store)).isFalse();
  }
 
 }
