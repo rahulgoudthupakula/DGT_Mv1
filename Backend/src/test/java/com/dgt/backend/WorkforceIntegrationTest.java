@@ -183,4 +183,24 @@ class WorkforceIntegrationTest {
   org.springframework.test.util.ReflectionTestUtils.setField(workforce,"shiftChangesEnabled",false);
   try{ok(req("cashier","POST",wf()+"/requests",body),400);ok(decide("accountant",id,"ACCEPT"),400);ok(decide("admin",id,"APPROVE"),400);ok(decide("cashier",id,"CANCEL"),200);}finally{org.springframework.test.util.ReflectionTestUtils.setField(workforce,"shiftChangesEnabled",true);}
  }
+ @Test @Order(11) void multiDayShiftsAreAtomicAndInactiveEmployeesCannotBeScheduled()throws Exception{
+  var monday=shiftBody(replacement,"2028-05-01T09:00","2028-05-01T17:00");
+  var tuesday=shiftBody(replacement,"2028-05-02T09:00","2028-05-02T17:00");
+  ok(req("cashier","POST",wf()+"/shifts/batch",Map.of("shifts",List.of(monday,tuesday))),403);
+  assertThat(ok(req("manager","POST",wf()+"/shifts/batch",Map.of("shifts",List.of(monday,tuesday))),200).path("count").asInt()).isEqualTo(2);
+  var wednesday=shiftBody(replacement,"2028-05-03T09:00","2028-05-03T17:00");
+  ok(req("manager","POST",wf()+"/shifts/batch",Map.of("shifts",List.of(wednesday,tuesday))),409);
+  assertThat(db.queryForObject("SELECT count(*) FROM employee_schedules WHERE employee_id=? AND work_date='2028-05-03'",Integer.class,replacement)).isZero();
+  ok(req("manager","POST",wf()+"/shifts/batch",Map.of("shifts",List.of(wednesday,wednesday))),400);
+  assertThat(db.queryForObject("SELECT count(*) FROM employee_schedules WHERE employee_id=? AND work_date='2028-05-03'",Integer.class,replacement)).isZero();
+  var nextWeek=shiftBody(replacement,"2028-05-08T09:00","2028-05-08T17:00");
+  ok(req("manager","POST",wf()+"/shifts/batch",Map.of("shifts",List.of(wednesday,nextWeek))),400);
+  db.update("UPDATE employee_store_assignments SET effective_to=((CURRENT_TIMESTAMP AT TIME ZONE (SELECT timezone FROM stores WHERE dgt_id=?))::date-1) WHERE employee_id=? AND dgt_id=?",store,replacement,store);
+  JsonNode employee=null;for(var e:ok(req("manager","GET",wf()+"?week=2028-05-01",null),200).path("employees"))if(e.path("employee_id").asLong()==replacement)employee=e;
+  assertThat(employee).isNotNull();assertThat(employee.path("active").asBoolean()).isFalse();
+  ok(req("manager","POST",wf()+"/shifts",wednesday),400);
+  ok(req("manager","POST",wf()+"/shifts/batch",Map.of("shifts",List.of(wednesday))),400);
+  assertThat(db.queryForObject("SELECT count(*) FROM employee_schedules WHERE employee_id=? AND work_date IN ('2028-05-01','2028-05-02')",Integer.class,replacement)).isEqualTo(2);
+ }
+
 }

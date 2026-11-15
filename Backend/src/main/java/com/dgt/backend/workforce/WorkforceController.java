@@ -11,6 +11,7 @@ public class WorkforceController {
  private final WorkforceService service;public WorkforceController(WorkforceService service){this.service=service;}
  @GetMapping public Object read(@PathVariable String store,@RequestParam(required=false) LocalDate week){return service.read(store,week);}
  @PostMapping("/shifts") public Object add(@PathVariable String store,@RequestBody WorkforceService.ShiftInput in){return service.saveShift(store,null,in);}
+ @PostMapping("/shifts/batch") public Object addBatch(@PathVariable String store,@RequestBody WorkforceService.ShiftBatchInput in){return service.saveShiftBatch(store,in);}
  @PutMapping("/shifts/{id}") public Object edit(@PathVariable String store,@PathVariable long id,@RequestBody WorkforceService.ShiftInput in){return service.saveShift(store,id,in);}
  @PostMapping("/week") public Object week(@PathVariable String store,@RequestBody WorkforceService.WeekAction in){return service.weekAction(store,in);}
  public record Version(String version){}
