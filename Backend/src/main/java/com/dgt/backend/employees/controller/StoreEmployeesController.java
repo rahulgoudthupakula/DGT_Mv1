@@ -41,6 +41,7 @@ public class StoreEmployeesController {
   var args=new ArrayList<Object>(Arrays.asList(day,day,day,day,day,store));if(employeeId!=null)args.add(employeeId);
   return a.db.queryForList("SELECT e.employee_id AS id,"+detailColumns+"e.user_id,esa.effective_to AS last_working_date,EXISTS(SELECT 1 FROM user_roles ar JOIN role_types art USING(role_type_id) WHERE ar.user_id=e.user_id AND ar.dgt_id=esa.dgt_id AND ar.is_active AND art.is_active AND u.account_status='ACTIVE') AS website_access_active,EXISTS(SELECT 1 FROM company_admins ca JOIN stores cs ON cs.company_id=ca.company_id WHERE cs.dgt_id=esa.dgt_id AND ca.user_id=e.user_id AND ca.is_active) AS website_access_admin,coalesce(u.first_name,e.first_name) AS first_name,coalesce(u.last_name,e.last_name) AS last_name,coalesce(rt.role_type_name,'No website access') AS role,esa.job_title,coalesce((SELECT store_department_name FROM store_departments WHERE department_id=esa.department_id AND dgt_id=esa.dgt_id),(SELECT store_department_name FROM store_departments WHERE store_department_id=esa.store_department_id),'') AS dept,c.pay_type,coalesce(c.hourly_rate,c.annual_salary) AS rate,CASE WHEN esa.effective_from<=? AND (esa.effective_to IS NULL OR esa.effective_to>=?) AND (e.termination_date IS NULL OR e.termination_date>?) THEN 'Active' ELSE 'Inactive' END AS status,coalesce(u.xmin::text,'0') || ':' || e.xmin::text || ':' || esa.xmin::text || ':' || coalesce(c.xmin::text,'0') || ':' || coalesce((SELECT string_agg(ar.user_role_id::text || '-' || ar.xmin::text,',' ORDER BY ar.user_role_id) FROM user_roles ar WHERE ar.user_id=e.user_id AND ar.dgt_id=esa.dgt_id),'0') AS version FROM employees e LEFT JOIN users u USING(user_id) JOIN employee_store_assignments esa ON esa.employee_id=e.employee_id LEFT JOIN role_types rt ON rt.role_type_id=esa.role_type_id LEFT JOIN LATERAL (SELECT ec.*,ec.xmin FROM employee_compensation ec WHERE ec.archived_at IS NULL AND ec.employee_id=e.employee_id AND ec.effective_from<=? AND (ec.effective_to IS NULL OR ec.effective_to>=?) ORDER BY ec.effective_from DESC,ec.compensation_id DESC LIMIT 1) c ON true WHERE esa.dgt_id=?"+(employeeId==null?"":" AND e.employee_id=?")+" ORDER BY u.first_name,e.employee_id",args.toArray()).stream().map(Rows::normalize).toList();
  }
+ @GetMapping("/{id}/summary") public Object summary(@PathVariable String store,@PathVariable long id){a.requireAdmin(store);return row(store,id);}
  @GetMapping("/{id}") public Object detail(@PathVariable String store,@PathVariable long id){
   a.requireAdmin(store);var employee=queryRows(store,id,true).stream().findFirst().orElseThrow(a::denied);details.enrich(employee);return employee;
  }
@@ -70,7 +71,7 @@ public class StoreEmployeesController {
   long uid=((Number)current.get("user_id")).longValue();
   if(a.admin(uid,a.company(store)))throw bad("Company admin access is managed through company ownership");
   a.db.update("UPDATE user_roles SET is_active=false,updated_at=CURRENT_TIMESTAMP WHERE user_id=? AND dgt_id=? AND is_active",uid,store);
-  a.audit(store,"EMPLOYEE_WEBSITE_ACCESS_DISABLED",Long.toString(id),"{}");return list(store);
+  a.audit(store,"EMPLOYEE_WEBSITE_ACCESS_DISABLED",Long.toString(id),"{}");return Map.of("success",true);
  }
  public record AssignmentInput(Boolean reactivate,LocalDate lastWorkingDate,Boolean disableWebsiteAccess,Boolean acknowledgeFutureShifts,String version){}
  // Change only this store assignment; shared identity and compensation remain untouched.
@@ -96,7 +97,7 @@ public class StoreEmployeesController {
    }
   }
   a.db.update("UPDATE employee_store_assignments SET effective_to=?,updated_at=CURRENT_TIMESTAMP WHERE employee_id=? AND dgt_id=?",Boolean.TRUE.equals(in.reactivate())?null:in.lastWorkingDate(),id,store);
-  a.audit(store,Boolean.TRUE.equals(in.reactivate())?"EMPLOYEE_ASSIGNMENT_REACTIVATED":"EMPLOYEE_ASSIGNMENT_ENDED",Long.toString(id),"{}");return list(store);
+  a.audit(store,Boolean.TRUE.equals(in.reactivate())?"EMPLOYEE_ASSIGNMENT_REACTIVATED":"EMPLOYEE_ASSIGNMENT_ENDED",Long.toString(id),"{}");return Map.of("success",true);
  }
  // Employee form values; withoutAccess permits an employee without a website user account.
  public record Input(Long userId,Long roleTypeId,String firstName,String lastName,String email,String password,String employeeCode,LocalDate hireDate,String employeeType,String payType,BigDecimal rate,String status,String version,EmployeeDetails.Input details,Boolean withoutAccess,LocalDate lastWorkingDate,Boolean disableWebsiteAccess,Boolean acknowledgeFutureShifts){}
@@ -199,6 +200,8 @@ public class StoreEmployeesController {
    // Revoke stored user_sessions after an email change; this is not a blanket JWT revocation.
    if(changedEmail)a.db.update("UPDATE user_sessions SET revoked_at=CURRENT_TIMESTAMP WHERE user_id=? AND revoked_at IS NULL",uid);
   }
-  return Map.of("employees",rows(store),"today",day,"signInAgain",signInAgain);
+  var result=new LinkedHashMap<String,Object>();result.put("success",true);result.put("employeeId",id);result.put("signInAgain",signInAgain);
+  result.put("userId",uid);
+  return result;
  }
 }
