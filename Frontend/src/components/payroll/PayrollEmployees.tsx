@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Search, Eye, Pencil, Plus } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Search, Eye, Pencil, Plus, MoreHorizontal } from "lucide-react";
 import { usePagination } from "@/hooks/use-pagination";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -19,12 +20,13 @@ import { useStoreAccess } from "@/lib/store-access";
 
 type Deposit={bank_name:string;account_holder:string;account_type:string;account_last_four:string;routing_number:string;active:boolean};
 type Deduction={deduction_type:string;amount:number;effective_from:string;effective_to:string|null;active:boolean};
-type Employee={last_working_date:string|null;job_title:string|null;department_key:string;deposit:Deposit|null;deductions:Deduction[];store_count:number;id:number;user_id:number|null;email:string;first_name:string;last_name:string;name:string;role:string;dept:string;payType:string;rate:number;status:string;hire_date:string;employee_type:string;version:string};
-type User={user_id:number;role_type_id:number;first_name:string;last_name:string;email:string;role_type_name:string};
-type Data={signInAgain?:boolean;employees:(Omit<Employee,'name'|'payType'>&{pay_type:string})[];users:User[];today:string};
+type Employee={website_access_active:boolean;website_access_admin:boolean;last_working_date:string|null;job_title:string|null;id:number;user_id:number|null;first_name:string;last_name:string;name:string;role:string;dept:string;payType:string;rate:number;status:string;version:string};
+type EmployeeDetail=Employee&{department_key:string;deposit:Deposit|null;deductions:Deduction[];store_count:number;email:string;hire_date:string;employee_type:string};
+type RawEmployeeDetail=Omit<EmployeeDetail,'name'|'payType'>&{pay_type:string};
+type Data={signInAgain?:boolean;employees:(Omit<Employee,'name'|'payType'>&{pay_type:string})[];today:string};
 
 const emptyForm = {
-  userKey:"",email:"",password:"",employeeCode:"",hireDate:"",employeeType:"Full-time", firstName: "", lastName: "", role: "NO_ACCESS", dept: "", payType: "", rate: "", status: "Active",
+  email:"",password:"",employeeCode:"",hireDate:"",employeeType:"Full-time", firstName: "", lastName: "", role: "NO_ACCESS", dept: "", payType: "", rate: "", status: "Active",
   lastWorkingDate:"",disableWebsiteAccess:false,acknowledgeFutureShifts:false,
   filingStatus: "", allowances: "", additionalWithholding: "",
   jobTitle:"",accountHolder:"",accountType:"Checking",depositActive:true,healthActive:true,retirementActive:true,healthStart:"",healthEnd:"",retirementStart:"",retirementEnd:"", bankName: "", accountNumber: "", routingNumber: "",
@@ -38,9 +40,15 @@ export const PayrollEmployees = ({storeId}:{storeId:string}) => {
   const employees:Employee[]=(query.data?.employees??[]).map(e=>({...e,name:`${e.first_name} ${e.last_name}`,payType:e.pay_type??'',rate:Number(e.rate??0)}));
   const [busy,setBusy]=useState(false),[error,setError]=useState('');
   const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<typeof employees[0] | null>(null);
+  const [selected, setSelected] = useState<EmployeeDetail | null>(null);
+  const detailRequestId=useRef(0);
+  const invalidateDetailRequest=useCallback(()=>{detailRequestId.current++;},[]);
+  const [detailRequest,setDetailRequest]=useState<{employee:Employee;mode:'view'|'edit'}|null>(null);
+  const [detailError,setDetailError]=useState('');
   const [addOpen, setAddOpen] = useState(false);
   const [assignmentEmployee,setAssignmentEmployee]=useState<Employee|null>(null);
+  const [accessEmployee,setAccessEmployee]=useState<Employee|null>(null);
+  const [accessEndError,setAccessEndError]=useState('');
   const [reactivating,setReactivating]=useState(false);
   const [lastWorkingDate,setLastWorkingDate]=useState("");
   const [disableWebsiteAccess,setDisableWebsiteAccess]=useState(false);
@@ -48,9 +56,13 @@ export const PayrollEmployees = ({storeId}:{storeId:string}) => {
   const [assignmentError,setAssignmentError]=useState("");
   const [employeeStep, setEmployeeStep] = useState("basic");
   const employeeSteps = ["basic", "pay", "deposit", "account"];
-  const [editingEmployee, setEditingEmployee] = useState<typeof employees[0] | null>(null);
+  const [editingEmployee, setEditingEmployee] = useState<EmployeeDetail | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [pageSize, setPageSize] = useState(10);
+  useEffect(()=>{
+    setDetailRequest(null);setDetailError('');setSelected(null);setEditingEmployee(null);setAddOpen(false);setAssignmentEmployee(null);setAccessEmployee(null);
+    return invalidateDetailRequest;
+  },[storeId,invalidateDetailRequest]);
   const departments=useStoreDepartments(storeId,addOpen&&access.data?.admin===true);
   const inactivation=useQuery({queryKey:['employee-inactivation',storeId,assignmentEmployee?.id,lastWorkingDate],queryFn:({signal})=>request<{futureShiftCount:number;inactiveFrom:string}>(`${path}/${assignmentEmployee!.id}/inactivation-preview?lastWorkingDate=${encodeURIComponent(lastWorkingDate)}`,{signal}),enabled:!!assignmentEmployee&&!reactivating&&!!lastWorkingDate,staleTime:0,refetchOnWindowFocus:true});
   const roles=useQuery({queryKey:['employee-account-roles',storeId],queryFn:({signal})=>request<{id:number;name:string}[]>(path+'/account-roles',{signal}),enabled:addOpen&&!editingEmployee&&access.data?.admin===true,staleTime:60000,refetchOnWindowFocus:false});
@@ -68,7 +80,7 @@ export const PayrollEmployees = ({storeId}:{storeId:string}) => {
   };
   const saveAssignment=async()=>{
     if(!assignmentEmployee)return;
-    if(!reactivating&&(!lastWorkingDate||lastWorkingDate<assignmentEmployee.hire_date)){setAssignmentError('Choose a last working date on or after the hire date.');return;}
+    if(!reactivating&&(!lastWorkingDate)){setAssignmentError('Choose a last working date on or after the hire date.');return;}
     if(!reactivating&&(inactivation.isPending||inactivation.isError)){setAssignmentError('Complete the shift check before confirming.');return;}
     if(!reactivating&&(inactivation.data?.futureShiftCount??0)>0&&!acknowledgeFutureShifts){setAssignmentError('Acknowledge the shifts that need review.');return;}
     setBusy(true);setAssignmentError('');
@@ -76,11 +88,20 @@ export const PayrollEmployees = ({storeId}:{storeId:string}) => {
       const data=await request<Data>(`${path}/${assignmentEmployee.id}/assignment`,{method:'PUT',body:JSON.stringify({reactivate:reactivating,lastWorkingDate:reactivating?null:lastWorkingDate,disableWebsiteAccess:!reactivating&&disableWebsiteAccess,acknowledgeFutureShifts,version:assignmentEmployee.version})});
       client.setQueryData(['workweek-employees',storeId],data);
       await Promise.all([client.invalidateQueries({queryKey:['workweek-employees',storeId]}),client.invalidateQueries({queryKey:['workforce',storeId]}),client.invalidateQueries({queryKey:['employee-access',storeId]})]);setAssignmentEmployee(null);
-    }catch(e){setAssignmentError(e instanceof Error?e.message:'Could not update assignment');}finally{setBusy(false);}
+    }catch(e){setAssignmentError(e instanceof Error?e.message:'Could not update employment status');}finally{setBusy(false);}
+  };
+  const endWebsiteAccess=async()=>{
+    if(!accessEmployee)return;
+    setBusy(true);setAccessEndError('');
+    try{
+      const data=await request<Data>(`${path}/${accessEmployee.id}/end-website-access`,{method:'POST',body:JSON.stringify({version:accessEmployee.version})});
+      client.setQueryData(['workweek-employees',storeId],data);
+      await Promise.all([client.invalidateQueries({queryKey:['workweek-employees',storeId]}),client.invalidateQueries({queryKey:['employee-access',storeId]}),client.invalidateQueries({queryKey:['permissions']}),client.invalidateQueries({queryKey:['store-access']})]);setAccessEmployee(null);
+    }catch(e){setAccessEndError(e instanceof Error?e.message:'Could not end website access');}finally{setBusy(false);}
   };
   const handleField = (key: string, value: string) => setForm((f) => ({ ...f, [key]: value }));
 
-  const handleEdit = (e: typeof employees[0]) => {
+  const handleEdit = (e: EmployeeDetail) => {
     setError('');
     const firstName=e.first_name;
     setForm({
@@ -102,6 +123,17 @@ export const PayrollEmployees = ({storeId}:{storeId:string}) => {
     setEmployeeStep("basic");setAddOpen(true);
   };
 
+  const loadEmployee=async(employee:Employee,mode:'view'|'edit')=>{
+    const ticket=++detailRequestId.current;setDetailRequest({employee,mode});setDetailError('');
+    try{
+      const raw=await client.fetchQuery({queryKey:['employee-detail',storeId,employee.id],queryFn:({signal})=>request<RawEmployeeDetail>(`${path}/${employee.id}`,{signal}),staleTime:0,retry:false});
+      if(ticket!==detailRequestId.current)return;
+      const detail:EmployeeDetail={...raw,name:`${raw.first_name} ${raw.last_name}`,payType:raw.pay_type??'',rate:Number(raw.rate??0)};
+      setDetailRequest(null);
+      if(mode==='view')setSelected(detail);else handleEdit(detail);
+    }catch(e){if(ticket===detailRequestId.current)setDetailError(e instanceof Error?e.message:'Could not load employee details');}
+  };
+
   const handleCloseSheet = () => {
     if(busy)return;
     setError('');
@@ -119,7 +151,7 @@ export const PayrollEmployees = ({storeId}:{storeId:string}) => {
     setBusy(true);
     try{
       
-      const data=await request<Data>(path+(editingEmployee?`/${editingEmployee.id}`:''),{method:editingEmployee?'PUT':'POST',body:JSON.stringify({withoutAccess:!editingEmployee&&!websiteAccess,userId:null,roleTypeId:websiteAccess?Number(form.role):null,firstName:form.firstName,lastName:form.lastName,email:websiteAccess||editingEmployee?.user_id?form.email:null,password:websiteAccess?form.password:null,employeeCode:form.employeeCode,hireDate:form.hireDate,employeeType:form.employeeType,payType:form.payType,rate:form.rate===''?null:Number(form.rate),status:editingEmployee?form.status:'Active',lastWorkingDate:editingEmployee&&form.status==='Inactive'?form.lastWorkingDate:null,disableWebsiteAccess:!!editingEmployee&&form.status==='Inactive'&&form.disableWebsiteAccess,acknowledgeFutureShifts:form.acknowledgeFutureShifts,version:editingEmployee?.version,details:{jobTitle:form.jobTitle,department:form.dept,deposit:form.bankName||form.accountNumber||form.routingNumber||form.accountHolder?{bankName:form.bankName,accountHolder:form.accountHolder,accountType:form.accountType,accountLastFour:form.accountNumber,routingNumber:form.routingNumber,active:form.depositActive}:null,deductions:[...(form.healthInsurance!==''?[{type:'HEALTH_INSURANCE',calculation:'FIXED',amount:Number(form.healthInsurance),effectiveFrom:form.healthStart||query.data?.today,effectiveTo:form.healthEnd||null,active:form.healthActive}]:[]),...(form.retirement!==''?[{type:'RETIREMENT',calculation:'PERCENT',amount:Number(form.retirement),effectiveFrom:form.retirementStart||query.data?.today,effectiveTo:form.retirementEnd||null,active:form.retirementActive}]:[])]}})});
+      const data=await request<Data>(path+(editingEmployee?`/${editingEmployee.id}`:''),{method:editingEmployee?'PUT':'POST',body:JSON.stringify({withoutAccess:!editingEmployee&&!websiteAccess,userId:null,roleTypeId:websiteAccess?Number(form.role):null,firstName:form.firstName,lastName:form.lastName,email:websiteAccess||editingEmployee?.user_id?form.email:null,password:websiteAccess?form.password:null,employeeCode:form.employeeCode,hireDate:form.hireDate,employeeType:form.employeeType,payType:form.payType,rate:form.rate===''?null:Number(form.rate),status:editingEmployee?form.status:'Active',lastWorkingDate:editingEmployee&&form.status==='Inactive'?form.lastWorkingDate:null,disableWebsiteAccess:!!editingEmployee&&form.status==='Inactive'&&form.disableWebsiteAccess,acknowledgeFutureShifts:form.acknowledgeFutureShifts,version:editingEmployee?.version,details:{jobTitle:form.jobTitle,department:form.dept,deposit:form.bankName||form.accountNumber||form.routingNumber||form.accountHolder?{bankName:form.bankName,accountHolder:form.accountHolder,accountType:form.accountType,accountLastFour:form.accountNumber,routingNumber:form.routingNumber,active:form.depositActive}:null,deductions:editingEmployee?undefined:[...(form.healthInsurance!==''?[{type:'HEALTH_INSURANCE',calculation:'FIXED',amount:Number(form.healthInsurance),effectiveFrom:form.healthStart||query.data?.today,effectiveTo:form.healthEnd||null,active:form.healthActive}]:[]),...(form.retirement!==''?[{type:'RETIREMENT',calculation:'PERCENT',amount:Number(form.retirement),effectiveFrom:form.retirementStart||query.data?.today,effectiveTo:form.retirementEnd||null,active:form.retirementActive}]:[])]}})});
       if(data.signInAgain){logout();client.clear();window.location.assign('/login');return;}
       client.setQueryData(['workweek-employees',storeId],data);await Promise.all([client.invalidateQueries({queryKey:['workweek-employees']}),client.invalidateQueries({queryKey:['workforce',storeId]}),client.invalidateQueries({queryKey:['employee-access',storeId]})]);setAddOpen(false);setEditingEmployee(null);setForm(emptyForm);
     }catch(e){setError(e instanceof Error?e.message:'Could not save employee');}finally{setBusy(false);}
@@ -134,7 +166,7 @@ export const PayrollEmployees = ({storeId}:{storeId:string}) => {
                 <TableHead>Role / Dept</TableHead>
                 <TableHead>Pay Type</TableHead>
                 <TableHead className="text-right">Rate</TableHead>
-                <TableHead>{former?"Last Working Date":"Assignment"}</TableHead>
+                <TableHead>Employment Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -148,12 +180,16 @@ export const PayrollEmployees = ({storeId}:{storeId:string}) => {
                     {e.payType === "Hourly" ? `$${e.rate.toFixed(2)}/hr` : `$${e.rate.toLocaleString()}/yr`}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={former?"secondary":"default"} className="text-[10px]">{former?e.last_working_date??"Ended":e.last_working_date?`Leaving on ${e.last_working_date}`:"Current"}</Badge>
+                    <Badge variant={former?"secondary":"default"} className="text-[10px]">{former?"Ended":e.last_working_date?`Leaving on ${e.last_working_date}`:"Active"}</Badge>
+                    {former&&e.last_working_date&&<div className="mt-1 text-xs text-muted-foreground">Last working date: {e.last_working_date}</div>}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSelected(e)}><Eye className="w-3.5 h-3.5" /></Button>
-                    <Button aria-label={`Edit ${e.name}`} variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(e)}><Pencil className="w-3.5 h-3.5" /></Button>
-                    <Button variant="outline" size="sm" className="ml-2" onClick={()=>openAssignment(e,former)}>{former?"Reactivate":e.last_working_date?"Change End Date":"End Assignment"}</Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => void loadEmployee(e,'view')}><Eye className="w-3.5 h-3.5" /></Button>
+                    <Button aria-label={`Edit ${e.name}`} variant="ghost" size="icon" className="h-7 w-7" onClick={() => void loadEmployee(e,'edit')}><Pencil className="w-3.5 h-3.5" /></Button>
+                    {former?<Button variant="outline" size="sm" className="ml-2" onClick={()=>openAssignment(e,true)}>Rehire Employee</Button>:<DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" disabled={busy} aria-label={`More actions for ${e.name}`}><MoreHorizontal className="w-4 h-4"/></Button></DropdownMenuTrigger><DropdownMenuContent align="end">
+                      <DropdownMenuItem onSelect={()=>openAssignment(e,false)}>End Employment</DropdownMenuItem>
+                      <DropdownMenuItem disabled={!e.user_id||!e.website_access_active||e.website_access_admin} onSelect={()=>{setAccessEmployee(e);setAccessEndError('');}}>End Website Access</DropdownMenuItem>
+                    </DropdownMenuContent></DropdownMenu>}
                   </TableCell>
                 </TableRow>
               ))}
@@ -180,23 +216,39 @@ export const PayrollEmployees = ({storeId}:{storeId:string}) => {
       </div>
 
       <section className="space-y-3"><h2 className="text-lg font-semibold">Current Employees</h2>{renderEmployees(currentPagination,false)}</section>
-      <section className="space-y-3"><h2 className="text-lg font-semibold">Former Employees</h2><p className="text-sm text-muted-foreground">Most recently ended assignments first.</p>{renderEmployees(formerPagination,true)}</section>
+      <section className="space-y-3"><h2 className="text-lg font-semibold">Former Employees</h2><p className="text-sm text-muted-foreground">Most recent employment end dates first.</p>{renderEmployees(formerPagination,true)}</section>
+
+      <Dialog open={!!detailRequest} onOpenChange={open=>{if(!open){detailRequestId.current++;setDetailRequest(null);setDetailError('');}}}>
+        <DialogContent><DialogHeader><DialogTitle>{detailRequest?.mode==='edit'?'Edit':'View'} — {detailRequest?.employee.name}</DialogTitle></DialogHeader>
+          {detailError?<><p role="alert" className="text-red-600 dark:text-red-400">{detailError}</p><Button onClick={()=>{if(detailRequest)void loadEmployee(detailRequest.employee,detailRequest.mode);}}>Retry</Button></>:<p role="status">Loading employee details…</p>}
+          <Button variant="outline" onClick={()=>{detailRequestId.current++;setDetailRequest(null);}}>Close</Button>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!accessEmployee} onOpenChange={open=>{if(!open&&!busy)setAccessEmployee(null);}}>
+        <DialogContent className="sm:max-w-lg"><DialogHeader><DialogTitle>End Website Access — {accessEmployee?.name}</DialogTitle></DialogHeader>
+          <p>This will immediately remove website access for this store. The employee will stay employed and can still be scheduled. Access at other stores stays unchanged.</p>
+          <p className="text-sm text-muted-foreground">You can restore website access later in Roles &amp; Access.</p>
+          {accessEndError&&<p role="alert" className="text-red-600 dark:text-red-400">{accessEndError}</p>}
+          <DialogFooter><Button variant="outline" disabled={busy} onClick={()=>setAccessEmployee(null)}>Cancel</Button><Button variant="destructive" disabled={busy} onClick={()=>void endWebsiteAccess()}>Confirm End Website Access</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!assignmentEmployee} onOpenChange={open=>{if(!open&&!busy)setAssignmentEmployee(null);}}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-          <DialogHeader><DialogTitle>{reactivating?'Reactivate':'End Assignment'} — {assignmentEmployee?.name}</DialogTitle></DialogHeader>
-          {reactivating?<p>Restore this employee’s assignment at this store. Website access will stay unchanged; restore it separately in Roles &amp; Access if needed.</p>:<div className="space-y-3">
+          <DialogHeader><DialogTitle>{reactivating?'Rehire Employee':'End Employment'} — {assignmentEmployee?.name}</DialogTitle></DialogHeader>
+          {reactivating?<p>Return this employee to Current Employees at this store. Website access will stay unchanged; restore it separately in Roles &amp; Access if needed.</p>:<div className="space-y-3">
             <Label htmlFor="assignment-last-day">Last Working Date</Label>
-            <Input id="assignment-last-day" type="date" disabled={busy} min={assignmentEmployee?.hire_date} value={lastWorkingDate} onChange={e=>{setLastWorkingDate(e.target.value);setAcknowledgeFutureShifts(false);}}/>
+            <Input id="assignment-last-day" type="date" disabled={busy} value={lastWorkingDate} onChange={e=>{setLastWorkingDate(e.target.value);setAcknowledgeFutureShifts(false);}}/>
             <p className="text-sm text-muted-foreground">The employee stays current through this date and moves to Former Employees the following day in this store’s timezone. Existing shifts and pay history are kept.</p>
             {inactivation.isFetching&&<p role="status">Checking shifts…</p>}
             {inactivation.isError&&<p role="alert" className="text-destructive">Could not check shifts. <button className="underline" onClick={()=>void inactivation.refetch()}>Retry</button></p>}
             {!!inactivation.data?.futureShiftCount&&<div className="rounded-md border p-3 space-y-2"><p role="alert">{inactivation.data.futureShiftCount} shift(s) extend past the last working date. Review or reassign them in Week Schedule; confirming here will not cancel them.</p><label className="flex gap-2"><input type="checkbox" disabled={busy} checked={acknowledgeFutureShifts} onChange={e=>setAcknowledgeFutureShifts(e.target.checked)}/>I will review these shifts separately.</label></div>}
             {!!assignmentEmployee?.user_id&&<label className="flex gap-2"><input type="checkbox" disabled={busy} checked={disableWebsiteAccess} onChange={e=>setDisableWebsiteAccess(e.target.checked)}/>Disable website access for this store immediately</label>}
-            <p className="text-sm text-muted-foreground">Other store assignments and access stay unchanged. Company admin access is managed through company ownership.</p>
+            <p className="text-sm text-muted-foreground">Employment and website access at other stores stay unchanged. Company admin access is managed through company ownership.</p>
           </div>}
           {assignmentError&&<p role="alert" className="text-destructive">{assignmentError}</p>}
-          <DialogFooter><Button variant="outline" disabled={busy} onClick={()=>setAssignmentEmployee(null)}>Cancel</Button><Button disabled={busy||(!reactivating&&(inactivation.isFetching||inactivation.isError||!lastWorkingDate))} onClick={()=>void saveAssignment()}>{reactivating?'Confirm Reactivation':'Confirm End Assignment'}</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" disabled={busy} onClick={()=>setAssignmentEmployee(null)}>Cancel</Button><Button disabled={busy||(!reactivating&&(inactivation.isFetching||inactivation.isError||!lastWorkingDate))} onClick={()=>void saveAssignment()}>{reactivating?'Confirm Rehire':'Confirm End Employment'}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
