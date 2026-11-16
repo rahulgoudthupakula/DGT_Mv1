@@ -24,6 +24,14 @@ public class StoreReductionController {
   long uid=a.user();if(a.admin(uid,a.company(store)))return true;
   return !a.db.queryForList("SELECT ur.user_role_id FROM user_roles ur JOIN role_types rt USING(role_type_id) JOIN store_role_permissions rp ON rp.dgt_id=ur.dgt_id AND rp.role_type_id=ur.role_type_id WHERE ur.user_id=? AND ur.dgt_id=? AND public.role_access_active(ur.is_active,ur.access_ends_on,ur.dgt_id) AND rt.is_active AND rp.permission_code=? AND rp.allowed AND (?=false OR upper(rt.role_type_name)='MANAGER')",uid,store,code,manager).isEmpty();
  }
+ // The visible adjustment page controls staff submissions; restoration only reactivates the role.
+ // Accountants retain their previous explicit action grants rather than acquiring editing by default.
+ private boolean canSubmit(String store){
+  if(!Boolean.TRUE.equals(pages.context(store).get("GROCERY_PAGE_INVENTORY_ADJUSTMENT")))return false;
+  long uid=a.user();if(a.admin(uid,a.company(store)))return true;
+  boolean staff=!a.db.queryForList("SELECT ur.user_role_id FROM user_roles ur JOIN role_types rt USING(role_type_id) WHERE ur.user_id=? AND ur.dgt_id=? AND public.role_access_active(ur.is_active,ur.access_ends_on,ur.dgt_id) AND rt.is_active AND upper(rt.role_type_name) IN ('CASHIER','MANAGER')",uid,store).isEmpty();
+  return staff||allowed(store,"GROCERY_REDUCE_STOCK",false);
+ }
  private void require(String store,String code,boolean manager){if(!allowed(store,code,manager))throw a.denied();}
  private RuntimeException bad(String s){return new ResponseStatusException(HttpStatus.BAD_REQUEST,s);}
  public record Input(long productId,BigDecimal quantity,String reason,String destination){}
@@ -37,13 +45,13 @@ public class StoreReductionController {
   for(var row:rows){row.put("route",route((String)row.get("reason")));row.put("canReview",reviewer&&(a.admin(uid,a.company(store))||uid!=((Number)row.get("requested_by")).longValue())&&"PENDING".equals(row.get("status")));}
   var items=a.db.queryForList("SELECT p.product_id AS id,p.product_name AS \"itemName\",p.product_sku AS \"scanCode\",d.store_department_name AS department,i.available_quantity AS \"inventoryCount\",p.is_taxable AS taxable,p.purchase_gross_cost,p.purchase_discount,p.purchase_unit,p.units_per_case,"+ItemSellingPrice.SQL+" AS price,COALESCE(linked.vendor,'') AS vendor,COALESCE(linked.names,'[]'::json) AS \"vendorNames\" FROM products p JOIN inventory i ON i.product_id=p.product_id AND i.dgt_id=p.dgt_id JOIN store_sub_departments sub ON sub.store_sub_department_id=p.store_sub_department_id AND sub.dgt_id=p.dgt_id JOIN store_departments d ON d.store_department_id=sub.store_department_id AND d.dgt_id=p.dgt_id LEFT JOIN product_store_prices pr ON pr.product_id=p.product_id AND pr.dgt_id=p.dgt_id LEFT JOIN LATERAL (SELECT string_agg(v.vendor_name,', ' ORDER BY v.vendor_name,v.vendor_id) AS vendor,json_agg(v.vendor_name ORDER BY v.vendor_name,v.vendor_id) AS names FROM product_vendors pv JOIN vendors v ON v.vendor_id=pv.vendor_id AND v.dgt_id=pv.dgt_id WHERE pv.archived_at IS NULL AND pv.product_id=p.product_id AND pv.dgt_id=p.dgt_id) linked ON true WHERE p.dgt_id=? ORDER BY p.product_name",store);
   for(var item:items)item.put("netCost",cost(item));
-  return Map.of("requests",rows.stream().map(Rows::normalize).toList(),"items",items.stream().map(Rows::normalize).toList(),"canSubmit",allowed(store,"GROCERY_REDUCE_STOCK",false),"stores",a.stores().stream().filter(s->!store.equals(s.get("dgt_id"))).map(Rows::normalize).toList());
+  return Map.of("requests",rows.stream().map(Rows::normalize).toList(),"items",items.stream().map(Rows::normalize).toList(),"canSubmit",canSubmit(store),"stores",a.stores().stream().filter(s->!store.equals(s.get("dgt_id"))).map(Rows::normalize).toList());
  }
  // Calculate net item cost from purchase cost/discount, converting case cost when possible.
  private BigDecimal cost(Map<String,Object> p){BigDecimal g=(BigDecimal)p.get("purchase_gross_cost"),d=(BigDecimal)p.get("purchase_discount");if(g==null||d==null)return null;BigDecimal divisor=BigDecimal.ONE;if("CASE".equals(p.get("purchase_unit"))){Number n=(Number)p.get("units_per_case");if(n==null||n.intValue()<=0)return null;divisor=BigDecimal.valueOf(n.intValue());}return g.subtract(d).divide(divisor,2,RoundingMode.HALF_UP);}
  @PostMapping("/batch") @Transactional public Object batch(@PathVariable String store,@RequestBody List<Input> inputs){if(inputs==null||inputs.isEmpty()||inputs.size()>200)throw bad("Choose 1–200 items");return inputs.stream().map(i->submit(store,i,UUID.randomUUID())).toList();}
  // Submit a stock reduction using a caller-supplied idempotency key.
- @PostMapping @Transactional public Object submit(@PathVariable String store,@RequestBody Input in,@RequestHeader("Idempotency-Key") UUID key){require(store,"GROCERY_REDUCE_STOCK",false);
+ @PostMapping @Transactional public Object submit(@PathVariable String store,@RequestBody Input in,@RequestHeader("Idempotency-Key") UUID key){if(!canSubmit(store))throw a.denied();
   a.db.queryForList("SELECT dgt_id FROM stores WHERE dgt_id=? FOR UPDATE",store);
   if(!a.db.queryForList("SELECT reduction_request_id FROM inventory_reduction_requests WHERE dgt_id=? AND product_id=? AND requested_by=? AND status='PENDING'",store,in.productId(),a.user()).isEmpty())throw new ResponseStatusException(HttpStatus.CONFLICT,"You already have a pending reduction for this item");
   if(in.reason()==null||!REASONS.contains(in.reason())||in.quantity()==null||in.quantity().signum()<=0||in.quantity().scale()>3)throw bad("Enter a positive reduction and valid reason");
