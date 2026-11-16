@@ -24,6 +24,8 @@ logging:
     org.springframework: INFO
 
 app:
+  employee-documents:
+    directory: ${user.dir}/.employee-documents
   cors-origins: http://localhost:5173,http://localhost:5174
   profile:
     enabled: true

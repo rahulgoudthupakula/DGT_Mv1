@@ -25,7 +25,7 @@ public class PosReportsController {
  public PosReportsController(ScopedAccess a,StoreClosingController closing){this.a=a;this.closing=closing;}
  // Restrict this report to company administrators or active store managers.
  private void access(String store){if(a.admin(a.user(),a.company(store)))return;
-  if(!Boolean.TRUE.equals(a.db.queryForObject("SELECT EXISTS(SELECT 1 FROM user_roles r JOIN role_types t USING(role_type_id) WHERE r.dgt_id=? AND r.user_id=? AND r.is_active AND t.is_active AND upper(t.role_type_name)='MANAGER')",Boolean.class,store,a.user())))throw a.denied();}
+  if(!Boolean.TRUE.equals(a.db.queryForObject("SELECT EXISTS(SELECT 1 FROM user_roles r JOIN role_types t USING(role_type_id) WHERE r.dgt_id=? AND r.user_id=? AND public.role_access_active(r.is_active,r.access_ends_on,r.dgt_id) AND t.is_active AND upper(t.role_type_name)='MANAGER')",Boolean.class,store,a.user())))throw a.denied();}
  // Read the related report datasets from a consistent repeatable-read snapshot.
  @GetMapping @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
  public Object get(@PathVariable String store,@RequestParam(required=false) LocalDate start,@RequestParam(required=false) LocalDate end){

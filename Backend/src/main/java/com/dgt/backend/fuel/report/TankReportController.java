@@ -31,7 +31,7 @@ public class TankReportController {
   boolean allowed=Boolean.TRUE.equals(a.db.queryForObject("""
    SELECT EXISTS(SELECT 1 FROM user_roles r JOIN role_types t USING(role_type_id)
    JOIN store_role_permissions p ON p.dgt_id=r.dgt_id AND p.role_type_id=r.role_type_id
-   WHERE r.dgt_id=? AND r.user_id=? AND r.is_active AND t.is_active AND p.allowed
+   WHERE r.dgt_id=? AND r.user_id=? AND public.role_access_active(r.is_active,r.access_ends_on,r.dgt_id) AND t.is_active AND p.allowed
    AND upper(t.role_type_name) IN ('MANAGER','CASHIER','ACCOUNTANT')
    AND (p.permission_code IN ('GAS_VIEW_ADJUSTMENTS','GAS_RECORD_ADJUSTMENT')
    OR (upper(t.role_type_name)='MANAGER' AND p.permission_code IN ('GAS_APPROVE_ADJUSTMENT','GAS_SETTINGS'))))

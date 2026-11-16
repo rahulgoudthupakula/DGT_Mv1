@@ -12,7 +12,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import tools.jackson.databind.*;
 import static org.assertj.core.api.Assertions.*;
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={
- "app.workforce.enabled=true","app.tender.fleet.enabled=true","app.tender.ebt.enabled=true","app.tender.credit-card.enabled=true","app.daily-closing.enabled=true","app.sales.activity.enabled=true","app.gas.tank-report.enabled=true","app.gas.adjustments.enabled=true","app.gas.price.enabled=true","app.gas.delivery.enabled=true","app.gas.settings.enabled=true","app.pricebook.enabled=true","app.workweek.enabled=true","app.billing.enabled=true","app.profile.enabled=true","app.profile.rate-limit.max=1000","spring.datasource.url=jdbc:postgresql://127.0.0.1:${DGT_TEST_PORT:55439}/dgt_test","spring.datasource.username=${DGT_TEST_RUNTIME_USER:dgt_test}","spring.datasource.password=${DGT_TEST_RUNTIME_PASSWORD:only-test-password}","spring.flyway.enabled=true","logging.level.root=WARN","debug=false"})
+ "app.employee-documents.directory=${java.io.tmpdir}/dgt-employee-document-tests","app.workforce.enabled=true","app.tender.fleet.enabled=true","app.tender.ebt.enabled=true","app.tender.credit-card.enabled=true","app.daily-closing.enabled=true","app.sales.activity.enabled=true","app.gas.tank-report.enabled=true","app.gas.adjustments.enabled=true","app.gas.price.enabled=true","app.gas.delivery.enabled=true","app.gas.settings.enabled=true","app.pricebook.enabled=true","app.workweek.enabled=true","app.billing.enabled=true","app.profile.enabled=true","app.profile.rate-limit.max=1000","spring.datasource.url=jdbc:postgresql://127.0.0.1:${DGT_TEST_PORT:55439}/dgt_test","spring.datasource.username=${DGT_TEST_RUNTIME_USER:dgt_test}","spring.datasource.password=${DGT_TEST_RUNTIME_PASSWORD:only-test-password}","spring.flyway.enabled=true","logging.level.root=WARN","debug=false"})
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class ScopedAccessIntegrationTest {
@@ -181,6 +181,8 @@ class ScopedAccessIntegrationTest {
   for(String table:List.of("inventory_movements","product_barcodes","product_store_prices","inventory","product_vendors","products","vendor_contacts","vendors","store_sub_departments"))db.update("DELETE FROM "+table+" WHERE dgt_id IN (?,?,?)",store,second,foreign);
   db.update("DELETE FROM employee_compensation WHERE employee_id IN (SELECT employee_id FROM employees WHERE user_id IN (SELECT user_id FROM users WHERE dgt_id IN (?,?,?)))",store,second,foreign);
   db.update("DELETE FROM employee_schedules WHERE dgt_id IN (?,?,?)",store,second,foreign);
+  db.update("DELETE FROM employee_employment_periods WHERE dgt_id IN (?,?,?)",store,second,foreign);
+  for(String table:List.of("employee_documents","employee_emergency_contacts"))db.update("DELETE FROM "+table+" WHERE employee_id IN (SELECT employee_id FROM employee_store_assignments WHERE dgt_id IN (?,?,?))",store,second,foreign);
   db.update("DELETE FROM employee_store_assignments WHERE dgt_id IN (?,?,?)",store,second,foreign);
   db.update("DELETE FROM employees WHERE first_name=? AND last_name='Discount fixture'",tag);
   db.update("DELETE FROM employees WHERE user_id IN (SELECT user_id FROM users WHERE dgt_id IN (?,?,?))",store,second,foreign);
@@ -193,6 +195,47 @@ class ScopedAccessIntegrationTest {
   db.update("DELETE FROM approval_requests WHERE company_id IN (?,?)",company,otherCompany);db.update("DELETE FROM access_audit_events WHERE company_id IN (?,?)",company,otherCompany);db.update("DELETE FROM module_approval_policies WHERE company_id IN (?,?)",company,otherCompany);
   db.update("DELETE FROM permissions WHERE user_role_id IN (SELECT user_role_id FROM user_roles WHERE dgt_id IN (?,?,?))",store,second,foreign);db.update("DELETE FROM user_roles WHERE dgt_id IN (?,?,?)",store,second,foreign);db.update("DELETE FROM company_admins WHERE company_id IN (?,?)",company,otherCompany);db.update("DELETE FROM users WHERE dgt_id IN (?,?,?)",store,second,foreign);
   db.update("DELETE FROM store_contact_info WHERE dgt_id IN (?,?,?)",store,second,foreign);db.update("DELETE FROM store_business_hours WHERE dgt_id IN (?,?,?)",store,second,foreign);db.update("DELETE FROM store_departments WHERE dgt_id IN (?,?,?)",store,second,foreign);db.update("DELETE FROM stores WHERE dgt_id IN (?,?,?)",store,second,foreign);db.update("DELETE FROM companies WHERE company_id IN (?,?)",company,otherCompany);
+ }
+ Response employeeMultipart(String who,String method,String path,Object employee,List<String> contents) throws Exception {
+  String boundary="dgt-"+UUID.randomUUID();var body=new StringBuilder();
+  for(var entry:Map.of("employee",json.writeValueAsString(employee),"documentTypes",json.writeValueAsString(contents.stream().map(c->"Other").toList())).entrySet())body.append("--").append(boundary).append("\r\nContent-Disposition: form-data; name=\"").append(entry.getKey()).append("\"\r\nContent-Type: application/json\r\n\r\n").append(entry.getValue()).append("\r\n");
+  for(String content:contents)body.append("--").append(boundary).append("\r\nContent-Disposition: form-data; name=\"files\"; filename=\"test.pdf\"\r\nContent-Type: application/pdf\r\n\r\n").append(content).append("\r\n");
+  body.append("--").append(boundary).append("--\r\n");
+  var response=http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/api/v1"+path)).header("Authorization","Bearer "+getToken(who)).header("Content-Type","multipart/form-data; boundary="+boundary).method(method,HttpRequest.BodyPublishers.ofString(body.toString())).build(),HttpResponse.BodyHandlers.ofString());
+  return new Response(response.statusCode(),json.readTree(response.body()));
+ }
+ @Test @Order(223) void employeeContactsAndPrivateDocumentsAreAtomicAndScoped() throws Exception {
+  String path=access()+"/employees",first="Documents-"+tag;
+  var input=new HashMap<String,Object>();input.put("first_name",first);input.put("last_name","Employee");input.put("without_access",true);input.put("hire_date","2026-01-01");input.put("employee_type","Full-time");input.put("pay_type","Hourly");input.put("rate",18);input.put("details",Map.of("job_title","Cashier","emergency_contacts",List.of(Map.of("name","Emergency Person","relationship","Sibling","phone","+1 412 555 0100"))));
+  var directory=java.nio.file.Path.of(System.getProperty("java.io.tmpdir"),"dgt-employee-document-tests");java.nio.file.Files.createDirectories(directory);
+  long before;try(var entries=java.nio.file.Files.list(directory)){before=entries.count();}
+  ok(employeeMultipart("other","POST",path,input,List.of("%PDF-1.4 test")),403);
+  ok(employeeMultipart("admin","POST",path,input,List.of("%PDF-1.4 valid header","invalid second file")),400);
+  assertThat(db.queryForObject("SELECT count(*) FROM employees WHERE first_name=?",Integer.class,first)).isZero();
+  try(var entries=java.nio.file.Files.list(directory)){assertThat(entries.count()).isEqualTo(before);}
+  var ack=ok(employeeMultipart("admin","POST",path,input,List.of("%PDF-1.4 document")),200);long id=ack.path("employeeId").asLong();
+  var detail=ok(req("admin","GET",path+"/"+id,null),200);
+  assertThat(detail.path("emergency_contacts").size()).isEqualTo(1);assertThat(detail.path("emergency_contacts").get(0).path("name").asText()).isEqualTo("Emergency Person");
+  assertThat(detail.path("documents").size()).isEqualTo(1);assertThat(detail.path("documents").get(0).has("document_url")).isFalse();
+  long document=detail.path("documents").get(0).path("id").asLong();String download=path+"/"+id+"/documents/"+document+"/download";
+  ok(req("other","GET",download,null),403);ok(req("manager","GET",download,null),403);
+  var response=http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/api/v1"+download)).header("Authorization","Bearer "+getToken("admin")).GET().build(),HttpResponse.BodyHandlers.ofString());
+  assertThat(response.statusCode()).isEqualTo(200);assertThat(response.body()).isEqualTo("%PDF-1.4 document");assertThat(response.headers().firstValue("Cache-Control").orElse("")).isEqualTo("no-store");
+  input.put("version",detail.path("version").asText());input.put("status","Active");
+  long contact=detail.path("emergency_contacts").get(0).path("id").asLong();
+  input.put("details",Map.of("job_title","Cashier","emergency_contacts",List.of(Map.of("id",contact,"name","Updated Contact","relationship","Sibling","phone","412-555-0111"))));
+  ok(req("admin","PUT",path+"/"+id,input),200);
+  assertThat(db.queryForObject("SELECT count(*) FROM employee_emergency_contacts WHERE employee_id=?",Integer.class,id)).isEqualTo(1);
+  detail=ok(req("admin","GET",path+"/"+id,null),200);assertThat(detail.path("emergency_contacts").get(0).path("name").asText()).isEqualTo("Updated Contact");
+  input.put("version",detail.path("version").asText());
+  ok(employeeMultipart("admin","PUT",path+"/"+id,input,List.of("%PDF-1.4 added in edit")),200);
+  ok(employeeMultipart("admin","PUT",path+"/"+id,input,List.of("%PDF-1.4 stale update")),409);
+  detail=ok(req("admin","GET",path+"/"+id,null),200);assertThat(detail.path("documents").size()).isEqualTo(2);
+  input.put("version",detail.path("version").asText());input.put("details",Map.of("job_title","Cashier","emergency_contacts",List.of(Map.of("id",Long.MAX_VALUE,"name","Intruder","relationship","Other","phone","412-555-0122"))));
+  ok(req("admin","PUT",path+"/"+id,input),400);
+  input.put("details",Map.of("job_title","Cashier","emergency_contacts",List.of(Map.of("name","Invalid","relationship","Other","phone","bad"))));ok(req("admin","PUT",path+"/"+id,input),400);
+  for(var row:ok(req("admin","GET",path,null),200).path("employees")){assertThat(row.has("documents")).isFalse();assertThat(row.has("emergency_contacts")).isFalse();}
+  for(String key:db.queryForList("SELECT document_url FROM employee_documents WHERE employee_id=?",String.class,id))java.nio.file.Files.delete(directory.resolve(key.substring(8)));
  }
  @Test @Order(1) void isolationAndLegacyBypassClosed() throws Exception{
   var list=ok(req("admin","GET","/access/stores",null),200);assertThat(list.size()).isEqualTo(2);assertThat(list.toString()).doesNotContain(foreign);
@@ -462,13 +505,13 @@ class ScopedAccessIntegrationTest {
   assertThat(bill(store).path("addons").get(0).path("active").asBoolean()).isFalse();assertThat(bill(store).path("invoices").size()).isEqualTo(count+3);
  }
  JsonNode employeeActionPage(Response response,String path)throws Exception{
-  var ack=ok(response,200);assertThat(ack.size()).isEqualTo(1);assertThat(ack.path("success").asBoolean()).isTrue();
-  return ok(req("admin","GET",path,null),200);
+  var ack=ok(response,200);assertThat(ack.size()).isEqualTo(2);assertThat(ack.path("version").asText()).isNotBlank();assertThat(ack.path("success").asBoolean()).isTrue();
+  var page=ok(req("admin","GET",path,null),200);assertThat(page.path("employees").findValues("version").stream().anyMatch(v->v.asText().equals(ack.path("version").asText()))).isTrue();return page;
  }
  JsonNode employeeSavePage(Response response,String path)throws Exception{
-  var ack=ok(response,200);assertThat(ack.path("success").asBoolean()).isTrue();assertThat(ack.path("employeeId").asLong()).isPositive();
+  var ack=ok(response,200);assertThat(ack.path("version").asText()).isNotBlank();assertThat(ack.path("success").asBoolean()).isTrue();assertThat(ack.path("employeeId").asLong()).isPositive();
   assertThat(ack.has("employees")).isFalse();assertThat(ack.has("users")).isFalse();assertThat(ack.has("deposit")).isFalse();assertThat(ack.has("deductions")).isFalse();
-  return ok(req("admin","GET",path,null),200);
+  var page=ok(req("admin","GET",path,null),200);assertThat(page.path("employees").findValues("version").stream().anyMatch(v->v.asText().equals(ack.path("version").asText()))).isTrue();return page;
  }
  @Test @Order(22) void scopedEmployeeCreateEditAndCashierAccount() throws Exception {
   db.update("UPDATE user_roles SET is_active=true WHERE user_role_id=?",assignments.get("cashier"));
@@ -2405,6 +2448,7 @@ ok(call("admin","PUT",path+"/programs/"+id,form,program.get("version").asText(),
   var catalogue=ok(req("admin","GET",matrix,null),200);
   Set<String> groups=new HashSet<>();catalogue.path("pages").forEach(p->groups.add(p.path("group").asText()));
   assertThat(groups).hasSize(12).contains("Payroll Permissions","Banking Management Permissions","Workweek Permissions","Financial and Payment Services Permissions");
+  assertThat(catalogue.path("children").findValues("code").stream().map(n->n.asText()).toList()).doesNotContain("WORKWEEK_PAGE_WEEK_SCHEDULE_AVAILABILITY","WORKWEEK_PAGE_WEEK_SCHEDULE_COVERAGE");
   for(String code:List.of("TENDERS_PAGE_CREDIT_CARD_SETTINGS","PRICE_BOOK_PAGE_DISCOUNTS_REASONS","WORKWEEK_PAGE_WEEK_SCHEDULE_AVAILABILITY"))
    ok(req("admin","PUT",matrix,Map.of("role_type_id",role,"code",code,"allowed",false,"version","0")),200);
   var rights=ok(req("manager","GET",access()+"/context",null),200).path("pages");
@@ -2478,28 +2522,91 @@ ok(call("admin","PUT",path+"/programs/"+id,form,program.get("version").asText(),
   assertThat(db.queryForObject("SELECT is_active FROM user_roles WHERE user_id=? AND dgt_id=?",Boolean.class,uid,second)).isTrue();
   assertThat(db.queryForObject("SELECT status FROM employee_schedules WHERE schedule_id=?",String.class,shift)).isEqualTo("PUBLISHED");
   // Ending employment alone retains access; reactivation does not silently regrant it.
-  row=ok(req("admin","GET",path+"/"+id+"/summary",null),200);assertThat(row.has("deposit")).isFalse();assertThat(row.has("email")).isFalse();
+  ok(req("admin","GET",path+"/"+id+"/summary",null),404);
   body.put("version",row.path("version").asText());body.put("disable_website_access",false);body.put("last_working_date",day.minusDays(1).toString());
   saved=employeeActionPage(req("admin","PUT",path+"/"+id+"/assignment",body),path);
   for(var r:saved.path("employees"))if(r.path("id").asLong()==id)row=r;
   assertThat(row.path("status").asText()).isEqualTo("Inactive");
   body.put("version",row.path("version").asText());body.put("reactivate",true);
+  body.put("rehire_date",day.minusDays(1).toString());
+  ok(req("admin","PUT",path+"/"+id+"/assignment",body),400);
+  body.put("rehire_date",day.plusDays(1).toString());
+  ok(req("admin","PUT",path+"/"+id+"/assignment",body),400);
+  body.put("rehire_date",day.toString());
   ok(req("admin","PUT",path+"/"+id+"/assignment",body),200);
+  var history=ok(req("admin","GET",path+"/"+id,null),200).path("employment_history");
+  assertThat(history.size()).isEqualTo(2);
+  assertThat(history.get(0).path("hired_on").asText()).isEqualTo(day.toString());
+  assertThat(history.get(0).path("ended_on").isNull()).isTrue();
+  assertThat(history.get(1).path("ended_on").asText()).isEqualTo(day.minusDays(1).toString());
+  assertThat(db.queryForObject("SELECT effective_from FROM employee_store_assignments WHERE employee_id=? AND dgt_id=?",java.sql.Date.class,id,store).toLocalDate()).isEqualTo(day);
+  ok(req("other","GET",path+"/"+id,null),403);
+  var rehiredDetail=ok(req("admin","GET",path+"/"+id,null),200);
+  var editRehired=new HashMap<String,Object>();
+  editRehired.put("first_name","Assignment");editRehired.put("last_name",tag);editRehired.put("email",mail);
+  editRehired.put("hire_date",rehiredDetail.path("hire_date").asText());editRehired.put("employee_type","Full-time");editRehired.put("pay_type","Hourly");editRehired.put("rate",18);editRehired.put("status","Active");editRehired.put("version",rehiredDetail.path("version").asText());
+  ok(req("admin","PUT",path+"/"+id,editRehired),200);
+  assertThat(db.queryForObject("SELECT effective_from FROM employee_store_assignments WHERE employee_id=? AND dgt_id=?",java.sql.Date.class,id,store).toLocalDate()).isEqualTo(day);
+  assertThat(ok(req("admin","GET",path+"/"+id,null),200).path("employment_history")).isEqualTo(history);
   assertThat(db.queryForObject("SELECT is_active FROM user_roles WHERE user_id=? AND dgt_id=?",Boolean.class,uid,store)).isFalse();
   // Website access can also be ended independently, without ending employment.
   db.update("UPDATE user_roles SET is_active=true WHERE user_id=? AND dgt_id=?",uid,store);
   for(var r:ok(req("admin","GET",path,null),200).path("employees"))if(r.path("id").asLong()==id)row=r;
   assertThat(row.path("website_access_active").asBoolean()).isTrue();
-  String accessPath=path+"/"+id+"/end-website-access";
-  ok(req("other","POST",accessPath,Map.of("version",row.path("version").asText())),403);
+  String accessPath=access()+"/employee-access/"+id+"/end-website-access";
+  String endVersion="";for(var r:ok(req("admin","GET",access()+"/employee-access",null),200))if(r.path("employee_id").asLong()==id)endVersion=r.path("version").asText();
+  ok(req("other","POST",accessPath,Map.of("version",endVersion,"end_date",day.toString())),403);
   ok(req("admin","POST",accessPath,Map.of("version","stale")),409);
-  var accessEnded=employeeActionPage(req("admin","POST",accessPath,Map.of("version",row.path("version").asText())),path);
+  var endAck=ok(req("admin","POST",accessPath,Map.of("version",endVersion,"end_date",day.toString())),200);assertThat(endAck.path("success").asBoolean()).isTrue();assertThat(endAck.size()).isEqualTo(2);
+  for(var r:ok(req("admin","GET",access()+"/employee-access",null),200))if(r.path("employee_id").asLong()==id){assertThat(r.path("version").asText()).isEqualTo(endAck.path("version").asText());assertThat(r.path("active").asBoolean()).isTrue();assertThat(r.path("access_ends_on").asText()).isEqualTo(day.toString());}
+  db.update("UPDATE user_roles SET access_ends_on=? WHERE user_id=? AND dgt_id=?",day.minusDays(1),uid,store);
+  var accessEnded=ok(req("admin","GET",path,null),200);
   for(var r:accessEnded.path("employees"))if(r.path("id").asLong()==id)row=r;
   assertThat(row.path("website_access_active").asBoolean()).isFalse();
   assertThat(row.path("status").asText()).isEqualTo("Active");
   assertThat(row.path("last_working_date").isNull()).isTrue();
   assertThat(db.queryForObject("SELECT is_active FROM user_roles WHERE user_id=? AND dgt_id=?",Boolean.class,uid,second)).isTrue();
 
+ }
+
+ JsonNode websiteEmployee(String path,long id)throws Exception{
+  for(var row:ok(req("admin","GET",path,null),200))if(row.path("employee_id").asLong()==id)return row;
+  throw new AssertionError("Employee missing");
+ }
+ @Test @Order(222) void scheduledWebsiteAccessUndoRestoreAndServerCutoff()throws Exception{
+  String path=access()+"/employee-access";
+  long uid=db.queryForObject("SELECT user_id FROM users WHERE email=?",Long.class,"end-assignment-"+tag+"@example.test");
+  long id=db.queryForObject("SELECT employee_id FROM employees WHERE user_id=?",Long.class,uid);
+  var row=websiteEmployee(path,id);
+  assertThat(row.path("active").asBoolean()).isFalse();
+  String base=path+"/"+id;
+  ok(req("other","POST",base+"/restore-website-access",Map.of("version",row.path("version").asText())),403);
+  ok(req("admin","POST",base+"/restore-website-access",Map.of("version","stale")),409);
+  var restored=ok(req("admin","POST",base+"/restore-website-access",Map.of("version",row.path("version").asText())),200);
+  row=websiteEmployee(path,id);assertThat(row.path("active").asBoolean()).isTrue();assertThat(row.path("access_ends_on").isNull()).isTrue();assertThat(row.path("version").asText()).isEqualTo(restored.path("version").asText());
+  var today=java.time.LocalDate.parse(row.path("today").asText());
+  long expiredRole=db.queryForObject("INSERT INTO user_roles(user_id,role_type_id,dgt_id,is_active,access_ends_on) VALUES (?,(SELECT role_type_id FROM role_types WHERE role_type_name='MANAGER'),?,true,?) RETURNING user_role_id",Long.class,uid,store,today.minusDays(2));
+  row=websiteEmployee(path,id);
+  ok(req("admin","POST",base+"/end-website-access",Map.of("version",row.path("version").asText())),400);
+  ok(req("admin","POST",base+"/end-website-access",Map.of("version",row.path("version").asText(),"end_date",today.minusDays(1).toString())),400);
+  ok(req("admin","POST",base+"/end-website-access",Map.of("version",row.path("version").asText(),"end_date",today.plusDays(3).toString())),200);
+  row=websiteEmployee(path,id);assertThat(row.path("active").asBoolean()).isTrue();assertThat(row.path("access_ends_on").asText()).isEqualTo(today.plusDays(3).toString());
+  ok(req("admin","POST",base+"/undo-website-access-ending",Map.of("version",row.path("version").asText())),200);
+  row=websiteEmployee(path,id);assertThat(row.path("active").asBoolean()).isTrue();assertThat(row.path("access_ends_on").isNull()).isTrue();
+  assertThat(db.queryForObject("SELECT public.role_access_active(is_active,access_ends_on,dgt_id) FROM user_roles WHERE user_role_id=?",Boolean.class,expiredRole)).isFalse();
+  ok(req("admin","POST",base+"/end-website-access",Map.of("version",row.path("version").asText(),"end_date",today.toString())),200);
+  assertThat(websiteEmployee(path,id).path("active").asBoolean()).isTrue();
+  // Existing JWT identity stays valid, but expired store permissions are denied by the database.
+  ok(req("end-assignment","GET",access()+"/context",null),200);
+  db.update("UPDATE user_roles SET access_ends_on=? WHERE user_id=? AND dgt_id=?",today.minusDays(1),uid,store);
+  ok(req("end-assignment","GET",access()+"/context",null),403);
+  ok(req("end-assignment","GET","/access/stores/"+second+"/context",null),200);
+  row=websiteEmployee(path,id);assertThat(row.path("active").asBoolean()).isFalse();
+  ok(req("admin","POST",base+"/undo-website-access-ending",Map.of("version",row.path("version").asText())),400);
+  ok(req("admin","POST",base+"/restore-website-access",Map.of("version",row.path("version").asText())),200);
+  assertThat(websiteEmployee(path,id).path("active").asBoolean()).isTrue();
+  ok(req("end-assignment","GET",access()+"/context",null),200);
+  assertThat(db.queryForObject("SELECT is_active FROM user_roles WHERE user_id=? AND dgt_id=?",Boolean.class,uid,second)).isTrue();
  }
 
 }

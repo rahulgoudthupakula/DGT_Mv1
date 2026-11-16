@@ -11,7 +11,7 @@ public class PagePermissionsRepository {
     public PagePermissionsRepository(JdbcTemplate db) { this.db = db; }
 
     public List<Map<String,Object>> findRoleRights(Object userId, Object storeId) {
-        return db.queryForList("SELECT r.role_type_id,p.permission_code,p.allowed FROM user_roles r JOIN role_types t USING(role_type_id) LEFT JOIN store_role_permissions p ON p.dgt_id=r.dgt_id AND p.role_type_id=r.role_type_id WHERE r.user_id=? AND r.dgt_id=? AND r.is_active AND t.is_active AND upper(t.role_type_name) IN ('MANAGER','CASHIER','ACCOUNTANT')", userId, storeId);
+        return db.queryForList("SELECT r.role_type_id,p.permission_code,p.allowed FROM user_roles r JOIN role_types t USING(role_type_id) LEFT JOIN store_role_permissions p ON p.dgt_id=r.dgt_id AND p.role_type_id=r.role_type_id WHERE r.user_id=? AND r.dgt_id=? AND public.role_access_active(r.is_active,r.access_ends_on,r.dgt_id) AND t.is_active AND upper(t.role_type_name) IN ('MANAGER','CASHIER','ACCOUNTANT')", userId, storeId);
     }
 
     public List<Map<String,Object>> findOverrides(Object storeId, Object userId) {

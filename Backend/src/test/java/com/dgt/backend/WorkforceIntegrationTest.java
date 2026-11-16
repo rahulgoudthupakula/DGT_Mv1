@@ -62,7 +62,9 @@ class WorkforceIntegrationTest {
   db.update("DELETE FROM employee_time_off_requests WHERE dgt_id IN (?,?,?)",store,second,foreign);
   db.update("DELETE FROM employee_schedules WHERE dgt_id IN (?,?,?)",store,second,foreign);
   db.update("DELETE FROM employee_compensation WHERE employee_id IN (SELECT employee_id FROM employees WHERE user_id IN (SELECT user_id FROM users WHERE dgt_id IN (?,?,?)))",store,second,foreign);
+  for(String table:List.of("employee_documents","employee_emergency_contacts"))db.update("DELETE FROM "+table+" WHERE employee_id IN (SELECT employee_id FROM employee_store_assignments WHERE dgt_id IN (?,?,?))",store,second,foreign);
   db.update("DELETE FROM employee_store_assignments WHERE dgt_id IN (?,?,?)",store,second,foreign);
+  db.update("DELETE FROM employee_employment_periods WHERE dgt_id IN (?,?,?)",store,second,foreign);
   db.update("DELETE FROM employees WHERE user_id IN (SELECT user_id FROM users WHERE dgt_id IN (?,?,?))",store,second,foreign);
   db.update("DELETE FROM billing_change_requests WHERE dgt_id IN (?,?,?)",store,second,foreign);
   db.update("DELETE FROM billing_invoices WHERE store_id IN (SELECT store_id FROM stores WHERE dgt_id IN (?,?,?))",store,second,foreign);
@@ -100,6 +102,14 @@ class WorkforceIntegrationTest {
   long rt=db.queryForObject("SELECT role_type_id FROM role_types WHERE role_type_name='CASHIER'",Long.class);
   db.update("INSERT INTO employee_store_assignments(employee_id,dgt_id,is_primary,effective_from,role_type_id) VALUES (?,?,false,'2026-01-01',?)",staff,second,rt);
   ok(req("admin","POST","/access/stores/"+second+"/workforce/shifts",shiftBody(staff,day+"T23:00","2027-06-06T07:00")),409);
+ }
+ @Test @Order(12) void twoSeparateShiftsOnOneDayAreReturnedAndOverlapIsRejected()throws Exception{
+  shiftAs("manager",staff,"2028-07-02T08:00","2028-07-02T12:00");
+  shiftAs("manager",staff,"2028-07-02T16:00","2028-07-02T20:00");
+  var data=ok(req("manager","GET",wf()+"?week=2028-07-02",null),200);int count=0;double hours=0;
+  for(var shift:data.path("shifts"))if(shift.path("employee_id").asLong()==staff&&shift.path("work_date").asText().equals("2028-07-02")){count++;hours+=shift.path("hours").asDouble();}
+  assertThat(count).isEqualTo(2);assertThat(hours).isEqualTo(8);
+  ok(req("manager","POST",wf()+"/shifts",shiftBody(staff,"2028-07-02T11:00","2028-07-02T17:00")),409);
  }
  @Test @Order(2) void leaveCountsWeekendAndRequiresReview()throws Exception{
   ok(req("cashier","POST",wf()+"/requests",leave(replacement,day)),403);
@@ -147,7 +157,7 @@ class WorkforceIntegrationTest {
   db.update("UPDATE stores SET timezone='America/New_York' WHERE dgt_id=?",store);
   ok(req("manager","POST",wf()+"/shifts",shiftBody(replacement,"2027-03-14T02:30","2027-03-14T05:00")),400);
   body=shiftBody(replacement,"2027-11-07T01:30","2027-11-07T02:30");ok(req("manager","POST",wf()+"/shifts",body),400);body.put("start_offset","-04:00");body.put("end_offset","-05:00");ok(req("manager","POST",wf()+"/shifts",body),200);
-  assertThat(ok(req("manager","GET",wf()+"?week=2027-11-01",null),200).path("shifts").get(0).path("hours").asDouble()).isEqualTo(2);
+  assertThat(ok(req("manager","GET",wf()+"?week=2027-11-07",null),200).path("shifts").get(0).path("hours").asDouble()).isEqualTo(2);
  }
 
  @Test @Order(7) void specificShiftLeaveDoesNotBlockSeparateShiftAndRejectsInjectedReferences()throws Exception{
@@ -195,6 +205,17 @@ class WorkforceIntegrationTest {
   assertThat(db.queryForObject("SELECT count(*) FROM employee_schedules WHERE employee_id=? AND work_date='2028-05-03'",Integer.class,replacement)).isZero();
   var nextWeek=shiftBody(replacement,"2028-05-08T09:00","2028-05-08T17:00");
   ok(req("manager","POST",wf()+"/shifts/batch",Map.of("shifts",List.of(wednesday,nextWeek))),400);
+  // Sunday and Saturday belong to one schedule week; the next Sunday does not.
+  var sunday=shiftBody(replacement,"2028-06-04T09:00","2028-06-04T17:00");
+  var saturday=shiftBody(replacement,"2028-06-10T09:00","2028-06-10T17:00");
+  assertThat(ok(req("manager","POST",wf()+"/shifts/batch",Map.of("shifts",List.of(sunday,saturday))),200).path("count").asInt()).isEqualTo(2);
+  var sundayWeek=ok(req("manager","GET",wf()+"?week=2028-06-07",null),200);
+  assertThat(sundayWeek.path("week").asText()).isEqualTo("2028-06-04");
+  assertThat(sundayWeek.path("shifts").size()).isEqualTo(2);
+  var friday=shiftBody(replacement,"2028-06-09T09:00","2028-06-09T17:00");
+  var followingSunday=shiftBody(replacement,"2028-06-11T09:00","2028-06-11T17:00");
+  ok(req("manager","POST",wf()+"/shifts/batch",Map.of("shifts",List.of(friday,followingSunday))),400);
+  assertThat(db.queryForObject("SELECT count(*) FROM employee_schedules WHERE employee_id=? AND work_date='2028-06-09'",Integer.class,replacement)).isZero();
   db.update("UPDATE employee_store_assignments SET effective_to=((CURRENT_TIMESTAMP AT TIME ZONE (SELECT timezone FROM stores WHERE dgt_id=?))::date-1) WHERE employee_id=? AND dgt_id=?",store,replacement,store);
   JsonNode employee=null;for(var e:ok(req("manager","GET",wf()+"?week=2028-05-01",null),200).path("employees"))if(e.path("employee_id").asLong()==replacement)employee=e;
   assertThat(employee).isNotNull();assertThat(employee.path("active").asBoolean()).isFalse();

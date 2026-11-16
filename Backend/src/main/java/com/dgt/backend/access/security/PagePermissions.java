@@ -63,6 +63,8 @@ public class PagePermissions {
   new Child("LOTTERY_PAGE_ACTIVATE_ACTIVATE","Activate Packs","LOTTERY_PAGE_ACTIVATE","activate"),
   new Child("LOTTERY_PAGE_RETURNS_SETTLE","Settle Packs","LOTTERY_PAGE_RETURNS","settle"),
   new Child("LOTTERY_PAGE_RETURNS_RETURN","Return Packs","LOTTERY_PAGE_RETURNS","return")).stream()).toList();
+ // Legacy permission keys remain valid for existing workflows, but removed pages stay out of editors.
+ public static List<Child> visibleChildren(){return CHILDREN.stream().filter(c->!Set.of("WORKWEEK_PAGE_WEEK_SCHEDULE_AVAILABILITY","WORKWEEK_PAGE_WEEK_SCHEDULE_COVERAGE").contains(c.code())).toList();}
  private final ScopedAccess access;
  public PagePermissions(ScopedAccess access, PagePermissionsRepository repository){this.repository=repository;this.access=access;}
  // Evaluate once per request after verifying store assignment; later gates reuse the same result.

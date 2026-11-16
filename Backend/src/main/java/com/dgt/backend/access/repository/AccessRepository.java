@@ -11,7 +11,7 @@ public class AccessRepository {
     public AccessRepository(JdbcTemplate db) { this.db = db; }
 
     public List<String> findUserRoles(Object userId, Object storeId) {
-        return db.queryForList("SELECT DISTINCT upper(t.role_type_name) FROM user_roles r JOIN role_types t USING(role_type_id) WHERE r.user_id=? AND r.dgt_id=? AND r.is_active AND t.is_active", String.class, userId, storeId);
+        return db.queryForList("SELECT DISTINCT upper(t.role_type_name) FROM user_roles r JOIN role_types t USING(role_type_id) WHERE r.user_id=? AND r.dgt_id=? AND public.role_access_active(r.is_active,r.access_ends_on,r.dgt_id) AND t.is_active", String.class, userId, storeId);
     }
 
     public List<Map<String,Object>> findCompanyUsers(Object companyId) {
@@ -23,7 +23,7 @@ public class AccessRepository {
     }
 
     public List<Map<String,Object>> findAssignments(Object storeId) {
-        return db.queryForList("SELECT ur.user_role_id,ur.user_id,ur.role_type_id,u.email,rt.role_type_name,ur.is_active,ur.xmin::text AS version FROM user_roles ur JOIN users u USING(user_id) JOIN role_types rt USING(role_type_id) WHERE ur.dgt_id=? ORDER BY u.email,rt.role_type_name", storeId);
+        return db.queryForList("SELECT ur.user_role_id,ur.user_id,ur.role_type_id,u.email,rt.role_type_name,public.role_access_active(ur.is_active,ur.access_ends_on,ur.dgt_id) AS is_active,ur.xmin::text AS version FROM user_roles ur JOIN users u USING(user_id) JOIN role_types rt USING(role_type_id) WHERE ur.dgt_id=? ORDER BY u.email,rt.role_type_name", storeId);
     }
 
     public List<Map<String,Object>> findLegacyPermissions(Object storeId) {

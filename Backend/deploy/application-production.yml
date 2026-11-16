@@ -11,6 +11,8 @@ server:
   port: 8080
   forward-headers-strategy: framework
 app:
+  employee-documents:
+    directory: /var/lib/dgt/employee-documents
   cors-origins: https://dgttechnologies.com,https://www.dgttechnologies.com
   profile:
     enabled: true

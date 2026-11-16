@@ -21,7 +21,7 @@ public class StoreReductionController {
  private static final Set<String> REASONS=Set.of("damaged-returnable","expired-returnable","vendor-recall","damaged-non-returnable","expired-non-returnable","theft","spoilage","counting-error","store-to-store-transfer");
  private boolean allowed(String store,String code,boolean manager){
   long uid=a.user();if(a.admin(uid,a.company(store)))return true;
-  return !a.db.queryForList("SELECT ur.user_role_id FROM user_roles ur JOIN role_types rt USING(role_type_id) JOIN store_role_permissions rp ON rp.dgt_id=ur.dgt_id AND rp.role_type_id=ur.role_type_id WHERE ur.user_id=? AND ur.dgt_id=? AND ur.is_active AND rt.is_active AND rp.permission_code=? AND rp.allowed AND (?=false OR upper(rt.role_type_name)='MANAGER')",uid,store,code,manager).isEmpty();
+  return !a.db.queryForList("SELECT ur.user_role_id FROM user_roles ur JOIN role_types rt USING(role_type_id) JOIN store_role_permissions rp ON rp.dgt_id=ur.dgt_id AND rp.role_type_id=ur.role_type_id WHERE ur.user_id=? AND ur.dgt_id=? AND public.role_access_active(ur.is_active,ur.access_ends_on,ur.dgt_id) AND rt.is_active AND rp.permission_code=? AND rp.allowed AND (?=false OR upper(rt.role_type_name)='MANAGER')",uid,store,code,manager).isEmpty();
  }
  private void require(String store,String code,boolean manager){if(!allowed(store,code,manager))throw a.denied();}
  private RuntimeException bad(String s){return new ResponseStatusException(HttpStatus.BAD_REQUEST,s);}

@@ -20,7 +20,7 @@ public class StorePurchaseOrderController {
  private final ScopedAccess a;public StorePurchaseOrderController(ScopedAccess a){this.a=a;}
  private boolean allowed(String store,boolean review){
   long uid=a.user();if(a.admin(uid,a.company(store)))return true;
-  return !a.db.queryForList("SELECT ur.user_role_id FROM user_roles ur JOIN role_types rt USING(role_type_id) JOIN store_role_permissions rp ON rp.dgt_id=ur.dgt_id AND rp.role_type_id=ur.role_type_id WHERE ur.user_id=? AND ur.dgt_id=? AND ur.is_active AND rt.is_active AND rp.allowed AND rp.permission_code=? AND (?=false OR upper(rt.role_type_name)='MANAGER')",uid,store,review?"GROCERY_APPROVE_PO":"GROCERY_CREATE_PO",review).isEmpty();
+  return !a.db.queryForList("SELECT ur.user_role_id FROM user_roles ur JOIN role_types rt USING(role_type_id) JOIN store_role_permissions rp ON rp.dgt_id=ur.dgt_id AND rp.role_type_id=ur.role_type_id WHERE ur.user_id=? AND ur.dgt_id=? AND public.role_access_active(ur.is_active,ur.access_ends_on,ur.dgt_id) AND rt.is_active AND rp.allowed AND rp.permission_code=? AND (?=false OR upper(rt.role_type_name)='MANAGER')",uid,store,review?"GROCERY_APPROVE_PO":"GROCERY_CREATE_PO",review).isEmpty();
  }
  private void access(String store){if(!allowed(store,false)&&!allowed(store,true))throw a.denied();}
  private void creator(String store){if(!allowed(store,false))throw a.denied();}
