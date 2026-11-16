@@ -180,6 +180,7 @@ class ScopedAccessIntegrationTest {
   db.update("DELETE FROM invoices WHERE dgt_id IN (?,?,?)",store,second,foreign);
   for(String table:List.of("inventory_movements","product_barcodes","product_store_prices","inventory","product_vendors","products","vendor_contacts","vendors","store_sub_departments"))db.update("DELETE FROM "+table+" WHERE dgt_id IN (?,?,?)",store,second,foreign);
   db.update("DELETE FROM employee_compensation WHERE employee_id IN (SELECT employee_id FROM employees WHERE user_id IN (SELECT user_id FROM users WHERE dgt_id IN (?,?,?)))",store,second,foreign);
+  db.update("DELETE FROM store_attendance_settings WHERE dgt_id IN (?,?,?)",store,second,foreign);
   db.update("DELETE FROM employee_schedules WHERE dgt_id IN (?,?,?)",store,second,foreign);
   db.update("DELETE FROM employee_employment_periods WHERE dgt_id IN (?,?,?)",store,second,foreign);
   for(String table:List.of("employee_documents","employee_emergency_contacts"))db.update("DELETE FROM "+table+" WHERE employee_id IN (SELECT employee_id FROM employee_store_assignments WHERE dgt_id IN (?,?,?))",store,second,foreign);
@@ -1127,9 +1128,82 @@ class ScopedAccessIntegrationTest {
   assertThat(listing.path("items").size()).isEqualTo(1);
   String status=base+"/return-slips/"+rid+"/status";
   ok(req("admin","POST",status,Map.of("status","CLOSED")),409);
-  for(String next:List.of("PENDING","SENT","CREDIT_RECEIVED","CLOSED"))ok(req("manager","POST",status,Map.of("status",next)),200);
+  assertThat(listing.path("status").asText()).isEqualTo("PENDING");
+  ok(req("cashier","POST",status,Map.of("status","CREDIT_RECEIVED")),403);
+  ok(req("other","POST",status,Map.of("status","CREDIT_RECEIVED")),403);
+  assertThat(ok(req("manager","POST",status,Map.of("status","CREDIT_RECEIVED")),200).path("status").asText()).isEqualTo("CLOSED");
+  var settled=db.queryForMap("SELECT status,settled_at,settled_by FROM inventory_returns WHERE return_id=?",rid);
+  assertThat(settled.get("status")).isEqualTo("CLOSED");assertThat(settled.get("settled_at")).isNotNull();assertThat(settled.get("settled_by")).isEqualTo(users.get("manager"));
+  ok(req("manager","POST",status,Map.of("status","CREDIT_RECEIVED")),409);
+  boolean retained=false;for(var row:ok(req("admin","GET",base+"/return-slips",null),200).path("returns"))if(row.path("return_id").asLong()==rid){retained=true;assertThat(row.path("status").asText()).isEqualTo("CLOSED");}assertThat(retained).isTrue();
   ok(req("manager","POST",status,Map.of("status","CLOSED")),409);
   assertThat(db.queryForObject("SELECT sum(available_quantity) FROM inventory WHERE dgt_id=?",java.math.BigDecimal.class,store)).isEqualByComparingTo(before);
+ }
+
+ @Test @Order(40) void returnProcessSuggestsPrimaryVendorAndGroupsItemsAtomically() throws Exception {
+  String base=access()+"/reductions";long product=db.queryForObject("SELECT product_id FROM products WHERE dgt_id=? AND product_sku=?",Long.class,store,"ARRIVAL-"+tag);
+  var oldPrimary=db.queryForList("SELECT product_vendor_id,is_primary FROM product_vendors WHERE dgt_id=? AND product_id=?",store,product);
+  long suggested=db.queryForObject("INSERT INTO vendors(dgt_id,vendor_name) VALUES (?,?) RETURNING vendor_id",Long.class,store,"ZZ Primary return "+tag);
+  long link=0;
+  try{
+   db.update("UPDATE product_vendors SET is_primary=false WHERE dgt_id=? AND product_id=?",store,product);
+   link=db.queryForObject("INSERT INTO product_vendors(dgt_id,product_id,vendor_id,unit_cost,is_primary) VALUES (?,?,?,1,true) RETURNING product_vendor_id",Long.class,store,product,suggested);
+   JsonNode item=null;for(var row:ok(req("admin","GET",base,null),200).path("items"))if(row.path("id").asLong()==product)item=row;
+   assertThat(item).isNotNull();assertThat(item.path("primaryVendorId").asLong()).isEqualTo(suggested);
+   db.update("UPDATE product_vendors SET is_primary=false WHERE product_vendor_id=?",link);
+   for(var row:ok(req("admin","GET",base,null),200).path("items"))if(row.path("id").asLong()==product)item=row;
+   assertThat(item.path("primaryVendorId").isNull()).isTrue();
+  }finally{
+   if(link!=0)db.update("DELETE FROM product_vendors WHERE product_vendor_id=?",link);
+   for(var row:oldPrimary)db.update("UPDATE product_vendors SET is_primary=? WHERE product_vendor_id=?",row.get("is_primary"),row.get("product_vendor_id"));
+   db.update("DELETE FROM vendors WHERE vendor_id=?",suggested);
+  }
+  long vendor=db.queryForObject("SELECT vendor_id FROM product_vendors WHERE dgt_id=? AND product_id=? AND archived_at IS NULL LIMIT 1",Long.class,store,product);
+  long otherProduct=db.queryForObject("SELECT p.product_id FROM products p JOIN inventory i ON i.product_id=p.product_id AND i.dgt_id=p.dgt_id WHERE p.dgt_id=? AND p.product_id<>? AND i.available_quantity>0 AND p.purchase_gross_cost IS NOT NULL AND p.purchase_discount IS NOT NULL LIMIT 1",Long.class,store,product);
+  long first=ok(req("admin","POST",base,Map.of("product_id",product,"quantity",0.01,"reason","damaged-returnable")),200).path("id").asLong();
+  long secondRequest=ok(req("admin","POST",base,Map.of("product_id",otherProduct,"quantity",0.01,"reason","expired-returnable")),200).path("id").asLong();
+  var one=Map.of("request_id",first,"reason","Damaged (vendor returnable)");
+  var two=Map.of("request_id",secondRequest,"reason","Expired (vendor returnable)");
+  var grouped=Map.of("vendor_id",vendor,"reference","ONE-RMA","method","Pickup","items",List.of(one,two));
+  ok(req("cashier","POST",base+"/return-slips/group",grouped),403);
+  ok(req("other","POST",base+"/return-slips/group",grouped),403);
+  var existingLinks=db.queryForList("SELECT product_vendor_id FROM product_vendors WHERE dgt_id=? AND product_id=? AND vendor_id=? AND archived_at IS NULL",Long.class,store,otherProduct,vendor);
+  Long addedLink=null;
+  if(existingLinks.isEmpty()){
+   ok(req("admin","POST",base+"/return-slips/group",grouped),400);
+   assertThat(db.queryForObject("SELECT count(*) FROM inventory_returns WHERE reduction_request_id IN (?,?)",Integer.class,first,secondRequest)).isZero();
+   addedLink=db.queryForObject("INSERT INTO product_vendors(dgt_id,product_id,vendor_id,unit_cost) VALUES (?,?,?,1) RETURNING product_vendor_id",Long.class,store,otherProduct,vendor);
+  }
+  try{
+   var stock=db.queryForObject("SELECT sum(available_quantity) FROM inventory WHERE dgt_id=?",java.math.BigDecimal.class,store);
+   long slip=ok(req("admin","POST",base+"/return-slips/group",grouped),200).path("id").asLong();
+   assertThat(db.queryForObject("SELECT count(*) FROM inventory_return_items WHERE return_id=?",Integer.class,slip)).isEqualTo(2);
+   assertThat(db.queryForObject("SELECT reference_number FROM inventory_returns WHERE return_id=?",String.class,slip)).isEqualTo("ONE-RMA");
+   assertThat(db.queryForObject("SELECT count(DISTINCT return_id) FROM inventory_return_items WHERE reduction_request_id IN (?,?)",Integer.class,first,secondRequest)).isEqualTo(1);
+   ok(req("admin","POST",base+"/return-slips/group",grouped),409);
+   ok(req("admin","POST",base+"/return-slips",Map.of("request_id",secondRequest,"vendor_id",vendor,"reason","Expired","method","Pickup")),409);
+   assertThat(db.queryForObject("SELECT sum(available_quantity) FROM inventory WHERE dgt_id=?",java.math.BigDecimal.class,store)).isEqualByComparingTo(stock);
+   var listing=ok(req("admin","GET",base+"/return-slips",null),200);JsonNode created=null;for(var row:listing.path("returns"))if(row.path("return_id").asLong()==slip)created=row;
+   assertThat(created).isNotNull();assertThat(created.path("items").size()).isEqualTo(2);
+   assertThat(created.path("items").findValues("reduction_request_id").stream().map(JsonNode::asLong)).containsExactlyInAnyOrder(first,secondRequest);
+  }finally{if(addedLink!=null)db.update("DELETE FROM product_vendors WHERE product_vendor_id=?",addedLink);}
+
+ }
+
+ @Test @Order(41) void vendorRecallIsOneReturnableReasonAndMigrationPreservesStock() throws Exception {
+  String path=access()+"/reductions";long product=db.queryForObject("SELECT product_id FROM products WHERE dgt_id=? AND product_sku=?",Long.class,store,"ARRIVAL-"+tag);
+  long recall=ok(req("admin","POST",path,Map.of("product_id",product,"quantity",0.001,"reason","vendor-recall")),200).path("id").asLong();
+  ok(req("admin","POST",path,Map.of("product_id",product,"quantity",0.001,"reason","vendor-recall-disposal")),400);
+  long historic=ok(req("admin","POST",path,Map.of("product_id",product,"quantity",0.001,"reason","vendor-recall")),200).path("id").asLong();
+  db.update("UPDATE inventory_reduction_requests SET reason='vendor-recall-disposal',request_type='shrinkage' WHERE reduction_request_id=?",historic);
+  var stock=db.queryForObject("SELECT available_quantity FROM inventory WHERE dgt_id=? AND product_id=?",java.math.BigDecimal.class,store,product);
+  long movements=db.queryForObject("SELECT count(*) FROM inventory_movements WHERE dgt_id=?",Long.class,store);
+  String migration=java.nio.file.Files.readString(java.nio.file.Path.of("src/main/resources/db/migration/V25__unify_vendor_recall_returns.sql"));db.execute(migration);db.execute(migration);
+  var routes=new HashMap<Long,String>();for(var row:ok(req("admin","GET",path,null),200).path("requests"))routes.put(row.path("reduction_request_id").asLong(),row.path("route").asText());
+  assertThat(routes.get(recall)).isEqualTo("returnable");assertThat(routes.get(historic)).isEqualTo("returnable");
+  assertThat(db.queryForObject("SELECT reason FROM inventory_reduction_requests WHERE reduction_request_id=?",String.class,historic)).isEqualTo("vendor-recall");
+  assertThat(db.queryForObject("SELECT available_quantity FROM inventory WHERE dgt_id=? AND product_id=?",java.math.BigDecimal.class,store,product)).isEqualByComparingTo(stock);
+  assertThat(db.queryForObject("SELECT count(*) FROM inventory_movements WHERE dgt_id=?",Long.class,store)).isEqualTo(movements);
  }
 
  @Test @Order(39) void recordedLossUsesMovementCost() throws Exception {
@@ -2660,6 +2734,34 @@ ok(call("admin","PUT",path+"/programs/"+id,form,program.get("version").asText(),
   assertThat(websiteEmployee(path,id).path("active").asBoolean()).isTrue();
   ok(req("end-assignment","GET",access()+"/context",null),200);
   assertThat(db.queryForObject("SELECT is_active FROM user_roles WHERE user_id=? AND dgt_id=?",Boolean.class,uid,second)).isTrue();
+ }
+
+ @Test @Order(1000) void attendanceUsesRealPunchesAndRestrictsScope() throws Exception {
+  long employee=db.queryForObject("INSERT INTO employees(first_name,last_name,hire_date,employee_type) VALUES ('Attendance','Fixture','2020-01-01','FULL_TIME') RETURNING employee_id",Long.class);
+  db.update("INSERT INTO employee_store_assignments(employee_id,dgt_id,effective_from) VALUES (?,?,'2020-01-01')",employee,store);
+  try {
+   // 43 actual hours in the store's Sunday week; two missing-punch hours must not be fabricated.
+   db.update("INSERT INTO employee_time_entries(employee_id,dgt_id,clock_in,clock_out,event_type) VALUES (?,?,'2026-02-01T10:00:00Z','2026-02-03T05:00:00Z','TEST')",employee,store);
+   db.update("INSERT INTO employee_time_entries(employee_id,dgt_id,clock_in,event_type) VALUES (?,?,'2026-02-04T01:00:00Z','TEST')",employee,store);
+   var result=ok(req("admin","GET",access()+"/attendance/"+employee+"?week=2026-02-04",null),200);
+   assertThat(result.path("week").asText()).isEqualTo("2026-02-01");
+   var row=result.path("employees").get(0);
+   assertThat(row.path("worked").decimalValue()).isEqualByComparingTo("43");
+   assertThat(row.path("overtime").decimalValue()).isEqualByComparingTo("3");
+   assertThat(row.path("openPunches").asInt()).isEqualTo(1);
+   ok(req("other","GET",access()+"/attendance",null),403);
+   ok(req("cashier","GET",access()+"/attendance/"+employee+"?week=2026-02-01",null),403);
+   ok(req("cashier","PUT",access()+"/attendance/settings",Map.of("weeklyOvertimeHours",35,"version","0")),403);
+   var config=ok(req("admin","GET",access()+"/attendance",null),200).path("settings");
+   ok(req("admin","PUT",access()+"/attendance/settings",Map.of("weeklyOvertimeHours",45,"version",config.path("version").asText())),200);
+   var changed=ok(req("admin","GET",access()+"/attendance/"+employee+"?week=2026-02-01",null),200);
+   assertThat(changed.path("employees").get(0).path("overtime").decimalValue()).isEqualByComparingTo("0");
+   ok(req("admin","PUT",access()+"/attendance/settings",Map.of("weeklyOvertimeHours",40,"version",config.path("version").asText())),409);
+  } finally {
+   db.update("DELETE FROM employee_time_entries WHERE employee_id=?",employee);
+   db.update("DELETE FROM employee_store_assignments WHERE employee_id=?",employee);
+   db.update("DELETE FROM employees WHERE employee_id=?",employee);
+  }
  }
 
 }

@@ -63,7 +63,7 @@ test('cashier granted Workweek lands on schedule without admin employee access',
  assert.equal(firstPermittedPage(employee,'Workweek'),'Week Schedule');
  assert.equal(canNavigatePage(employee,'Workweek','Employees'),false);
  assert.equal(canNavigatePage(employee,'Workweek','Time Off Approvals'),false);
- assert.equal(canNavigatePage(employee,'Workweek','Time Off Request'),true);
+ assert.equal(canNavigatePage(employee,'Workweek','My Time Off Request'),true);
 });
 
 test('new page permissions hide denied pages and choose an allowed fallback',()=>{

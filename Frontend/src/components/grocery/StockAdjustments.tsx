@@ -95,7 +95,6 @@ const reasonOptions = [
 ];
 
 const SHRINKAGE_REASONS = new Set([
-  "vendor-recall",
   "theft",
   "spoilage",
   "counting-error",
@@ -113,7 +112,7 @@ interface ReduceRequestRow {
   itemName: string;
   scanCode: string;
   currentCount: number;
-  updatedCount: number;
+  reducingCount: number;
   reason: string;
   transferStore?: string;
 }
@@ -337,7 +336,7 @@ export const StockAdjustments = ({storeId}:{storeId:string}) => {
         itemName: i.itemName,
         scanCode: i.scanCode,
         currentCount: i.inventoryCount,
-        updatedCount: i.inventoryCount,
+        reducingCount: 0,
         reason: "",
       }));
     setReduceRows(rows);
@@ -361,8 +360,10 @@ export const StockAdjustments = ({storeId}:{storeId:string}) => {
 
   // Submit a reduction request instead of directly overwriting inventory; the backend applies approval rules.
   const handleSubmitReduceRequest = async () => {
-    if(saving)return;setSaving(true);
-    try{const results=await request<{pending:boolean}[]>(`${path}/batch`,{method:'POST',body:JSON.stringify(reduceRows.map(r=>({productId:r.id,quantity:r.currentCount-r.updatedCount,reason:r.reason,destination:r.reason==='store-to-store-transfer'?r.transferStore:null})))});
+    if(saving)return;
+    if(reduceRows.length===0||reduceRows.some(r=>!Number.isInteger(r.reducingCount)||r.reducingCount<=0||r.reducingCount>r.currentCount)){toast({title:'Enter a whole-number reducing count greater than 0 and no more than current stock.',variant:'destructive'});return;}
+    setSaving(true);
+    try{const results=await request<{pending:boolean}[]>(`${path}/batch`,{method:'POST',body:JSON.stringify(reduceRows.map(r=>({productId:r.id,quantity:r.reducingCount,reason:r.reason,destination:r.reason==='store-to-store-transfer'?r.transferStore:null})))});
       await refreshStock(client,storeId,...reduceRows.map(row=>row.transferStore));const approved=results.every(r=>!r.pending);toast({title:approved?'Adjustment approved':'Sent for approval',description:approved?'Movement recorded and stock updated.':'Stock stays unchanged until approval.'});setShowReduceModal(false);setIsEditMode(false);setSelectedIds(new Set());
     }catch(e){toast({title:'Could not submit',description:e instanceof Error?e.message:'Try again',variant:'destructive'});}finally{setSaving(false);}
   };
@@ -414,7 +415,8 @@ export const StockAdjustments = ({storeId}:{storeId:string}) => {
                       <TableHead className="text-xs">Item Name</TableHead>
                       <TableHead className="text-xs">Scan Code</TableHead>
                       <TableHead className="text-xs text-center">Current Count</TableHead>
-                      <TableHead className="text-xs text-center">Updated Count</TableHead>
+                      <TableHead className="text-xs text-center">Reducing Count</TableHead>
+                      <TableHead className="text-xs text-center">Remaining Count</TableHead>
                       <TableHead className="text-xs w-[220px]">Reason</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -429,11 +431,14 @@ export const StockAdjustments = ({storeId}:{storeId:string}) => {
                             type="number"
                             min={0}
                             max={row.currentCount}
-                            value={row.updatedCount}
-                            onChange={e => handleReduceRowChange(row.id, "updatedCount", parseFloat(e.target.value) || 0)}
+                            step={1}
+                            aria-label={`Reducing count for ${row.itemName}`}
+                            value={row.reducingCount}
+                            onChange={e => handleReduceRowChange(row.id, "reducingCount", Number(e.target.value) || 0)}
                             className="h-7 text-xs w-16 text-center mx-auto"
                           />
                         </TableCell>
+                        <TableCell className="text-xs text-center">{Number.isFinite(row.reducingCount) && row.reducingCount>=0 && row.reducingCount<=row.currentCount ? Number((row.currentCount-row.reducingCount).toFixed(3)) : '—'}</TableCell>
                         <TableCell>
                           <Select
                             value={row.reason}
@@ -481,7 +486,7 @@ export const StockAdjustments = ({storeId}:{storeId:string}) => {
               </Button>
               <Button
                 size="sm"
-                disabled={saving || !query.data?.canSubmit || reduceRows.length === 0 || reduceRows.some(r => !r.reason || r.updatedCount<0 || r.updatedCount>=r.currentCount || (r.reason === "store-to-store-transfer" && !r.transferStore))}
+                disabled={saving || !query.data?.canSubmit || reduceRows.length === 0 || reduceRows.some(r => !r.reason || !Number.isInteger(r.reducingCount) || r.reducingCount<=0 || r.reducingCount>r.currentCount || (r.reason === "store-to-store-transfer" && !r.transferStore))}
                 onClick={handleSubmitReduceRequest}
               >
                 Submit Request

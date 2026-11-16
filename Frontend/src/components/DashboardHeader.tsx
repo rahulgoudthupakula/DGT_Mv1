@@ -138,7 +138,7 @@ const subNavItems: Record<string, string[]> = {
     "Employees",
     "Week Schedule",
     "Time & Attendance",
-    "Time Off Request",
+    "My Time Off Request",
     "Time Off Approvals",
   ],
   "Payroll": [
