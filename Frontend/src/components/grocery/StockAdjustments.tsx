@@ -311,12 +311,14 @@ export const StockAdjustments = ({storeId}:{storeId:string}) => {
     setEditedItem(null);
   };
 
+  const allFilteredSelected = filteredData.length > 0 && filteredData.every(item => selectedIds.has(item.id));
   const toggleSelectAll = () => {
-    if (selectedIds.size === filteredData.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(filteredData.map(i => i.id)));
-    }
+    setSelectedIds(previous => {
+      const next = new Set(previous);
+      const remove = filteredData.length > 0 && filteredData.every(item => previous.has(item.id));
+      filteredData.forEach(item => { if (remove) next.delete(item.id); else next.add(item.id); });
+      return next;
+    });
   };
 
   const toggleSelectItem = (id: number) => {
@@ -328,7 +330,7 @@ export const StockAdjustments = ({storeId}:{storeId:string}) => {
   };
 
   const handleOpenReduceModal = () => {
-    const rows: ReduceRequestRow[] = filteredData
+    const rows: ReduceRequestRow[] = inventoryData
       .filter(i => selectedIds.has(i.id))
       .map(i => ({
         id: i.id,
@@ -479,7 +481,7 @@ export const StockAdjustments = ({storeId}:{storeId:string}) => {
               </Button>
               <Button
                 size="sm"
-                disabled={saving || !query.data?.canSubmit || reduceRows.some(r => !r.reason || r.updatedCount<0 || r.updatedCount>=r.currentCount || (r.reason === "store-to-store-transfer" && !r.transferStore))}
+                disabled={saving || !query.data?.canSubmit || reduceRows.length === 0 || reduceRows.some(r => !r.reason || r.updatedCount<0 || r.updatedCount>=r.currentCount || (r.reason === "store-to-store-transfer" && !r.transferStore))}
                 onClick={handleSubmitReduceRequest}
               >
                 Submit Request
@@ -697,7 +699,7 @@ export const StockAdjustments = ({storeId}:{storeId:string}) => {
                   {isEditMode && (
                     <TableHead className="w-10 text-center">
                       <Checkbox
-                        checked={selectedIds.size === filteredData.length && filteredData.length > 0}
+                        checked={allFilteredSelected}
                         onCheckedChange={toggleSelectAll}
                         aria-label="Select all"
                         className="h-4 w-4"
