@@ -24,7 +24,7 @@ public class FleetController {
  private ResponseStatusException bad(String s){return new ResponseStatusException(HttpStatus.BAD_REQUEST,s);}
  private ResponseStatusException conflict(String s){return new ResponseStatusException(HttpStatus.CONFLICT,s);}
  // Restrict this workflow to company administrators or active store managers.
- private void access(String store){if(a.admin(a.user(),a.company(store)))return;if(!Boolean.TRUE.equals(a.db.queryForObject("SELECT EXISTS(SELECT 1 FROM user_roles r JOIN role_types t USING(role_type_id) WHERE r.user_id=? AND r.dgt_id=? AND r.is_active AND t.is_active AND upper(t.role_type_name)='MANAGER')",Boolean.class,a.user(),store)))throw a.denied();}
+ private void access(String store){if(a.admin(a.user(),a.company(store)))return;if(!Boolean.TRUE.equals(a.db.queryForObject("SELECT EXISTS(SELECT 1 FROM user_roles r JOIN role_types t USING(role_type_id) WHERE r.user_id=? AND r.dgt_id=? AND public.role_access_active(r.is_active,r.access_ends_on,r.dgt_id) AND t.is_active AND upper(t.role_type_name)='MANAGER')",Boolean.class,a.user(),store)))throw a.denied();}
  // Check access and serialize writes with a store row lock inside the endpoint transaction.
  private void lock(String store){access(store);a.db.queryForObject("SELECT dgt_id FROM stores WHERE dgt_id=? FOR UPDATE",String.class,store);}
  private ZoneId zone(String store){return ZoneId.of(a.db.queryForObject("SELECT timezone FROM stores WHERE dgt_id=?",String.class,store));}

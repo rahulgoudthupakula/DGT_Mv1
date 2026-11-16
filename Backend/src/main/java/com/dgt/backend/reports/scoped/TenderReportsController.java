@@ -26,7 +26,7 @@ public class TenderReportsController {
  public Object get(@PathVariable String store,@RequestParam(defaultValue="card") String family,
    @RequestParam(required=false) LocalDate start,@RequestParam(required=false) LocalDate end,
    @RequestParam(required=false) LocalDate asOf){
-  if(!a.admin(a.user(),a.company(store))&&!Boolean.TRUE.equals(a.db.queryForObject("SELECT EXISTS(SELECT 1 FROM user_roles r JOIN role_types t USING(role_type_id) WHERE r.dgt_id=? AND r.user_id=? AND r.is_active AND t.is_active AND upper(t.role_type_name)='MANAGER')",Boolean.class,store,a.user())))throw a.denied();
+  if(!a.admin(a.user(),a.company(store))&&!Boolean.TRUE.equals(a.db.queryForObject("SELECT EXISTS(SELECT 1 FROM user_roles r JOIN role_types t USING(role_type_id) WHERE r.dgt_id=? AND r.user_id=? AND public.role_access_active(r.is_active,r.access_ends_on,r.dgt_id) AND t.is_active AND upper(t.role_type_name)='MANAGER')",Boolean.class,store,a.user())))throw a.denied();
   // Allow only the card or tender report families before choosing fixed SQL fragments.
   if(!Set.of("card","tender").contains(family))throw bad("Unknown report family");
   // Validate report dates against the current date in the store timezone.

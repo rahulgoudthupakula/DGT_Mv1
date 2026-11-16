@@ -30,7 +30,7 @@ public class StoreClosingController {
  public StoreClosingController(ScopedAccess a,LiveActivityController activity,ObjectMapper json,ClosingBreakdowns breakdowns,ClosingReconciliation reconciliation){this.a=a;this.activity=activity;this.json=json;this.breakdowns=breakdowns;this.reconciliation=reconciliation;}
  private ResponseStatusException bad(String message){return new ResponseStatusException(HttpStatus.BAD_REQUEST,message);}
  // Restrict closing operations to company administrators or active store managers.
- private void access(String store){if(a.admin(a.user(),a.company(store)))return;if(!Boolean.TRUE.equals(a.db.queryForObject("SELECT EXISTS(SELECT 1 FROM user_roles r JOIN role_types t USING(role_type_id) WHERE r.dgt_id=? AND r.user_id=? AND r.is_active AND t.is_active AND upper(t.role_type_name)='MANAGER')",Boolean.class,store,a.user())))throw a.denied();}
+ private void access(String store){if(a.admin(a.user(),a.company(store)))return;if(!Boolean.TRUE.equals(a.db.queryForObject("SELECT EXISTS(SELECT 1 FROM user_roles r JOIN role_types t USING(role_type_id) WHERE r.dgt_id=? AND r.user_id=? AND public.role_access_active(r.is_active,r.access_ends_on,r.dgt_id) AND t.is_active AND upper(t.role_type_name)='MANAGER')",Boolean.class,store,a.user())))throw a.denied();}
  // Resolve the timezone used to interpret this store business date.
  private ZoneId zone(String store){return ZoneId.of(a.db.queryForObject("SELECT timezone FROM stores WHERE dgt_id=?",String.class,store));}
  // Reject future business dates and dates before 1900 in the store timezone.

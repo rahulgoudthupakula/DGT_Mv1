@@ -39,7 +39,7 @@ public class EmployeePermissionService {
  // Return both inherited defaults and effective overrides so the editor can explain each choice.
   public Object get(String store,long id){
   long user=target(store,id);var result=new LinkedHashMap<String,Object>(snapshot(store,user));
-  result.put("sections",PagePermissions.SECTIONS);result.put("pages",PagePermissions.PAGES);result.put("children",PagePermissions.CHILDREN);
+  result.put("sections",PagePermissions.SECTIONS);result.put("pages",PagePermissions.PAGES);result.put("children",PagePermissions.visibleChildren());
   result.put("roleDefaults",pages.evaluate(store,user,false,false));result.put("effective",pages.evaluate(store,user,false,true));return result;
  }
 

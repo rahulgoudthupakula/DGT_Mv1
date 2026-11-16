@@ -11,7 +11,7 @@ public class EmployeePermissionRepository {
     public EmployeePermissionRepository(JdbcTemplate db) { this.db = db; }
 
     public List<Long> findEmployeeUsers(Object employeeId, Object storeId) {
-        return db.queryForList("SELECT DISTINCT e.user_id FROM employees e JOIN employee_store_assignments s USING(employee_id) JOIN users u USING(user_id) WHERE e.employee_id=? AND s.dgt_id=? AND u.account_status='ACTIVE' AND EXISTS(SELECT 1 FROM user_roles r JOIN role_types t USING(role_type_id) WHERE r.user_id=e.user_id AND r.dgt_id=s.dgt_id AND r.is_active AND t.is_active AND upper(t.role_type_name) IN ('MANAGER','CASHIER','ACCOUNTANT'))", Long.class, employeeId, storeId);
+        return db.queryForList("SELECT DISTINCT e.user_id FROM employees e JOIN employee_store_assignments s USING(employee_id) JOIN users u USING(user_id) WHERE e.employee_id=? AND s.dgt_id=? AND u.account_status='ACTIVE' AND EXISTS(SELECT 1 FROM user_roles r JOIN role_types t USING(role_type_id) WHERE r.user_id=e.user_id AND r.dgt_id=s.dgt_id AND public.role_access_active(r.is_active,r.access_ends_on,r.dgt_id) AND t.is_active AND upper(t.role_type_name) IN ('MANAGER','CASHIER','ACCOUNTANT'))", Long.class, employeeId, storeId);
     }
 
     public List<Map<String,Object>> findSnapshot(Object storeId, Object userId) {

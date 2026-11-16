@@ -31,7 +31,7 @@ public class CheckoutDiscountController {
  private String name(long uid){return a.db.queryForObject("SELECT concat_ws(' ',first_name,last_name) FROM users WHERE user_id=?",String.class,uid);}
  private boolean manager(String store,long uid){try{return Set.of("ADMIN","MANAGER").contains(a.grant(uid,store,"PRICE_BOOK",true).role());}catch(ResponseStatusException e){return false;}}
  private void access(String store){a.assigned(store);if(manager(store,a.user()))return;
- if(!Boolean.TRUE.equals(a.db.queryForObject("SELECT EXISTS(SELECT 1 FROM user_roles r JOIN role_types t USING(role_type_id) WHERE r.user_id=? AND r.dgt_id=? AND r.is_active AND t.is_active AND upper(t.role_type_name)='CASHIER')",Boolean.class,a.user(),store)))throw a.denied();}
+ if(!Boolean.TRUE.equals(a.db.queryForObject("SELECT EXISTS(SELECT 1 FROM user_roles r JOIN role_types t USING(role_type_id) WHERE r.user_id=? AND r.dgt_id=? AND public.role_access_active(r.is_active,r.access_ends_on,r.dgt_id) AND t.is_active AND upper(t.role_type_name)='CASHIER')",Boolean.class,a.user(),store)))throw a.denied();}
  private void lock(String store){a.db.queryForList("SELECT dgt_id FROM stores WHERE dgt_id=? FOR UPDATE",store);}
  // Use the store business date for date-sensitive discount rules.
  private LocalDate day(String store){return a.db.queryForObject("SELECT (CURRENT_TIMESTAMP AT TIME ZONE timezone)::date FROM stores WHERE dgt_id=?",LocalDate.class,store);}

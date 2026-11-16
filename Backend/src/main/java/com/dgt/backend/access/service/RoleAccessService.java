@@ -49,7 +49,7 @@ public class RoleAccessService {
   PagePermissions.PAGES.forEach(p->list.add(new Action(p.code(),p.label(),p.group(),p.implemented())));return list;
  }
  // Only company admins can read the role editor snapshot and its optimistic-lock versions.
-  public Object get(String store){access.requireAdmin(store);return Map.of("actions",visibleActions(),"sections",PagePermissions.SECTIONS,"pages",PagePermissions.PAGES,"children",PagePermissions.CHILDREN,"roles",repository.findRoles(),"permissions",repository.findPermissions(store).stream().map(com.dgt.backend.common.entity.Rows::normalize).toList());}
+  public Object get(String store){access.requireAdmin(store);return Map.of("actions",visibleActions(),"sections",PagePermissions.SECTIONS,"pages",PagePermissions.PAGES,"children",PagePermissions.visibleChildren(),"roles",repository.findRoles(),"permissions",repository.findPermissions(store).stream().map(com.dgt.backend.common.entity.Rows::normalize).toList());}
 
 
  // Check every incoming version before writing; order edit changes around view changes to preserve

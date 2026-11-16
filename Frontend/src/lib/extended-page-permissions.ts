@@ -674,20 +674,6 @@ export const extendedChildren = [
     "implemented": true
   },
   {
-    "code": "WORKWEEK_PAGE_WEEK_SCHEDULE_AVAILABILITY",
-    "label": "Availability",
-    "parent": "WORKWEEK_PAGE_WEEK_SCHEDULE",
-    "tab": "availability",
-    "implemented": true
-  },
-  {
-    "code": "WORKWEEK_PAGE_WEEK_SCHEDULE_COVERAGE",
-    "label": "Shift Swaps & Coverage",
-    "parent": "WORKWEEK_PAGE_WEEK_SCHEDULE",
-    "tab": "coverage",
-    "implemented": false
-  },
-  {
     "code": "WORKWEEK_PAGE_TIME_OFF_APPROVALS_PENDING",
     "label": "Pending",
     "parent": "WORKWEEK_PAGE_TIME_OFF_APPROVALS",
