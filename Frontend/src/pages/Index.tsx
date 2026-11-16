@@ -127,7 +127,7 @@ const Index = ({ onLogout }: { onLogout: () => void }) => {
   const [selectedStoreId, setSelectedStoreId] = useState<string>(initial?.selectedStoreId ?? "");
 
   const storeAccess = useStoreAccess(selectedStoreId);
-  const connectedPage = (!activeProfilePage && activeNav === "Lottery" && ["Received and confirm delivery","Verify and activate packs","Day/shift closing","Settle and return packs","Games","Pack history","Settings"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Sales and Performance Reports" && activeSubNav === "POS report") || (!activeProfilePage && activeNav === "Tender Types" && ["Credit card","EBT/Foodstamps","Fleet cards","Reports"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Everyday Closing Reports" && ["Dashboard","Store","Reports"].includes(activeSubNav??"")) || showLiveCounter || !showLiveCounter && ((!activeProfilePage && activeNav === "Gas" && ["Dashboard","Settings","Delivery","Gas price","Inventory adjustment","Tank report"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Grocery" && ["Dashboard","Purchase Orders","Customized order guide","Edit & view invoices","Inventory adjustment","Settings","Reports"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Inventory Valuation" && activeSubNav === "Current stock") || (!activeProfilePage && activeNav === "Price Book" && ["Statistics","New arrivals","Items","Vendor management","Rebate management","Promotions","Discounts","Bulk update","Price groups","Inventory by item (current stock)"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Workweek" && ["Employees","Week Schedule","Time Off Request","Time Off Approvals"].includes(activeSubNav??"")) || ["POS Settings","Support & Training","Manage Stores","Store Account Overview","Access & Integrations","User Profile Management","Subscriptions & Billing"].includes(activeProfilePage ?? ""));
+  const connectedPage = (!activeProfilePage && activeNav === "Lottery" && ["Received and confirm delivery","Verify and activate packs","Day/shift closing","Settle and return packs","Games","Pack history","Settings"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Sales and Performance Reports" && activeSubNav === "POS report") || (!activeProfilePage && activeNav === "Tender Types" && ["Credit card","EBT/Foodstamps","Fleet cards","Reports"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Everyday Closing Reports" && ["Dashboard","Store","Reports"].includes(activeSubNav??"")) || showLiveCounter || !showLiveCounter && ((!activeProfilePage && activeNav === "Gas" && ["Dashboard","Settings","Delivery","Gas price","Inventory adjustment","Tank report"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Grocery" && ["Dashboard","Purchase Orders","Customized order guide","Edit & view invoices","Inventory adjustment","Settings","Reports"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Inventory Valuation" && activeSubNav === "Current stock") || (!activeProfilePage && activeNav === "Price Book" && ["Statistics","New arrivals","Items","Vendor management","Rebate management","Promotions","Discounts","Bulk update","Price groups","Inventory by item (current stock)"].includes(activeSubNav??"")) || (!activeProfilePage && activeNav === "Workweek" && ["Employees","Week Schedule","My Time Off Request","Time Off Approvals"].includes(activeSubNav??"")) || ["POS Settings","Support & Training","Manage Stores","Store Account Overview","Access & Integrations","User Profile Management","Subscriptions & Billing"].includes(activeProfilePage ?? ""));
   const governedPage = !activeProfilePage && !showLiveCounter;
   const pageAccessPending = governedPage && storeAccess.isPending;
   const pageAccessDenied = governedPage && !storeAccess.isPending && !canNavigatePage(storeAccess.data,activeNav,activeSubNav);
@@ -468,7 +468,7 @@ const Index = ({ onLogout }: { onLogout: () => void }) => {
   const showPayrollEmployees = activeNav === "Workweek" && activeSubNav === "Employees";
   const showPayrollWeekSchedule = activeNav === "Workweek" && activeSubNav === "Week Schedule";
   const showPayrollTime = activeNav === "Workweek" && activeSubNav === "Time & Attendance";
-  const showTimeOffRequest = activeNav === "Workweek" && activeSubNav === "Time Off Request";
+  const showTimeOffRequest = activeNav === "Workweek" && activeSubNav === "My Time Off Request";
   const showTimeOffApprovals = activeNav === "Workweek" && activeSubNav === "Time Off Approvals";
   const showPayrollRun = activeNav === "Payroll" && activeSubNav === "Run Payroll";
   const showPayrollPaystubs = activeNav === "Payroll" && activeSubNav === "Paystubs";
@@ -669,7 +669,7 @@ const Index = ({ onLogout }: { onLogout: () => void }) => {
           ) : showPayrollWeekSchedule ? (
             <WorkforcePage key={selectedStoreId+"schedule"} storeId={selectedStoreId} />
           ) : showPayrollTime ? (
-            <PayrollTimeAttendance />
+            <PayrollTimeAttendance key={selectedStoreId} storeId={selectedStoreId} />
           ) : showTimeOffRequest ? (
             <WorkforcePage key={selectedStoreId+"requests"} storeId={selectedStoreId} view="requests" />
           ) : showTimeOffApprovals ? (

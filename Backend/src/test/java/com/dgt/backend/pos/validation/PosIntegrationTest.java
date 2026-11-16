@@ -44,7 +44,7 @@ class PosIntegrationTest {
   employee=db.queryForObject("INSERT INTO employees(hire_date,employee_type,first_name,last_name) VALUES ('2020-01-01','FULL_TIME','POS','Test') RETURNING employee_id",Long.class);
   db.update("INSERT INTO employee_store_assignments(employee_id,dgt_id,effective_from) VALUES (?,?,'2020-01-01')",employee,store);
   long dept=db.queryForObject("SELECT department_id FROM departments LIMIT 1",Long.class);
-  long sd=db.queryForObject("INSERT INTO store_departments(dgt_id,department_id,source_type,store_department_name) VALUES (?,?,'DEFAULT','POS') RETURNING store_department_id",Long.class,store,dept);
+  long sd=db.queryForObject("INSERT INTO store_departments(dgt_id,department_id,source_type,store_department_name) VALUES (?,?,'DEFAULT','POS') ON CONFLICT(dgt_id,department_id) DO UPDATE SET store_department_name=excluded.store_department_name RETURNING store_department_id",Long.class,store,dept);
   long sub=db.queryForObject("INSERT INTO store_sub_departments(dgt_id,store_department_id,store_sub_department_name) VALUES (?,?,'POS') RETURNING store_sub_department_id",Long.class,store,sd);
   product=db.queryForObject("INSERT INTO products(dgt_id,store_sub_department_id,product_name,product_sku) VALUES (?,?,'POS item','POS-ITEM') RETURNING product_id",Long.class,store,sub);
   db.update("INSERT INTO product_barcodes(dgt_id,product_id,product_barcode_type,product_barcode_value) VALUES (?,?,'UPC','00001')",store,product);
@@ -101,4 +101,21 @@ class PosIntegrationTest {
   }assertEquals(before+1,db.queryForObject("SELECT count(*) FROM sales",Long.class));}finally{Files.deleteIfExists(config);}
  }
  @AfterAll void cleanup()throws Exception{try(var c=DriverManager.getConnection(URL,USER,PASSWORD);var s=c.createStatement()){s.execute("DROP SCHEMA IF EXISTS "+SCHEMA+" CASCADE");}}
+ @Test void attendanceRetriesCompletionAndOverlapAreSafe() throws Exception {
+  String ref=UUID.randomUUID().toString();String source="VERIFONE_COMMANDER_SIMULATOR";
+  var start=java.time.OffsetDateTime.parse("2026-02-01T09:00:00-05:00");
+  var open=new com.dgt.backend.attendance.AttendanceIngestion.Entry(1,store,source,ref,"C",start,null);
+  try {
+   assertEquals(200,call("/pos/time-entries","Bearer "+key,open).statusCode());
+   assertEquals("DUPLICATE",json.readTree(call("/pos/time-entries","Bearer "+key,open).body()).path("outcome").asText());
+   var closed=new com.dgt.backend.attendance.AttendanceIngestion.Entry(1,store,source,ref,"C",start,start.plusHours(8));
+   assertEquals(200,call("/pos/time-entries","Bearer "+key,closed).statusCode());
+   assertEquals("DUPLICATE",json.readTree(call("/pos/time-entries","Bearer "+key,closed).body()).path("outcome").asText());
+   assertEquals(409,call("/pos/time-entries","Bearer "+key,open).statusCode());
+   assertEquals(409,call("/pos/time-entries","Bearer "+key,new com.dgt.backend.attendance.AttendanceIngestion.Entry(1,store,source,ref+"overlap","C",start.plusHours(1),start.plusHours(2))).statusCode());
+   assertEquals(422,call("/pos/time-entries","Bearer "+key,new com.dgt.backend.attendance.AttendanceIngestion.Entry(1,store,source,ref+"unknown","UNKNOWN",start,start.plusHours(1))).statusCode());
+   assertEquals(403,call("/pos/time-entries","Bearer "+key,new com.dgt.backend.attendance.AttendanceIngestion.Entry(1,other,source,ref,"C",start,start.plusHours(1))).statusCode());
+  } finally { db.update("DELETE FROM employee_time_entries WHERE source_entry_id=?",ref); }
+ }
+
 }

@@ -13,8 +13,9 @@ import tools.jackson.databind.*;
 // Connector-only API; authentication supplies a store-bound PosIdentity.
 @RestController @RequestMapping("/api/v1/pos")
 public class PosController {
+ private final com.dgt.backend.attendance.AttendanceIngestion attendance;
  private final PosIngestionService service;private final JdbcTemplate db;private final ObjectMapper json;
- public PosController(PosIngestionService service,JdbcTemplate db,ObjectMapper json){this.service=service;this.db=db;this.json=json;}
+ public PosController(PosIngestionService service,JdbcTemplate db,ObjectMapper json,com.dgt.backend.attendance.AttendanceIngestion attendance){this.attendance=attendance;this.service=service;this.db=db;this.json=json;}
  // Use the authenticated connector identity rather than trusting a submitted store ID.
  private PosIdentity identity(Authentication a){return (PosIdentity)a.getPrincipal();}
  // Allow only named contract fields, including nested item/payment records, before deserialization.
@@ -33,6 +34,12 @@ public class PosController {
   try{transaction=json.treeToValue(body,PosTransaction.class);}catch(Exception e){throw new org.springframework.web.server.ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,"Invalid transaction format");}
   var result=service.ingest(identity(auth),transaction,false);
   return ResponseEntity.status(result.outcome().equals("ACCEPTED")?201:result.outcome().equals("HELD")?202:200).body(result);
+ }
+ @PostMapping("/time-entries") public ResponseEntity<?> timeEntry(Authentication auth,@RequestBody JsonNode body){
+  fields(body,com.dgt.backend.attendance.AttendanceIngestion.Entry.class);
+  com.dgt.backend.attendance.AttendanceIngestion.Entry entry;
+  try{entry=json.treeToValue(body,com.dgt.backend.attendance.AttendanceIngestion.Entry.class);}catch(Exception e){throw new org.springframework.web.server.ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,"Invalid attendance format");}
+  return ResponseEntity.ok(attendance.ingest(identity(auth),entry));
  }
  // Return the authenticated connector configuration without returning its credential hash.
  @GetMapping("/configuration") public Object configuration(Authentication a){return db.queryForMap("SELECT dgt_id AS \"dgtId\",source_system AS \"sourceSystem\",schedule_minutes AS \"scheduleMinutes\" FROM pos_connectors WHERE connector_id=? AND active",identity(a).id());}

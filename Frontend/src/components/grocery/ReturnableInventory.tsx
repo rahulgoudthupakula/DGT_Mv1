@@ -10,7 +10,7 @@ import { DepartmentFilter } from "@/components/shared/DepartmentFilter";
  */
 import {useQuery} from '@tanstack/react-query';
 import {request} from '@/lib/backend';
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Search, Package, Upload, FileText, Send, Clock, Check, CreditCard, X, Printer, AlertCircle } from "lucide-react";
 import { loadApprovals } from "@/lib/approvalsStore";
 import { usePagination } from "@/hooks/use-pagination";
@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarIcon } from "lucide-react";
@@ -49,6 +50,8 @@ interface InventoryItem {
   itemName: string;
   vendor: string;
   vendorNames?: string[];
+  primaryVendorId?: number|null;
+  vendorIds?: number[];
   department?: string;
   currentStock: number;
   returnQty: number;
@@ -111,10 +114,12 @@ const mockInventoryItems: InventoryItem[] = [
 
 const departments = ["All Departments", "Dairy", "Bakery", "Beverages", "Snacks", "Frozen", "Produce"];
 const vendors = ["All Vendors", "Dairy Fresh Co", "Baker's Best", "Citrus Grove", "Snack World", "Fresh Farms"];
-const returnReasons = ["Expired (vendor returnable)", "Damaged in transit", "Vendor recall"];
+const returnReasons = ["Expired (vendor returnable)", "Damaged (vendor returnable)", "Vendor Recall"];
+const suggestedReason=(reason:string)=>({'expired-returnable':returnReasons[0],'damaged-returnable':returnReasons[1],'vendor-recall':returnReasons[2]}[reason]??reason);
+type ReturnDraft={requestId:string;itemName:string;scanCode:string;returnQty:number;netCost:number;reason:string};
 const returnMethods = ["Pickup", "Drop-off", "Credit without return"];
 
-type ReturnStatus = "draft" | "pending" | "sent" | "credit_received" | "closed";
+type ReturnStatus = "pending" | "credit_received";
 
 interface ReturnRecord {
   id: string;
@@ -152,36 +157,43 @@ const loadApprovedReturnables = (): InventoryItem[] =>
 export const ReturnableInventory = ({storeId}:{storeId:string}) => {
   const approved=useQuery({queryKey:['reductions',storeId],...stockRefreshOptions,queryFn:()=>request<{requests:any[];items:any[]}>(`/access/stores/${encodeURIComponent(storeId)}/reductions`)});
   const slipPath=`/access/stores/${encodeURIComponent(storeId)}/reductions/return-slips`;
-  const slips=useQuery({queryKey:['return-slips',storeId],...stockRefreshOptions,queryFn:()=>request<{returns:any[];vendors:{vendor_id:number;vendor_name:string}[];canManage:boolean}>(slipPath)});
-  const [saving,setSaving]=useState(false),[error,setError]=useState('');
+  const slips=useQuery({queryKey:['return-slips',storeId],...stockRefreshOptions,queryFn:()=>request<{returns:any[];vendors:{vendor_id:number;vendor_name:string}[];canManage:boolean;timezone:string}>(slipPath)});
+  const [saving,setSaving]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');
   const [openSlipId,setOpenSlipId]=useState<string|null>(null);
   const [scanCode, setScanCode] = useState("");
   const [itemName, setItemName] = useState("");
-  const [selectedVendor, setSelectedVendor] = useState<string[]>([]);
   const [selectedDepartment, setSelectedDepartment] = useState<string[]>([]);
   const [date, setDate] = useState<Date>();
+  const [trackingFrom,setTrackingFrom]=useState(''),[trackingTo,setTrackingTo]=useState('');
 
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const [selectionVendorId,setSelectionVendorId]=useState('');
 
   useEffect(() => {
-    setInventoryItems((approved.data?.requests??[]).filter(r=>r.status==='APPROVED'&&r.route==='returnable').map(r=>{const item=approved.data?.items.find(i=>Number(i.id)===Number(r.product_id));return {id:String(r.reduction_request_id),scanCode:r.product_sku,itemName:r.product_name,vendor:item?.vendor??'',vendorNames:item?.vendorNames??[item?.vendor??''],department:item?.department??'',currentStock:Number(item?.inventoryCount??0),returnQty:Number(r.quantity),netCost:Number(item?.netCost??0),reason:r.reason};}));
-  }, [approved.data]);
-  const vendors=['All Vendors',...(slips.data?.vendors??[]).map(v=>v.vendor_name)];
-  const [selectedItems, setSelectedItems] = useState<string[]>([]);
+    // A reduction is ready for return only until its paperwork has been created.
+    if(!approved.data||!slips.data){setInventoryItems([]);return;}
+    const createdReturns=new Set(slips.data.returns.flatMap(record=>[record.reduction_request_id,...(record.items??[]).map((item:any)=>item.reduction_request_id)].filter(id=>id!=null).map(String)));
+    const waitingItems:InventoryItem[]=(approved.data.requests??[]).filter(r=>r.status==='APPROVED'&&r.route==='returnable'&&!createdReturns.has(String(r.reduction_request_id))).map(r=>{const item=approved.data.items.find(i=>Number(i.id)===Number(r.product_id));return {id:String(r.reduction_request_id),scanCode:r.product_sku,itemName:r.product_name,vendor:item?.vendor??'',vendorNames:item?.vendorNames??[item?.vendor??''],department:item?.department??'',currentStock:Number(item?.inventoryCount??0),returnQty:Number(r.quantity),netCost:Number(item?.netCost??0),reason:r.reason,primaryVendorId:item?.primaryVendorId??null,vendorIds:(item?.vendorIds??[]).map(Number)};});
+    setInventoryItems(waitingItems);
+    setSelectedItems(previous=>previous.filter(id=>waitingItems.some(item=>item.id===id)));
+  }, [approved.data,slips.data]);
 
   // Return details
-  const [returnReason, setReturnReason] = useState("");
+  const [returnDrafts,setReturnDrafts]=useState<ReturnDraft[]>([]);
+  const [showReturnDetails,setShowReturnDetails]=useState(false);
+  const detailsRef=useRef<HTMLDivElement>(null);
   const [returnMethod, setReturnMethod] = useState("");
-  const [returnVendorName, setReturnVendorName] = useState("");
   const [rmaNumber, setRmaNumber] = useState("");
   const [notes, setNotes] = useState("");
 
   // Return slip modal
   const [showReturnSlip, setShowReturnSlip] = useState(false);
   const [currentReturnSlip, setCurrentReturnSlip] = useState<ReturnRecord | null>(null);
+  const [creditConfirmation,setCreditConfirmation]=useState<ReturnRecord|null>(null);
 
   // Return records for status tracking
-  const returnRecords:ReturnRecord[]=(slips.data?.returns??[]).map(r=>({id:String(r.return_id),vendorName:r.vendor_name,reason:r.items?.[0]?.reason??'',method:r.return_type,rmaNumber:r.reference_number??'',status:r.status.toLowerCase() as ReturnStatus,createdAt:new Date(r.created_at),items:(r.items??[]).map((i:any)=>({id:String(i.return_item_id),scanCode:i.product_sku,itemName:i.product_name,vendor:r.vendor_name,currentStock:0,returnQty:Number(i.qty),netCost:Number(i.unit_cost),reason:i.reason})),totalCredit:(r.items??[]).reduce((n:number,i:any)=>n+Number(i.qty)*Number(i.unit_cost),0)}));
+  const returnRecords:ReturnRecord[]=(slips.data?.returns??[]).map(r=>({id:String(r.return_id),vendorName:r.vendor_name,reason:[...new Set((r.items??[]).map((item:any)=>item.reason).filter(Boolean))].join(', '),method:r.return_type,rmaNumber:r.reference_number??'',status:(['CLOSED','CREDIT_RECEIVED'].includes(r.status)?'credit_received':'pending') as ReturnStatus,createdAt:new Date(r.created_at),items:(r.items??[]).map((i:any)=>({id:String(i.return_item_id),scanCode:i.product_sku,itemName:i.product_name,vendor:r.vendor_name,currentStock:0,returnQty:Number(i.qty),netCost:Number(i.unit_cost),reason:i.reason})),totalCredit:(r.items??[]).reduce((n:number,i:any)=>n+Number(i.qty)*Number(i.unit_cost),0)}));
 
   useEffect(()=>{if(openSlipId){const record=returnRecords.find(r=>r.id===openSlipId);if(record){setCurrentReturnSlip(record);setShowReturnSlip(true);setOpenSlipId(null);}}},[openSlipId,slips.data]);
   const handleReturnQtyChange = (id: string, qty: number) => {
@@ -198,59 +210,51 @@ export const ReturnableInventory = ({storeId}:{storeId:string}) => {
     );
   };
 
-  const toggleItemSelection = (id: string) => {
-    setSelectedItems((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
-    );
+  const linkedToVendor=(item:InventoryItem,vendorId:string)=>!!vendorId&&(item.vendorIds??[]).includes(Number(vendorId));
+  const canSelectItem=(item:InventoryItem)=>selectedItems.includes(item.id)||(!saving&&!showReturnDetails&&(selectionVendorId?linkedToVendor(item,selectionVendorId):selectedItems.length===0&&(item.vendorIds?.length??0)>0));
+  const changeReturnVendor=(vendorId:string)=>{
+    setSelectionVendorId(vendorId);setSelectedItems(previous=>previous.filter(id=>inventoryItems.some(item=>item.id===id&&linkedToVendor(item,vendorId))));setReturnDrafts([]);setShowReturnDetails(false);setError('');
   };
-
-  // Create the vendor paperwork from an already approved reduction rather than reducing stock again.
-  const handleCreateReturn = async () => {
+  const clearReturnSelection=()=>{setSelectedItems([]);setSelectionVendorId('');setReturnDrafts([]);setShowReturnDetails(false);setError('');};
+  const toggleItemSelection=(id:string)=>{
+    if(saving||showReturnDetails)return;
+    const item=inventoryItems.find(item=>item.id===id);if(!item)return;
+    if(selectedItems.includes(id)){const next=selectedItems.filter(value=>value!==id);setSelectedItems(next);if(!next.length)setSelectionVendorId('');return;}
+    if(!canSelectItem(item))return;
+    if(!selectedItems.length&&!selectionVendorId)setSelectionVendorId(item.primaryVendorId!=null?String(item.primaryVendorId):item.vendorIds?.length===1?String(item.vendorIds[0]):'');
+    setSelectedItems(previous=>[...previous,id]);setError('');
+  };
+  const startReturnProcess=()=>{
+    const items=inventoryItems.filter(item=>selectedItems.includes(item.id));if(!items.length)return;
+    if(!selectionVendorId||items.some(item=>!linkedToVendor(item,selectionVendorId))){setError('Choose one vendor linked to every selected item.');return;}
+    setError('');setMessage('');setReturnMethod('');setRmaNumber('');setNotes('');
+    setReturnDrafts(items.map(item=>({requestId:item.id,itemName:item.itemName,scanCode:item.scanCode,returnQty:item.returnQty,netCost:item.netCost,reason:suggestedReason(item.reason)})));
+    setShowReturnDetails(true);
+  };
+  useEffect(()=>{if(showReturnDetails)detailsRef.current?.scrollIntoView({behavior:'smooth',block:'start'});},[showReturnDetails,returnDrafts.length]);
+  const handleCreateReturn=async()=>{
     if(saving)return;
-    if(selectedItems.length!==1){setError('Select one approved item for this return slip.');return;}
-    const existing=slips.data?.returns.find(r=>String(r.reduction_request_id)===selectedItems[0]);if(existing){setOpenSlipId(String(existing.return_id));return;}
-    const vendor=slips.data?.vendors.find(v=>v.vendor_name===returnVendorName);
-    if(!vendor||!returnReason||!returnMethod){setError('Choose vendor, reason and return method.');return;}
+    if(!returnDrafts.length||!returnMethod||!selectionVendorId||returnDrafts.some(row=>!row.reason)){setError('Choose a vendor, return method and reason for each item.');return;}
     setSaving(true);setError('');
-    try{const saved=await request<{id:number}>(slipPath,{method:'POST',body:JSON.stringify({requestId:Number(selectedItems[0]),vendorId:vendor.vendor_id,reason:returnReason,method:returnMethod,reference:rmaNumber})});await slips.refetch();setOpenSlipId(String(saved.id));}
-    catch(e){setError(e instanceof Error?e.message:'Could not save return');}finally{setSaving(false);}
+    try{
+      const saved=await request<{id:number}>(`${slipPath}/group`,{method:'POST',body:JSON.stringify({vendorId:Number(selectionVendorId),method:returnMethod,reference:rmaNumber,items:returnDrafts.map(row=>({requestId:Number(row.requestId),reason:row.reason}))})});
+      await slips.refetch();clearReturnSelection();setOpenSlipId(String(saved.id));
+    }catch(e){setError(e instanceof Error?e.message:'Could not save the return');}finally{setSaving(false);}
   };
-  const updateStatus=async(id:string,status:string)=>{if(saving)return;setSaving(true);setError('');try{await request(`${slipPath}/${id}/status`,{method:'POST',body:JSON.stringify({status})});await slips.refetch();}catch(e){setError(String(e));}finally{setSaving(false);}};
+  const updateStatus=async(id:string,status:string)=>{if(saving)return;setSaving(true);setError('');try{await request(`${slipPath}/${id}/status`,{method:'POST',body:JSON.stringify({status})});await slips.refetch();return true;}catch(e){setError(e instanceof Error?e.message:'Could not record credit received.');return false;}finally{setSaving(false);}};
 
-  const getStatusBadge = (status: ReturnStatus) => {
-    const styles: Record<ReturnStatus, string> = {
-      draft: "bg-muted text-muted-foreground border-border",
-      pending: "bg-yellow-100 text-yellow-800 border-yellow-200",
-      sent: "bg-blue-100 text-blue-800 border-blue-200",
-      credit_received: "bg-green-100 text-green-800 border-green-200",
-      closed: "bg-gray-100 text-gray-800 border-gray-200",
-    };
-    const labels: Record<ReturnStatus, string> = {
-      draft: "Draft",
-      pending: "Pending",
-      sent: "Sent",
-      credit_received: "Credit Received",
-      closed: "Closed",
-    };
-    const icons: Record<ReturnStatus, JSX.Element> = {
-      draft: <FileText className="w-3 h-3" />,
-      pending: <Clock className="w-3 h-3" />,
-      sent: <Send className="w-3 h-3" />,
-      credit_received: <CreditCard className="w-3 h-3" />,
-      closed: <Check className="w-3 h-3" />,
-    };
-    return (
-      <Badge variant="outline" className={cn("flex items-center gap-1", styles[status])}>
-        {icons[status]}
-        {labels[status]}
-      </Badge>
-    );
+  const getStatusBadge=(status:ReturnStatus)=><Badge variant="outline" className={cn("inline-flex items-center gap-1",status==='credit_received'?"bg-green-100 text-green-800 border-green-200":"bg-yellow-100 text-yellow-800 border-yellow-200")}>{status==='credit_received'?<CreditCard className="w-3 h-3"/>:<Clock className="w-3 h-3"/>}{status==='credit_received'?'Credit Received':'Pending'}</Badge>;
+  const trackingDate=(date:Date)=>{
+    const parts=new Intl.DateTimeFormat('en-US',{timeZone:slips.data?.timezone??'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(date);
+    return ['year','month','day'].map(type=>parts.find(part=>part.type===type)?.value??'').join('-');
   };
+  const invalidTrackingRange=!!trackingFrom&&!!trackingTo&&trackingFrom>trackingTo;
+  const trackingRecords=returnRecords.filter(record=>{const created=trackingDate(record.createdAt);return !invalidTrackingRange&&(!trackingFrom||created>=trackingFrom)&&(!trackingTo||created<=trackingTo);});
 
   const filteredItems = inventoryItems.filter((item) => {
     const matchesScanCode = !scanCode || item.scanCode.includes(scanCode);
     const matchesItemName = !itemName || item.itemName.toLowerCase().includes(itemName.toLowerCase());
-    const matchesVendor = matchesFilter(selectedVendor,item.vendorNames??[item.vendor]);
+    const matchesVendor = !selectionVendorId || linkedToVendor(item,selectionVendorId);
     return matchesScanCode && matchesItemName && matchesVendor && (matchesFilter(selectedDepartment,item.department));
   });
 
@@ -264,7 +268,16 @@ export const ReturnableInventory = ({storeId}:{storeId:string}) => {
 
   return (
     <div className="space-y-6">
-      {(error||slips.error)&&<p role="status">{error||String(slips.error)}</p>}
+      {(error||slips.error)&&<p role="alert" className="text-sm text-destructive">{error||String(slips.error)}</p>}
+      {message&&<p role="status" className="text-sm text-success">{message}</p>}
+      <Dialog open={!!creditConfirmation} onOpenChange={open=>{if(!open&&!saving){setCreditConfirmation(null);setError('');}}}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>Confirm Credit Received</DialogTitle><DialogDescription>Confirm that you received the vendor credit. This closes the return automatically and keeps it in tracking.</DialogDescription></DialogHeader>
+          {creditConfirmation&&<div className="rounded-lg border bg-muted/20 p-3 space-y-2 text-sm"><p><span className="text-muted-foreground">Return:</span> #{creditConfirmation.id}</p><p><span className="text-muted-foreground">Vendor:</span> {creditConfirmation.vendorName}</p><p className="flex items-center justify-between gap-3"><span className="text-muted-foreground">Expected credit</span><span className="font-semibold text-green-500">${creditConfirmation.totalCredit.toFixed(2)}</span></p></div>}
+          {error&&<p role="alert" className="text-sm text-destructive">{error}</p>}
+          <DialogFooter><Button variant="outline" disabled={saving} onClick={()=>{setCreditConfirmation(null);setError('');}}>Cancel</Button><Button disabled={saving||!slips.data?.canManage} onClick={async()=>{if(creditConfirmation&&await updateStatus(creditConfirmation.id,'CREDIT_RECEIVED'))setCreditConfirmation(null);}}>{saving?'Saving…':'Confirm Credit Received'}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
       {/* Return Slip Modal */}
       {showReturnSlip && currentReturnSlip && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -315,7 +328,7 @@ export const ReturnableInventory = ({storeId}:{storeId:string}) => {
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground uppercase tracking-wide">Status</p>
-                    {getStatusBadge("draft")}
+                    {getStatusBadge(currentReturnSlip.status)}
                   </div>
                 </div>
               </div>
@@ -442,7 +455,8 @@ export const ReturnableInventory = ({storeId}:{storeId:string}) => {
               <Label className="text-xs">
                 Vendor <span className="text-destructive">*</span>
               </Label>
-              <SearchMultiFilter storeId={storeId} filterType="vendor" values={selectedVendor} onValuesChange={setSelectedVendor} options={vendors.filter(name=>name!=="All Vendors").map(name=>({value:name,label:name}))} allLabel="All Vendors" className="h-9 text-sm" />
+              <SearchMultiFilter storeId={storeId} filterType="vendor" singleSelect disabled={saving} values={selectionVendorId?[selectionVendorId]:[]} onValuesChange={values=>changeReturnVendor(values[0]??'')} options={(slips.data?.vendors??[]).map(vendor=>({value:String(vendor.vendor_id),label:vendor.vendor_name}))} allLabel="All Vendors" className="h-9 text-sm" />
+              <p className="text-xs text-muted-foreground">Filters items and sets the vendor for this return.</p>
             </div>
 
             <div className="space-y-1.5">
@@ -456,10 +470,13 @@ export const ReturnableInventory = ({storeId}:{storeId:string}) => {
 
       {/* Inventory Table */}
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Inventory Items</CardTitle>
+        <CardHeader className="pb-3 flex-row items-center justify-between flex-wrap gap-2">
+          <div><CardTitle className="text-base">Inventory Items</CardTitle><p className="text-sm text-muted-foreground mt-1">Items waiting for a return slip. Created returns are shown in Return Status Tracking below.</p></div>
+          <div className="flex items-center gap-2 flex-wrap"><Button variant="outline" disabled={saving||(!selectionVendorId&&!selectedItems.length)} onClick={clearReturnSelection}>Clear Selection</Button><Button disabled={!selectedItems.length||!selectionVendorId||saving||!slips.data||showReturnDetails} onClick={startReturnProcess}>Start Return Process</Button></div>
         </CardHeader>
         <CardContent>
+          {selectionVendorId&&<p className="text-sm text-muted-foreground mb-3">Only items linked to {(slips.data?.vendors??[]).find(vendor=>String(vendor.vendor_id)===selectionVendorId)?.vendor_name??'the selected vendor'} can be selected for this return.</p>}
+          {selectedItems.length>0&&!selectionVendorId&&<p className="text-sm text-destructive mb-3">Choose a vendor in Filters before selecting more items.</p>}
           <div className="rounded-md border overflow-x-auto">
             <Table>
               <TableHeader>
@@ -468,11 +485,9 @@ export const ReturnableInventory = ({storeId}:{storeId:string}) => {
                     <input
                       type="checkbox"
                       className="rounded border-input"
-                      onChange={(e) => {
-                        if (e.target.checked) setSelectedItems(filteredItems.map((i) => i.id));
-                        else setSelectedItems([]);
-                      }}
-                      checked={selectedItems.length === filteredItems.length && filteredItems.length > 0}
+                      disabled={!selectionVendorId||saving||showReturnDetails}
+                      onChange={e=>{const eligible=filteredItems.filter(item=>linkedToVendor(item,selectionVendorId));const next=e.target.checked?[...new Set([...selectedItems,...eligible.map(item=>item.id)])]:selectedItems.filter(id=>!eligible.some(item=>item.id===id));setSelectedItems(next);if(!next.length)setSelectionVendorId('');}}
+                      checked={!!selectionVendorId&&filteredItems.some(item=>linkedToVendor(item,selectionVendorId))&&filteredItems.filter(item=>linkedToVendor(item,selectionVendorId)).every(item=>selectedItems.includes(item.id))}
                     />
                   </TableHead>
                   <TableHead className="text-xs font-semibold">Scan Code</TableHead>
@@ -486,6 +501,7 @@ export const ReturnableInventory = ({storeId}:{storeId:string}) => {
                 </TableRow>
               </TableHeader>
               <TableBody>
+                {paginatedReturnable.length===0&&<TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">{approved.isPending||slips.isPending?'Loading returnable items…':inventoryItems.length?'No items match the current filters.':'No items are waiting for a return slip.'}</TableCell></TableRow>}
                 {paginatedReturnable.map((item) => (
                   <TableRow key={item.id} className="hover:bg-muted/30">
                     <TableCell>
@@ -493,6 +509,8 @@ export const ReturnableInventory = ({storeId}:{storeId:string}) => {
                         type="checkbox"
                         className="rounded border-input"
                         checked={selectedItems.includes(item.id)}
+                        disabled={saving||showReturnDetails||!canSelectItem(item)}
+                        title={!(item.vendorIds?.length)?'Link an active vendor to this item before returning it.':!canSelectItem(item)?'This item is not linked to the selected return vendor.':undefined}
                         onChange={() => toggleItemSelection(item.id)}
                       />
                     </TableCell>
@@ -540,43 +558,25 @@ export const ReturnableInventory = ({storeId}:{storeId:string}) => {
       </Card>
 
       {/* Return Details */}
-      <Card>
+      {showReturnDetails&&<div ref={detailsRef} className="space-y-4 scroll-mt-4"><Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Return Details</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            <div className="space-y-1.5">
-              <Label className="text-xs">
-                Vendor Name <span className="text-destructive">*</span>
-              </Label>
-              <Select value={returnVendorName} onValueChange={setReturnVendorName}>
-                <SelectTrigger className="h-9 text-sm">
-                  <SelectValue placeholder="Select vendor" />
-                </SelectTrigger>
-                <SelectContent>
-                  {vendors.filter(v => v !== "All Vendors").map((vendor) => (
-                    <SelectItem key={vendor} value={vendor}>{vendor}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">
-                Reason <span className="text-destructive">*</span>
-              </Label>
-              <Select value={returnReason} onValueChange={setReturnReason}>
-                <SelectTrigger className="h-9 text-sm">
-                  <SelectValue placeholder="Select reason" />
-                </SelectTrigger>
-                <SelectContent>
-                  {returnReasons.map((reason) => (
-                    <SelectItem key={reason} value={reason}>{reason}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <p className="text-sm text-muted-foreground mb-4">{returnDrafts.length} selected item(s). Review the selected vendor and items. All selected items will be included in one return slip under one RMA.</p>
+          {!slips.data?.canManage&&<p className="text-sm text-muted-foreground mb-4">A manager or administrator with return-management access must create the return slips.</p>}
 
+          <section className="mb-6 space-y-4" aria-label="Return items">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Return Items</h3>
+            <div className="rounded-xl border overflow-x-auto">
+              <Table className="min-w-[680px]">
+                <TableHeader><TableRow className="bg-muted/30">{['Scan Code','Item Name','Vendor','Return Qty','Net Cost','Credit','Reason'].map(label=><TableHead key={label} className={`px-4 py-3 font-semibold ${['Return Qty','Net Cost','Credit'].includes(label)?'text-right':''}`}>{label}</TableHead>)}</TableRow></TableHeader>
+                <TableBody>{returnDrafts.map(row=><TableRow key={row.requestId} className="odd:bg-muted/20"><TableCell className="px-4 py-5 font-mono text-sm">{row.scanCode||'—'}</TableCell><TableCell className="px-4 py-5 font-semibold">{row.itemName}</TableCell><TableCell className="px-4 py-5">{(slips.data?.vendors??[]).find(vendor=>String(vendor.vendor_id)===selectionVendorId)?.vendor_name??'—'}</TableCell><TableCell className="px-4 py-5 text-right">{row.returnQty}</TableCell><TableCell className="px-4 py-5 text-right whitespace-nowrap">${row.netCost.toFixed(2)}</TableCell><TableCell className="px-4 py-5 text-right font-semibold text-green-500 whitespace-nowrap">${(row.returnQty*row.netCost).toFixed(2)}</TableCell><TableCell className="px-4 py-5">{row.reason}</TableCell></TableRow>)}</TableBody>
+              </Table>
+            </div>
+            <div className="ml-auto w-fit min-w-60 max-w-full rounded-xl border bg-muted/20 px-5 py-4 text-right"><p className="text-sm text-muted-foreground">Total Expected Credit</p><p className="mt-1 text-2xl font-bold text-green-500">${returnDrafts.reduce((total,row)=>total+row.returnQty*row.netCost,0).toFixed(2)}</p></div>
+          </section>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <Label className="text-xs">
                 Return Method <span className="text-destructive">*</span>
@@ -627,29 +627,22 @@ export const ReturnableInventory = ({storeId}:{storeId:string}) => {
               rows={3}
             />
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Actions */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-wrap gap-3">
-            <Button className="gap-2" disabled={saving||!slips.data?.canManage} onClick={handleCreateReturn}>
-              <Package className="w-4 h-4" />
-              Create Return
-            </Button>
-            <Button disabled={saving||!slips.data?.canManage} onClick={handleCreateReturn} variant="outline" className="gap-2">
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Button disabled={saving||!slips.data?.canManage||!returnMethod||!selectionVendorId||returnDrafts.some(row=>!row.reason)} onClick={handleCreateReturn} className="gap-2">
               <FileText className="w-4 h-4" />
               Generate Return Slip
             </Button>
+            <Button variant="ghost" disabled={saving} onClick={()=>setShowReturnDetails(false)}>Cancel</Button>
           </div>
         </CardContent>
-      </Card>
+      </Card></div>}
 
       {/* Status Tracking */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Return Status Tracking</CardTitle>
+          <div className="mt-3 flex flex-wrap items-end gap-3"><label className="space-y-1 text-xs"><span>Created From</span><Input type="date" value={trackingFrom} max={trackingTo||undefined} onChange={e=>setTrackingFrom(e.target.value)}/></label><label className="space-y-1 text-xs"><span>Created To</span><Input type="date" value={trackingTo} min={trackingFrom||undefined} onChange={e=>setTrackingTo(e.target.value)}/></label><Button variant="outline" disabled={!trackingFrom&&!trackingTo} onClick={()=>{setTrackingFrom('');setTrackingTo('');}}>Clear Dates</Button></div>
+          {invalidTrackingRange&&<p role="alert" className="text-sm text-destructive">From date must be on or before To date.</p>}
         </CardHeader>
         <CardContent>
           <div className="rounded-md border overflow-x-auto">
@@ -657,6 +650,7 @@ export const ReturnableInventory = ({storeId}:{storeId:string}) => {
               <TableHeader>
                 <TableRow className="bg-muted/50">
                   <TableHead className="text-xs font-semibold">Return ID</TableHead>
+                  <TableHead className="text-xs font-semibold">Items</TableHead>
                   <TableHead className="text-xs font-semibold">Vendor Name</TableHead>
                   <TableHead className="text-xs font-semibold">RMA #</TableHead>
                   <TableHead className="text-xs font-semibold">Reason</TableHead>
@@ -668,19 +662,22 @@ export const ReturnableInventory = ({storeId}:{storeId:string}) => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {returnRecords.map((record) => (
+                {trackingRecords.length===0&&<TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground">{trackingFrom||trackingTo?'No returns match the selected dates.':'No returns created yet.'}</TableCell></TableRow>}
+                {trackingRecords.map((record) => (
                   <TableRow key={record.id} className="hover:bg-muted/30">
                     <TableCell className="font-mono text-xs font-medium">{record.id}</TableCell>
+                    <TableCell className="text-sm">{record.items.map(item=><div key={item.id}>{item.itemName} <span className="text-muted-foreground">× {item.returnQty}</span></div>)}</TableCell>
                     <TableCell className="text-sm font-medium">{record.vendorName || "—"}</TableCell>
                     <TableCell className="text-sm">{record.rmaNumber}</TableCell>
                     <TableCell className="text-sm">{record.reason || "—"}</TableCell>
                     <TableCell className="text-sm">{record.method || "—"}</TableCell>
-                    <TableCell className="text-sm">{format(record.createdAt, "MMM dd, yyyy")}</TableCell>
+                    <TableCell className="text-sm">{format(new Date(trackingDate(record.createdAt)+'T12:00:00'), "MMM dd, yyyy")}</TableCell>
                     <TableCell className="text-right text-sm font-medium text-success">
                       ${record.totalCredit.toFixed(2)}
                     </TableCell>
-                    <TableCell>{getStatusBadge(record.status)}{slips.data?.canManage&&record.status!=='closed'&&<select aria-label={`Update return ${record.id} status`} value="" disabled={saving} onChange={e=>{if(e.target.value&&window.confirm('Record this status change?'))updateStatus(record.id,e.target.value);}} className="mt-2 border rounded p-1 text-xs"><option value="">Update status</option>{record.status==='draft'&&<option value="PENDING">Pending</option>}{record.status==='pending'&&<option value="SENT">Sent</option>}{['pending','sent'].includes(record.status)&&<option value="CREDIT_RECEIVED">Credit received</option>}{record.status==='credit_received'&&<option value="CLOSED">Closed</option>}</select>}</TableCell>
+                    <TableCell>{getStatusBadge(record.status)}{record.status==='credit_received'&&<p className="text-xs text-muted-foreground mt-1">Closed automatically</p>}</TableCell>
                     <TableCell className="text-center">
+                      {slips.data?.canManage&&record.status==='pending'&&<Button size="sm" variant="outline" className="mb-1" disabled={saving} onClick={()=>{setError('');setCreditConfirmation(record);}}>Mark Credit Received</Button>}
                       <Button
                         variant="ghost"
                         size="sm"

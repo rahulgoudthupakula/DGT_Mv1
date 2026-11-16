@@ -95,7 +95,6 @@ const reasonOptions = [
 ];
 
 const SHRINKAGE_REASONS = new Set([
-  "vendor-recall",
   "theft",
   "spoilage",
   "counting-error",

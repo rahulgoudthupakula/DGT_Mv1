@@ -37,13 +37,13 @@ public class StoreReductionController {
  public record Input(long productId,BigDecimal quantity,String reason,String destination){}
  public record Decision(String status,String note){}
  // Map each reduction reason to the corresponding inventory workflow.
- private String route(String reason){return switch(reason){case "store-to-store-transfer"->"transfers";case "damaged-returnable","expired-returnable"->"returnable";case "damaged-non-returnable","expired-non-returnable"->"non-returnable";default->"shrinkage";};}
+ private String route(String reason){return switch(reason){case "store-to-store-transfer"->"transfers";case "damaged-returnable","expired-returnable","vendor-recall"->"returnable";case "damaged-non-returnable","expired-non-returnable"->"non-returnable";default->"shrinkage";};}
  // Shared inventory data follows the same effective module/page rights as its consuming pages.
  @GetMapping public Object list(@PathVariable String store){pages.requireAny(store,"GROCERY_PAGE_INVENTORY");
   var rows=a.db.queryForList("SELECT r.*,p.product_name,p.product_sku,(SELECT b.product_barcode_value FROM product_barcodes b WHERE b.archived_at IS NULL AND b.product_id=p.product_id AND b.dgt_id=p.dgt_id ORDER BY b.is_primary DESC,b.product_barcode_id LIMIT 1) AS barcode,(SELECT m.unit_cost FROM inventory_movements m WHERE m.dgt_id=r.dgt_id AND m.product_id=r.product_id AND m.reference_id=r.reduction_request_id AND m.movement_type='ADJUSTMENT' ORDER BY m.movement_id DESC LIMIT 1) AS recorded_unit_cost,(SELECT round(-m.qty_changed*m.unit_cost,2) FROM inventory_movements m WHERE m.dgt_id=r.dgt_id AND m.product_id=r.product_id AND m.reference_id=r.reduction_request_id AND m.movement_type='ADJUSTMENT' ORDER BY m.movement_id DESC LIMIT 1) AS recorded_loss,s.store_name AS destination_name FROM inventory_reduction_requests r JOIN products p ON p.product_id=r.product_id AND p.dgt_id=r.dgt_id LEFT JOIN stores s ON s.dgt_id=r.destination WHERE r.dgt_id=? ORDER BY r.reduction_request_id DESC",store);
   boolean reviewer=allowed(store,"GROCERY_ADJUST_STOCK",true);long uid=a.user();
-  for(var row:rows){row.put("route",route((String)row.get("reason")));row.put("canReview",reviewer&&(a.admin(uid,a.company(store))||uid!=((Number)row.get("requested_by")).longValue())&&"PENDING".equals(row.get("status")));}
-  var items=a.db.queryForList("SELECT p.product_id AS id,p.product_name AS \"itemName\",p.product_sku AS \"scanCode\",d.store_department_name AS department,i.available_quantity AS \"inventoryCount\",p.is_taxable AS taxable,p.purchase_gross_cost,p.purchase_discount,p.purchase_unit,p.units_per_case,"+ItemSellingPrice.SQL+" AS price,COALESCE(linked.vendor,'') AS vendor,COALESCE(linked.names,'[]'::json) AS \"vendorNames\" FROM products p JOIN inventory i ON i.product_id=p.product_id AND i.dgt_id=p.dgt_id JOIN store_sub_departments sub ON sub.store_sub_department_id=p.store_sub_department_id AND sub.dgt_id=p.dgt_id JOIN store_departments d ON d.store_department_id=sub.store_department_id AND d.dgt_id=p.dgt_id LEFT JOIN product_store_prices pr ON pr.product_id=p.product_id AND pr.dgt_id=p.dgt_id LEFT JOIN LATERAL (SELECT string_agg(v.vendor_name,', ' ORDER BY v.vendor_name,v.vendor_id) AS vendor,json_agg(v.vendor_name ORDER BY v.vendor_name,v.vendor_id) AS names FROM product_vendors pv JOIN vendors v ON v.vendor_id=pv.vendor_id AND v.dgt_id=pv.dgt_id WHERE pv.archived_at IS NULL AND pv.product_id=p.product_id AND pv.dgt_id=p.dgt_id) linked ON true WHERE p.dgt_id=? ORDER BY p.product_name",store);
+  for(var row:rows){row.put("route",row.get("request_type"));row.put("canReview",reviewer&&(a.admin(uid,a.company(store))||uid!=((Number)row.get("requested_by")).longValue())&&"PENDING".equals(row.get("status")));}
+  var items=a.db.queryForList("SELECT p.product_id AS id,p.product_name AS \"itemName\",p.product_sku AS \"scanCode\",d.store_department_name AS department,i.available_quantity AS \"inventoryCount\",p.is_taxable AS taxable,p.purchase_gross_cost,p.purchase_discount,p.purchase_unit,p.units_per_case,"+ItemSellingPrice.SQL+" AS price,COALESCE(linked.vendor,'') AS vendor,COALESCE(linked.names,'[]'::json) AS \"vendorNames\",linked.primary_id AS \"primaryVendorId\",COALESCE(linked.ids,'[]'::json) AS \"vendorIds\" FROM products p JOIN inventory i ON i.product_id=p.product_id AND i.dgt_id=p.dgt_id JOIN store_sub_departments sub ON sub.store_sub_department_id=p.store_sub_department_id AND sub.dgt_id=p.dgt_id JOIN store_departments d ON d.store_department_id=sub.store_department_id AND d.dgt_id=p.dgt_id LEFT JOIN product_store_prices pr ON pr.product_id=p.product_id AND pr.dgt_id=p.dgt_id LEFT JOIN LATERAL (SELECT string_agg(v.vendor_name,', ' ORDER BY v.vendor_name,v.vendor_id) AS vendor,json_agg(v.vendor_name ORDER BY v.vendor_name,v.vendor_id) AS names,json_agg(v.vendor_id ORDER BY v.vendor_id) FILTER (WHERE v.is_active) AS ids,COALESCE((array_agg(v.vendor_id ORDER BY pv.product_vendor_id) FILTER (WHERE pv.is_primary AND v.is_active))[1],CASE WHEN count(*) FILTER (WHERE v.is_active)=1 THEN min(v.vendor_id) FILTER (WHERE v.is_active) END) AS primary_id FROM product_vendors pv JOIN vendors v ON v.vendor_id=pv.vendor_id AND v.dgt_id=pv.dgt_id WHERE pv.archived_at IS NULL AND pv.product_id=p.product_id AND pv.dgt_id=p.dgt_id) linked ON true WHERE p.dgt_id=? ORDER BY p.product_name",store);
   for(var item:items)item.put("netCost",cost(item));
   return Map.of("requests",rows.stream().map(Rows::normalize).toList(),"items",items.stream().map(Rows::normalize).toList(),"canSubmit",canSubmit(store),"stores",a.stores().stream().filter(s->!store.equals(s.get("dgt_id"))).map(Rows::normalize).toList());
  }
@@ -82,28 +82,47 @@ public class StoreReductionController {
  }
 
 
- @GetMapping("/return-slips") public Object slips(@PathVariable String store){require(store,"GROCERY_VIEW_INVENTORY",false);
+ @GetMapping("/return-slips") public Object slips(@PathVariable String store){pages.requireAny(store,"GROCERY_PAGE_INVENTORY_RETURNABLE");
   var rows=a.db.queryForList("SELECT r.*,v.vendor_name,q.reason AS adjustment_reason FROM inventory_returns r JOIN vendors v ON v.vendor_id=r.vendor_id AND v.dgt_id=r.dgt_id JOIN inventory_reduction_requests q ON q.reduction_request_id=r.reduction_request_id AND q.dgt_id=r.dgt_id WHERE r.dgt_id=? ORDER BY r.return_id DESC",store);
   for(var r:rows)r.put("items",a.db.queryForList("SELECT i.*,p.product_name,p.product_sku FROM inventory_return_items i JOIN products p ON p.product_id=i.product_id AND p.dgt_id=? WHERE i.return_id=?",store,r.get("return_id")));
-  return Map.of("returns",rows.stream().map(Rows::normalize).toList(),"vendors",a.db.queryForList("SELECT vendor_id,vendor_name FROM vendors WHERE dgt_id=? ORDER BY vendor_name",store),"canManage",allowed(store,"GROCERY_ADJUST_STOCK",true));
+  return Map.of("returns",rows.stream().map(Rows::normalize).toList(),"vendors",a.db.queryForList("SELECT vendor_id,vendor_name FROM vendors WHERE dgt_id=? AND is_active ORDER BY vendor_name",store),"canManage",allowed(store,"GROCERY_ADJUST_STOCK",true),"timezone",a.db.queryForObject("SELECT timezone FROM stores WHERE dgt_id=?",String.class,store));
  }
  public record Slip(long requestId,long vendorId,String reason,String method,String reference){}
- @PostMapping("/return-slips") @Transactional public Object createSlip(@PathVariable String store,@RequestBody Slip in){require(store,"GROCERY_ADJUST_STOCK",true);
-  if(in.reason()==null||in.reason().isBlank()||in.reason().length()>255||in.method()==null||!Set.of("Pickup","Drop-off","Credit without return").contains(in.method())||in.reference()!=null&&in.reference().length()>100)throw bad("Enter a reason, return method and reference of at most 100 characters");
-  var rows=a.db.queryForList("SELECT * FROM inventory_reduction_requests WHERE reduction_request_id=? AND dgt_id=? FOR UPDATE",in.requestId(),store);if(rows.isEmpty())throw a.denied();var r=rows.getFirst();
-  if(!"APPROVED".equals(r.get("status"))||!"returnable".equals(r.get("request_type")))throw bad("Select an approved returnable item");
-  if(a.db.queryForList("SELECT vendor_id FROM vendors WHERE vendor_id=? AND dgt_id=?",in.vendorId(),store).isEmpty())throw bad("Select this store's vendor");
-  if(!a.db.queryForList("SELECT return_id FROM inventory_returns WHERE reduction_request_id=?",in.requestId()).isEmpty())throw new ResponseStatusException(HttpStatus.CONFLICT,"Return slip already exists; open it in Return Status Tracking");
-  BigDecimal cost=a.db.queryForObject("SELECT unit_cost FROM inventory_movements WHERE dgt_id=? AND product_id=? AND reference_id=? AND movement_type='ADJUSTMENT' ORDER BY movement_id DESC LIMIT 1",BigDecimal.class,store,r.get("product_id"),in.requestId());
-  long id=a.db.queryForObject("INSERT INTO inventory_returns(dgt_id,vendor_id,return_type,reference_number,status,reduction_request_id) VALUES (?,?,?,?,'DRAFT',?) RETURNING return_id",Long.class,store,in.vendorId(),in.method(),in.reference(),in.requestId());
-  a.db.update("INSERT INTO inventory_return_items(return_id,product_id,qty,unit_cost,reason) VALUES (?,?,?,?,?)",id,r.get("product_id"),r.get("quantity"),cost,in.reason());a.audit(store,"RETURN_SLIP_CREATED",Long.toString(id),"{}");return Map.of("id",id);
+ public record ReturnLine(long requestId,String reason){}
+ public record VendorSlip(long vendorId,String method,String reference,List<ReturnLine> items){}
+ @PostMapping("/return-slips") @Transactional public Object createSlip(@PathVariable String store,@RequestBody Slip in){
+  return createVendorSlip(store,new VendorSlip(in.vendorId(),in.method(),in.reference(),List.of(new ReturnLine(in.requestId(),in.reason()))),false);
+ }
+ @PostMapping("/return-slips/group") @Transactional public Object createGroupedSlip(@PathVariable String store,@RequestBody VendorSlip input){return createVendorSlip(store,input,true);}
+ private Object createVendorSlip(String store,VendorSlip input,boolean requireVendorLink){
+  require(store,"GROCERY_ADJUST_STOCK",true);
+  if(input.items()==null||input.items().isEmpty()||input.items().size()>200||input.items().stream().anyMatch(Objects::isNull)||input.items().stream().map(ReturnLine::requestId).distinct().count()!=input.items().size())throw bad("Choose 1–200 distinct approved returnable items");
+  if(input.method()==null||!Set.of("Pickup","Drop-off","Credit without return").contains(input.method())||input.reference()!=null&&input.reference().length()>100)throw bad("Choose a return method and reference of at most 100 characters");
+  if(a.db.queryForList("SELECT vendor_id FROM vendors WHERE vendor_id=? AND dgt_id=? AND is_active",input.vendorId(),store).isEmpty())throw bad("Select this store's active vendor");
+  var lines=input.items().stream().sorted(Comparator.comparingLong(ReturnLine::requestId)).toList();
+  var reductions=new ArrayList<Map<String,Object>>();
+  for(var line:lines){
+   if(line.reason()==null||line.reason().isBlank()||line.reason().length()>255)throw bad("Choose a reason for every item (maximum 255 characters)");
+   var rows=a.db.queryForList("SELECT * FROM inventory_reduction_requests WHERE reduction_request_id=? AND dgt_id=? FOR UPDATE",line.requestId(),store);if(rows.isEmpty())throw a.denied();var row=rows.getFirst();
+   if(!"APPROVED".equals(row.get("status"))||!"returnable".equals(row.get("request_type")))throw bad("Select approved returnable items");
+   if(requireVendorLink&&a.db.queryForList("SELECT product_vendor_id FROM product_vendors WHERE dgt_id=? AND product_id=? AND vendor_id=? AND archived_at IS NULL",store,row.get("product_id"),input.vendorId()).isEmpty())throw bad("Every selected item must be linked to the selected vendor");
+   if(!a.db.queryForList("SELECT return_id FROM inventory_returns WHERE reduction_request_id=? UNION ALL SELECT return_id FROM inventory_return_items WHERE reduction_request_id=?",line.requestId(),line.requestId()).isEmpty())throw new ResponseStatusException(HttpStatus.CONFLICT,"A selected item already has a return slip. Refresh the list and select only items waiting for return.");
+   reductions.add(row);
+  }
+  long id=a.db.queryForObject("INSERT INTO inventory_returns(dgt_id,vendor_id,return_type,reference_number,status,reduction_request_id) VALUES (?,?,?,?,'PENDING',?) RETURNING return_id",Long.class,store,input.vendorId(),input.method(),input.reference(),lines.getFirst().requestId());
+  for(int index=0;index<lines.size();index++){
+   var row=reductions.get(index);var line=lines.get(index);
+   BigDecimal cost=a.db.queryForObject("SELECT unit_cost FROM inventory_movements WHERE dgt_id=? AND product_id=? AND reference_id=? AND movement_type='ADJUSTMENT' ORDER BY movement_id DESC LIMIT 1",BigDecimal.class,store,row.get("product_id"),line.requestId());
+   a.db.update("INSERT INTO inventory_return_items(return_id,product_id,qty,unit_cost,reason,reduction_request_id) VALUES (?,?,?,?,?,?)",id,row.get("product_id"),row.get("quantity"),cost,line.reason().strip(),line.requestId());
+  }
+  a.audit(store,"RETURN_SLIP_CREATED",Long.toString(id),"{}");return Map.of("id",id);
  }
  public record ReturnState(String status){}
  @PostMapping("/return-slips/{id}/status") @Transactional public Object returnState(@PathVariable String store,@PathVariable long id,@RequestBody ReturnState in){require(store,"GROCERY_ADJUST_STOCK",true);
   var rows=a.db.queryForList("SELECT status FROM inventory_returns WHERE return_id=? AND dgt_id=? AND reduction_request_id IS NOT NULL FOR UPDATE",id,store);if(rows.isEmpty())throw a.denied();String old=(String)rows.getFirst().get("status");
-  var next=switch(old){case "DRAFT"->Set.of("PENDING");case "PENDING"->Set.of("SENT","CREDIT_RECEIVED");case "SENT"->Set.of("CREDIT_RECEIVED");case "CREDIT_RECEIVED"->Set.of("CLOSED");default->Set.<String>of();};
-  if(in.status()==null||!next.contains(in.status()))throw new ResponseStatusException(HttpStatus.CONFLICT,"Invalid or already completed status change");
-  a.db.update("UPDATE inventory_returns SET status=?,updated_at=CURRENT_TIMESTAMP,settled_at=CASE WHEN ?='CREDIT_RECEIVED' THEN CURRENT_TIMESTAMP ELSE settled_at END,settled_by=CASE WHEN ?='CREDIT_RECEIVED' THEN ? ELSE settled_by END WHERE return_id=?",in.status(),in.status(),in.status(),a.user(),id);a.audit(store,"RETURN_STATUS_"+in.status(),Long.toString(id),"{}");return Map.of("status",in.status());
+  if(!"CREDIT_RECEIVED".equals(in.status())||!Set.of("PENDING","DRAFT","SENT").contains(old))throw new ResponseStatusException(HttpStatus.CONFLICT,"This return is already closed or the requested status is invalid");
+  a.db.update("UPDATE inventory_returns SET status='CLOSED',updated_at=CURRENT_TIMESTAMP,settled_at=CURRENT_TIMESTAMP,settled_by=? WHERE return_id=?",a.user(),id);
+  a.audit(store,"RETURN_CREDIT_RECEIVED",Long.toString(id),"{\"closed\":true}");return Map.of("status","CLOSED");
  }
 
  private long ensureTransfer(Map<String,Object> r){

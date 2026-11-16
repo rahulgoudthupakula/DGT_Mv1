@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, PackageX, AlertTriangle, Loader2, ShieldAlert, Trash2, Calculator } from "lucide-react";
+import { Search, PackageX, Loader2, ShieldAlert, Trash2, Calculator } from "lucide-react";
 
 interface ShrinkageRow {
   id: string;
@@ -33,7 +33,6 @@ interface ShrinkageRow {
 }
 
 const REASON_META: Record<string, { label: string; icon: typeof PackageX; cls: string }> = {
-  "vendor-recall": { label: "Vendor Recall", icon: AlertTriangle, cls: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400" },
   "theft": { label: "Theft / Shrinkage", icon: ShieldAlert, cls: "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400" },
   "spoilage": { label: "Spoilage", icon: Trash2, cls: "bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-400" },
   "counting-error": { label: "Counting Error", icon: Calculator, cls: "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400" },

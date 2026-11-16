@@ -28,7 +28,7 @@ public class PagePermissionInterceptor implements WebMvcConfigurer {
    case "current-stock" -> new String[]{"MODULE_INVENTORY_VALUATION","MODULE_PRICE_BOOK"};
    case "pos-reports" -> new String[]{"MODULE_SALES_REPORTS"};
    case "credit-card","ebt","fleet","tender-reports" -> new String[]{"MODULE_TENDERS"};
-   case "workforce","employees","employee-access" -> new String[]{"MODULE_WORKWEEK"};
+   case "attendance","workforce","employees","employee-access" -> new String[]{"MODULE_WORKWEEK"};
    case "daily-closing" -> new String[]{"MODULE_DAILY_CLOSING"};
    default -> new String[0];
   };
@@ -60,6 +60,7 @@ public class PagePermissionInterceptor implements WebMvcConfigurer {
    case "fleet" -> new String[]{"TENDERS_PAGE_FLEET_CARDS"};
    case "tender-reports" -> new String[]{"TENDERS_PAGE_REPORTS"};
    case "pos-reports" -> new String[]{"SALES_REPORTS_PAGE_POS_REPORT"};
+   case "attendance" -> new String[]{"WORKWEEK_PAGE_TIME_ATTENDANCE"};
    case "employees" -> new String[]{"WORKWEEK_PAGE_EMPLOYEES"};
    case "sales-statistics" -> new String[]{"PRICE_BOOK_PAGE_STATISTICS"};
    case "new-arrivals" -> new String[]{"PRICE_BOOK_PAGE_NEW_ARRIVALS"};

@@ -290,12 +290,12 @@ export const extendedPages = [
     "code": "WORKWEEK_PAGE_TIME_ATTENDANCE",
     "label": "Time & Attendance",
     "group": "Workweek Permissions",
-    "implemented": false,
+    "implemented": true,
     "module": "Workweek"
   },
   {
     "code": "WORKWEEK_PAGE_TIME_OFF_REQUEST",
-    "label": "Time Off Request",
+    "label": "My Time Off Request",
     "group": "Workweek Permissions",
     "implemented": true,
     "module": "Workweek"

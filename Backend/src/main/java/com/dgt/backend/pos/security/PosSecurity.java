@@ -49,6 +49,6 @@ public class PosSecurity {
   return http.securityMatcher("/api/v1/pos/**").csrf(c->c.disable())
    .sessionManagement(s->s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
    .addFilterBefore(filter,BasicAuthenticationFilter.class)
-   .authorizeHttpRequests(a->a.requestMatchers("/api/v1/pos/sales","/api/v1/pos/heartbeat","/api/v1/pos/configuration").authenticated().anyRequest().denyAll()).build();
+   .authorizeHttpRequests(a->a.requestMatchers("/api/v1/pos/sales","/api/v1/pos/time-entries","/api/v1/pos/heartbeat","/api/v1/pos/configuration").authenticated().anyRequest().denyAll()).build();
  }
 }
