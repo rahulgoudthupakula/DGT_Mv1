@@ -1,6 +1,7 @@
 package com.dgt.backend.pricebook.controller;
 import com.dgt.backend.pricebook.repository.ItemSellingPrice;
 import com.dgt.backend.access.security.ScopedAccess;
+import com.dgt.backend.access.security.PagePermissions;
 import com.dgt.backend.common.entity.Rows;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,8 +17,8 @@ import lombok.extern.slf4j.Slf4j;
 @RequestMapping("/api/v1/access/stores/{store}/reductions")
 // Coordinate stock reduction requests, return slips and inter-store transfer receipts.
 public class StoreReductionController {
- private final ScopedAccess a;
- public StoreReductionController(ScopedAccess a){this.a=a;}
+ private final ScopedAccess a;private final PagePermissions pages;
+ public StoreReductionController(ScopedAccess a,PagePermissions pages){this.a=a;this.pages=pages;}
  private static final Set<String> REASONS=Set.of("damaged-returnable","expired-returnable","vendor-recall","damaged-non-returnable","expired-non-returnable","theft","spoilage","counting-error","store-to-store-transfer");
  private boolean allowed(String store,String code,boolean manager){
   long uid=a.user();if(a.admin(uid,a.company(store)))return true;
@@ -29,7 +30,8 @@ public class StoreReductionController {
  public record Decision(String status,String note){}
  // Map each reduction reason to the corresponding inventory workflow.
  private String route(String reason){return switch(reason){case "store-to-store-transfer"->"transfers";case "damaged-returnable","expired-returnable"->"returnable";case "damaged-non-returnable","expired-non-returnable"->"non-returnable";default->"shrinkage";};}
- @GetMapping public Object list(@PathVariable String store){require(store,"GROCERY_VIEW_INVENTORY",false);
+ // Shared inventory data follows the same effective module/page rights as its consuming pages.
+ @GetMapping public Object list(@PathVariable String store){pages.requireAny(store,"GROCERY_PAGE_INVENTORY");
   var rows=a.db.queryForList("SELECT r.*,p.product_name,p.product_sku,(SELECT b.product_barcode_value FROM product_barcodes b WHERE b.archived_at IS NULL AND b.product_id=p.product_id AND b.dgt_id=p.dgt_id ORDER BY b.is_primary DESC,b.product_barcode_id LIMIT 1) AS barcode,(SELECT m.unit_cost FROM inventory_movements m WHERE m.dgt_id=r.dgt_id AND m.product_id=r.product_id AND m.reference_id=r.reduction_request_id AND m.movement_type='ADJUSTMENT' ORDER BY m.movement_id DESC LIMIT 1) AS recorded_unit_cost,(SELECT round(-m.qty_changed*m.unit_cost,2) FROM inventory_movements m WHERE m.dgt_id=r.dgt_id AND m.product_id=r.product_id AND m.reference_id=r.reduction_request_id AND m.movement_type='ADJUSTMENT' ORDER BY m.movement_id DESC LIMIT 1) AS recorded_loss,s.store_name AS destination_name FROM inventory_reduction_requests r JOIN products p ON p.product_id=r.product_id AND p.dgt_id=r.dgt_id LEFT JOIN stores s ON s.dgt_id=r.destination WHERE r.dgt_id=? ORDER BY r.reduction_request_id DESC",store);
   boolean reviewer=allowed(store,"GROCERY_ADJUST_STOCK",true);long uid=a.user();
   for(var row:rows){row.put("route",route((String)row.get("reason")));row.put("canReview",reviewer&&(a.admin(uid,a.company(store))||uid!=((Number)row.get("requested_by")).longValue())&&"PENDING".equals(row.get("status")));}

@@ -1015,6 +1015,31 @@ class ScopedAccessIntegrationTest {
   assertThat(ok(req("admin","GET",entry+"/"+id,null),200).path("items").get(0).path("msrp").asDouble()).isEqualTo(3.49);
  }
 
+ @Test @Order(36) void inventoryReadUsesEffectivePageRightsWithoutLegacyGrant() throws Exception {
+  String path=access()+"/reductions";long uid=users.get("cashier");
+  long role=db.queryForObject("SELECT role_type_id FROM user_roles WHERE user_role_id=?",Long.class,assignments.get("cashier"));
+  var oldRights=db.queryForList("SELECT permission_code,allowed FROM store_role_permissions WHERE dgt_id=? AND role_type_id=? AND permission_code IN ('GROCERY_VIEW_INVENTORY','GROCERY_REDUCE_STOCK')",store,role);
+  var oldOverride=db.queryForList("SELECT overrides::text FROM user_store_permission_overrides WHERE dgt_id=? AND user_id=?",String.class,store,uid);
+  try{
+   db.update("DELETE FROM store_role_permissions WHERE dgt_id=? AND role_type_id=? AND permission_code IN ('GROCERY_VIEW_INVENTORY','GROCERY_REDUCE_STOCK')",store,role);
+   db.update("INSERT INTO store_role_permissions(dgt_id,role_type_id,permission_code,allowed) VALUES (?,?,'GROCERY_REDUCE_STOCK',false)",store,role);
+   db.update("INSERT INTO user_store_permission_overrides(dgt_id,user_id,overrides,updated_by) VALUES (?,?,?::jsonb,?) ON CONFLICT(dgt_id,user_id) DO UPDATE SET overrides=excluded.overrides",store,uid,"{\"MODULE_GROCERY\":true,\"GROCERY_PAGE_INVENTORY\":true,\"GROCERY_PAGE_INVENTORY_ADJUSTMENT\":true}",users.get("admin"));
+   var data=ok(req("cashier","GET",path,null),200);assertThat(data.path("items").isArray()).isTrue();assertThat(data.path("canSubmit").asBoolean()).isFalse();
+   db.update("INSERT INTO store_role_permissions(dgt_id,role_type_id,permission_code,allowed) VALUES (?,?,'GROCERY_VIEW_INVENTORY',false)",store,role);
+   ok(req("cashier","GET",path,null),200);
+   ok(req("other","GET",path,null),403);
+   ok(req("cashier","POST",path,Map.of("product_id",1,"quantity",1,"reason","damaged-returnable")),403);
+   db.update("UPDATE user_store_permission_overrides SET overrides=overrides||'{\"GROCERY_PAGE_INVENTORY\":false}'::jsonb WHERE dgt_id=? AND user_id=?",store,uid);
+   ok(req("cashier","GET",path,null),403);
+   db.update("UPDATE user_store_permission_overrides SET overrides=overrides||'{\"GROCERY_PAGE_INVENTORY\":true,\"MODULE_GROCERY\":false}'::jsonb WHERE dgt_id=? AND user_id=?",store,uid);
+   ok(req("cashier","GET",path,null),403);
+  }finally{
+   db.update("DELETE FROM store_role_permissions WHERE dgt_id=? AND role_type_id=? AND permission_code IN ('GROCERY_VIEW_INVENTORY','GROCERY_REDUCE_STOCK')",store,role);
+   for(var row:oldRights)db.update("INSERT INTO store_role_permissions(dgt_id,role_type_id,permission_code,allowed) VALUES (?,?,?,?)",store,role,row.get("permission_code"),row.get("allowed"));
+   if(oldOverride.isEmpty())db.update("DELETE FROM user_store_permission_overrides WHERE dgt_id=? AND user_id=?",store,uid);
+   else db.update("UPDATE user_store_permission_overrides SET overrides=?::jsonb WHERE dgt_id=? AND user_id=?",oldOverride.getFirst(),store,uid);
+  }
+ }
  @Test @Order(37) void reductionQueueApprovalRoutesAndOnceOnly() throws Exception {
   String path="/access/stores/"+store+"/reductions";
   for(var item:ok(req("admin","GET",path,null),200).path("items")){
