@@ -159,6 +159,7 @@ export const ReturnableInventory = ({storeId}:{storeId:string}) => {
   const slipPath=`/access/stores/${encodeURIComponent(storeId)}/reductions/return-slips`;
   const slips=useQuery({queryKey:['return-slips',storeId],...stockRefreshOptions,queryFn:()=>request<{returns:any[];vendors:{vendor_id:number;vendor_name:string}[];canManage:boolean;timezone:string}>(slipPath)});
   const [saving,setSaving]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');
+  const [disposal,setDisposal]=useState<InventoryItem|null>(null),[disposalNote,setDisposalNote]=useState('');
   const [openSlipId,setOpenSlipId]=useState<string|null>(null);
   const [scanCode, setScanCode] = useState("");
   const [itemName, setItemName] = useState("");
@@ -241,6 +242,12 @@ export const ReturnableInventory = ({storeId}:{storeId:string}) => {
       await slips.refetch();clearReturnSelection();setOpenSlipId(String(saved.id));
     }catch(e){setError(e instanceof Error?e.message:'Could not save the return');}finally{setSaving(false);}
   };
+  const moveToShrinkage=async()=>{
+    if(!disposal||saving||!disposalNote.trim())return;
+    setSaving(true);setError('');
+    try{await request(`/access/stores/${encodeURIComponent(storeId)}/reductions/${disposal.id}/move-to-shrinkage`,{method:'POST',body:JSON.stringify({note:disposalNote.trim()})});await approved.refetch();clearReturnSelection();setDisposal(null);setMessage('Moved to Shrinkage & Waste. Stock was not reduced again.');}
+    catch(e){setError(e instanceof Error?e.message:'Could not move this item.');}finally{setSaving(false);}
+  };
   const updateStatus=async(id:string,status:string)=>{if(saving)return;setSaving(true);setError('');try{await request(`${slipPath}/${id}/status`,{method:'POST',body:JSON.stringify({status})});await slips.refetch();return true;}catch(e){setError(e instanceof Error?e.message:'Could not record credit received.');return false;}finally{setSaving(false);}};
 
   const getStatusBadge=(status:ReturnStatus)=><Badge variant="outline" className={cn("inline-flex items-center gap-1",status==='credit_received'?"bg-green-100 text-green-800 border-green-200":"bg-yellow-100 text-yellow-800 border-yellow-200")}>{status==='credit_received'?<CreditCard className="w-3 h-3"/>:<Clock className="w-3 h-3"/>}{status==='credit_received'?'Credit Received':'Pending'}</Badge>;
@@ -270,6 +277,7 @@ export const ReturnableInventory = ({storeId}:{storeId:string}) => {
     <div className="space-y-6">
       {(error||slips.error)&&<p role="alert" className="text-sm text-destructive">{error||String(slips.error)}</p>}
       {message&&<p role="status" className="text-sm text-success">{message}</p>}
+      <Dialog open={!!disposal} onOpenChange={open=>{if(!open&&!saving){setDisposal(null);setError('');}}}><DialogContent><DialogHeader><DialogTitle>Move to Shrinkage &amp; Waste?</DialogTitle><DialogDescription>{disposal?.itemName} — {disposal?.returnQty} units. This removes the item from the return queue without requesting vendor credit. Its stock reduction has already been recorded and will not be repeated.</DialogDescription></DialogHeader><Label htmlFor="disposal-note">Why are you disposing of this item?</Label><Input id="disposal-note" maxLength={200} value={disposalNote} onChange={e=>setDisposalNote(e.target.value)}/>{error&&<p role="alert" className="text-destructive">{error}</p>}<DialogFooter><Button variant="outline" disabled={saving} onClick={()=>setDisposal(null)}>Cancel</Button><Button variant="destructive" disabled={saving||!disposalNote.trim()} onClick={moveToShrinkage}>{saving?'Moving…':'Move to Shrinkage'}</Button></DialogFooter></DialogContent></Dialog>
       <Dialog open={!!creditConfirmation} onOpenChange={open=>{if(!open&&!saving){setCreditConfirmation(null);setError('');}}}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader><DialogTitle>Confirm Credit Received</DialogTitle><DialogDescription>Confirm that you received the vendor credit. This closes the return automatically and keeps it in tracking.</DialogDescription></DialogHeader>
@@ -498,10 +506,11 @@ export const ReturnableInventory = ({storeId}:{storeId:string}) => {
                   <TableHead className="text-xs font-semibold text-right">Remaining Stock</TableHead>
                   <TableHead className="text-xs font-semibold text-right">Net Cost</TableHead>
                   <TableHead className="text-xs font-semibold text-right">Expected Credit</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedReturnable.length===0&&<TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">{approved.isPending||slips.isPending?'Loading returnable items…':inventoryItems.length?'No items match the current filters.':'No items are waiting for a return slip.'}</TableCell></TableRow>}
+                {paginatedReturnable.length===0&&<TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground">{approved.isPending||slips.isPending?'Loading returnable items…':inventoryItems.length?'No items match the current filters.':'No items are waiting for a return slip.'}</TableCell></TableRow>}
                 {paginatedReturnable.map((item) => (
                   <TableRow key={item.id} className="hover:bg-muted/30">
                     <TableCell>
@@ -533,6 +542,7 @@ export const ReturnableInventory = ({storeId}:{storeId:string}) => {
                     <TableCell className="text-right text-sm font-medium text-success">
                       ${(item.returnQty * item.netCost).toFixed(2)}
                     </TableCell>
+                    <TableCell><Button variant="outline" size="sm" disabled={saving||showReturnDetails||!slips.data?.canManage} onClick={()=>{setDisposal(item);setDisposalNote('');setError('');}}>Move to Shrinkage</Button></TableCell>
                   </TableRow>
                 ))}
               </TableBody>

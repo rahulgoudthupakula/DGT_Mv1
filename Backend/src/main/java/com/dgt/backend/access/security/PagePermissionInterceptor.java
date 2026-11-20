@@ -113,6 +113,7 @@ public class PagePermissionInterceptor implements WebMvcConfigurer {
    if(!read)return new String[]{path.equals("purchase-orders")?"GROCERY_PAGE_PURCHASE_ORDERS_SUGGESTED":"GROCERY_PAGE_PURCHASE_ORDERS_HISTORY"};
    return new String[]{"GROCERY_PAGE_PURCHASE_ORDERS_SUGGESTED","GROCERY_PAGE_PURCHASE_ORDERS_HISTORY"};
   }
+  if(path.startsWith("reductions/")&&path.endsWith("/move-to-shrinkage"))return new String[]{"GROCERY_PAGE_INVENTORY_RETURNABLE"};
   if(path.startsWith("reductions/return-slips"))return new String[]{"GROCERY_PAGE_INVENTORY_RETURNABLE"};
   if(path.startsWith("reductions/transfers"))return new String[]{"GROCERY_PAGE_INVENTORY_TRANSFERS"};
   if(path.startsWith("reductions")&&!read)return new String[]{path.endsWith("/decision")?"GROCERY_PAGE_INVENTORY_APPROVALS":"GROCERY_PAGE_INVENTORY_ADJUSTMENT"};
