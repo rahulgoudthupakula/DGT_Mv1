@@ -1082,6 +1082,7 @@ class ScopedAccessIntegrationTest {
    long role=db.queryForObject("SELECT role_type_id FROM user_roles WHERE user_role_id=?",Long.class,assignments.get(who));
    for(String code:List.of("GROCERY_VIEW_INVENTORY","GROCERY_REDUCE_STOCK","GROCERY_ADJUST_STOCK"))db.update("INSERT INTO store_role_permissions(dgt_id,role_type_id,permission_code,allowed) VALUES (?,?,?,true) ON CONFLICT(dgt_id,role_type_id,permission_code) DO UPDATE SET allowed=true",store,role,code);
   }
+  db.update("UPDATE products SET is_returnable=true WHERE product_id=?",pid);
   var input=Map.of("product_id",pid,"quantity",2.5,"reason","damaged-returnable");
   long id=ok(req("cashier","POST",path,input),200).path("id").asLong();
   assertThat(db.queryForObject("SELECT available_quantity FROM inventory WHERE product_id=?",java.math.BigDecimal.class,pid)).isEqualByComparingTo("24");
@@ -1160,6 +1161,7 @@ class ScopedAccessIntegrationTest {
   }
   long vendor=db.queryForObject("SELECT vendor_id FROM product_vendors WHERE dgt_id=? AND product_id=? AND archived_at IS NULL LIMIT 1",Long.class,store,product);
   long otherProduct=db.queryForObject("SELECT p.product_id FROM products p JOIN inventory i ON i.product_id=p.product_id AND i.dgt_id=p.dgt_id WHERE p.dgt_id=? AND p.product_id<>? AND i.available_quantity>0 AND p.purchase_gross_cost IS NOT NULL AND p.purchase_discount IS NOT NULL LIMIT 1",Long.class,store,product);
+  db.update("UPDATE products SET is_returnable=true WHERE product_id IN (?,?)",product,otherProduct);
   long first=ok(req("admin","POST",base,Map.of("product_id",product,"quantity",0.01,"reason","damaged-returnable")),200).path("id").asLong();
   long secondRequest=ok(req("admin","POST",base,Map.of("product_id",otherProduct,"quantity",0.01,"reason","expired-returnable")),200).path("id").asLong();
   var one=Map.of("request_id",first,"reason","Damaged (vendor returnable)");
@@ -2762,6 +2764,34 @@ ok(call("admin","PUT",path+"/programs/"+id,form,program.get("version").asText(),
    db.update("DELETE FROM employee_store_assignments WHERE employee_id=?",employee);
    db.update("DELETE FROM employees WHERE employee_id=?",employee);
   }
+ }
+
+ @Test @Order(1005) void reductionsUseProductReturnabilityAndDisposalNeverDeductsStockTwice() throws Exception {
+  String base=access()+"/reductions";
+  long sub=db.queryForObject("SELECT min(store_sub_department_id) FROM store_sub_departments WHERE dgt_id=?",Long.class,store);
+  long yes=db.queryForObject("INSERT INTO products(dgt_id,store_sub_department_id,product_name,product_sku,is_returnable,purchase_unit,purchase_gross_cost,purchase_discount) VALUES (?,?,'Returnable fixture',?,true,'ITEM',2,0) RETURNING product_id",Long.class,store,sub,"RETURN-FLAG-"+tag);
+  long no=db.queryForObject("INSERT INTO products(dgt_id,store_sub_department_id,product_name,product_sku,is_returnable,purchase_unit,purchase_gross_cost,purchase_discount) VALUES (?,?,'Nonreturnable fixture',?,false,'ITEM',2,0) RETURNING product_id",Long.class,store,sub,"NO-RETURN-FLAG-"+tag);
+  for(long p:List.of(yes,no))db.update("INSERT INTO inventory(dgt_id,product_id,available_quantity) VALUES (?,?,10)",store,p);
+  long waste=ok(req("admin","POST",base,Map.of("productId",no,"quantity",1,"reason","expired-returnable")),200).path("id").asLong();
+  assertThat(db.queryForObject("SELECT request_type FROM inventory_reduction_requests WHERE reduction_request_id=?",String.class,waste)).isEqualTo("shrinkage");
+  assertThat(db.queryForObject("SELECT reason FROM inventory_reduction_requests WHERE reduction_request_id=?",String.class,waste)).isEqualTo("expired-non-returnable");
+  long pendingReturn=ok(req("admin","POST",base,Map.of("productId",yes,"quantity",1,"reason","damaged-non-returnable")),200).path("id").asLong();
+  assertThat(db.queryForObject("SELECT request_type FROM inventory_reduction_requests WHERE reduction_request_id=?",String.class,pendingReturn)).isEqualTo("returnable");
+  String move=base+"/"+pendingReturn+"/move-to-shrinkage";
+  var before=db.queryForObject("SELECT available_quantity FROM inventory WHERE product_id=? AND dgt_id=?",java.math.BigDecimal.class,yes,store);
+  long movements=db.queryForObject("SELECT count(*) FROM inventory_movements WHERE product_id=? AND dgt_id=?",Long.class,yes,store);
+  ok(req("other","POST",move,Map.of("note","Dispose")),403);
+  ok(req("cashier","POST",move,Map.of("note","Dispose")),403);
+  ok(req("admin","POST",move,Map.of("note","")),400);
+  ok(req("admin","POST",move,Map.of("note","Vendor refused credit; dispose")),200);
+  assertThat(db.queryForObject("SELECT request_type FROM inventory_reduction_requests WHERE reduction_request_id=?",String.class,pendingReturn)).isEqualTo("shrinkage");
+  ok(req("admin","POST",move,Map.of("note","Dispose")),409);
+  assertThat(db.queryForObject("SELECT available_quantity FROM inventory WHERE product_id=? AND dgt_id=?",java.math.BigDecimal.class,yes,store)).isEqualByComparingTo(before);
+  assertThat(db.queryForObject("SELECT count(*) FROM inventory_movements WHERE product_id=? AND dgt_id=?",Long.class,yes,store)).isEqualTo(movements);
+  long returning=ok(req("admin","POST",base,Map.of("productId",yes,"quantity",1,"reason","expired")),200).path("id").asLong();
+  long vendor=db.queryForObject("SELECT vendor_id FROM vendors WHERE dgt_id=? AND is_active LIMIT 1",Long.class,store);
+  ok(req("admin","POST",base+"/return-slips",Map.of("requestId",returning,"vendorId",vendor,"reason","Expired","method","Pickup")),200);
+  ok(req("admin","POST",base+"/"+returning+"/move-to-shrinkage",Map.of("note","Dispose")),409);
  }
 
 }

@@ -33,6 +33,11 @@ interface ShrinkageRow {
 }
 
 const REASON_META: Record<string, { label: string; icon: typeof PackageX; cls: string }> = {
+  "damaged-non-returnable": { label: "Damaged", icon: Trash2, cls: "bg-orange-100 text-orange-700" },
+  "expired-non-returnable": { label: "Expired", icon: PackageX, cls: "bg-orange-100 text-orange-700" },
+  "damaged-returnable": { label: "Damaged — disposed", icon: Trash2, cls: "bg-orange-100 text-orange-700" },
+  "expired-returnable": { label: "Expired — disposed", icon: PackageX, cls: "bg-orange-100 text-orange-700" },
+  "vendor-recall": { label: "Vendor Recall", icon: PackageX, cls: "bg-orange-100 text-orange-700" },
   "theft": { label: "Theft / Shrinkage", icon: ShieldAlert, cls: "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400" },
   "spoilage": { label: "Spoilage", icon: Trash2, cls: "bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-400" },
   "counting-error": { label: "Counting Error", icon: Calculator, cls: "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400" },
@@ -47,7 +52,7 @@ export const InventoryShrinkageWaste = ({storeId}:{storeId:string}) => {
 
   const reductions=useQuery({queryKey:['reductions',storeId],...stockRefreshOptions,enabled:!!storeId,queryFn:({signal})=>request<{requests:{status:string;route:string;reduction_request_id:number;product_name:string;barcode:string|null;quantity:number;product_id:number;recorded_unit_cost:number|null;recorded_loss:number|null;reason:string;notes:string|null;updated_at:string}[];items:{id:number;inventoryCount:number|null}[]}>(`/access/stores/${encodeURIComponent(storeId)}/reductions`,{signal})});
   const loading=reductions.isPending;
-  const records:ShrinkageRow[]=(reductions.data?.requests??[]).filter(r=>r.status==='APPROVED'&&r.route==='shrinkage').map(r=>({id:String(r.reduction_request_id),item_name:r.product_name,scan_code:r.barcode??'',quantity:Number(r.quantity),current_stock:reductions.data?.items.find(i=>Number(i.id)===Number(r.product_id))?.inventoryCount??null,net_cost:r.recorded_unit_cost==null?null:Number(r.recorded_unit_cost),recorded_loss:r.recorded_loss==null?null:Number(r.recorded_loss),reason:r.reason,notes:r.notes,recorded_at:r.updated_at}));
+  const records:ShrinkageRow[]=(reductions.data?.requests??[]).filter(r=>r.status==='APPROVED'&&['shrinkage','non-returnable'].includes(r.route)).map(r=>({id:String(r.reduction_request_id),item_name:r.product_name,scan_code:r.barcode??'',quantity:Number(r.quantity),current_stock:reductions.data?.items.find(i=>Number(i.id)===Number(r.product_id))?.inventoryCount??null,net_cost:r.recorded_unit_cost==null?null:Number(r.recorded_unit_cost),recorded_loss:r.recorded_loss==null?null:Number(r.recorded_loss),reason:r.reason,notes:r.notes,recorded_at:r.updated_at}));
 
 
   const filtered = records.filter(r => {
@@ -78,7 +83,7 @@ export const InventoryShrinkageWaste = ({storeId}:{storeId:string}) => {
               Inventory Shrinkage &amp; Waste
             </CardTitle>
             <p className="text-xs text-muted-foreground mt-1">
-              Items removed from stock due to vendor recall, theft, spoilage, or counting errors. Stock columns show the live balance after approval; the reduction is already applied.
+              Items disposed of without vendor credit, including damage, expiration, theft, spoilage, and counting errors. Stock columns show the live balance after approval; the reduction is already applied.
             </p>
           </div>
           <div className="text-right">

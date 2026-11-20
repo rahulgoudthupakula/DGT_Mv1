@@ -83,15 +83,13 @@ const sortOptions = [
 ];
 
 const reasonOptions = [
-  { value: "damaged-returnable", label: "Damaged (Returnable)", returnable: true },
-  { value: "expired-returnable", label: "Expired (Returnable)", returnable: true },
-  { value: "vendor-recall", label: "Vendor Recall", returnable: true },
-  { value: "damaged-non-returnable", label: "Damaged (Non-Returnable)", returnable: false },
-  { value: "expired-non-returnable", label: "Expired (Non-Returnable)", returnable: false },
-  { value: "theft", label: "Theft / Shrinkage", returnable: false },
-  { value: "spoilage", label: "Spoilage", returnable: false },
-  { value: "counting-error", label: "Counting Error", returnable: false },
-  { value: "store-to-store-transfer", label: "Store to Store Transfer", returnable: false },
+  { value: "damaged", label: "Damaged" },
+  { value: "expired", label: "Expired" },
+  { value: "vendor-recall", label: "Vendor Recall" },
+  { value: "theft", label: "Theft / Shrinkage" },
+  { value: "spoilage", label: "Spoilage" },
+  { value: "counting-error", label: "Counting Error" },
+  { value: "store-to-store-transfer", label: "Store to Store Transfer" },
 ];
 
 const SHRINKAGE_REASONS = new Set([
@@ -113,6 +111,7 @@ interface ReduceRequestRow {
   scanCode: string;
   currentCount: number;
   reducingCount: number;
+  returnable: boolean;
   reason: string;
   transferStore?: string;
 }
@@ -125,6 +124,7 @@ interface InventoryItem {
   department: string;
   vendor: string;
   vendorNames?: string[];
+  returnable?: boolean;
   inventoryCount: number;
   netCost: number;
   price: number;
@@ -300,7 +300,7 @@ export const StockAdjustments = ({storeId}:{storeId:string}) => {
       }
     });
 
-  const { paginated: paginatedData, page, totalPages, totalItems, pageSize, hasPrev, hasNext, nextPage, prevPage } =
+  const { paginated: paginatedData, page, totalPages, totalItems, pageSize, hasPrev, hasNext, nextPage, prevPage, goToPage } =
     usePagination(filteredData, 10);
 
   const toggleEditMode = () => {
@@ -337,6 +337,7 @@ export const StockAdjustments = ({storeId}:{storeId:string}) => {
         scanCode: i.scanCode,
         currentCount: i.inventoryCount,
         reducingCount: 0,
+        returnable: i.returnable===true,
         reason: "",
       }));
     setReduceRows(rows);
@@ -423,7 +424,7 @@ export const StockAdjustments = ({storeId}:{storeId:string}) => {
                   <TableBody>
                     {reduceRows.map(row => (
                       <TableRow key={row.id}>
-                        <TableCell className="text-xs font-medium">{row.itemName}</TableCell>
+                        <TableCell className="text-xs font-medium">{row.itemName}<p className="text-[10px] text-muted-foreground">{row.returnable?"Returnable":"Non-returnable"}</p></TableCell>
                         <TableCell className="text-xs font-mono">{row.scanCode}</TableCell>
                         <TableCell className="text-xs text-center">{row.currentCount}</TableCell>
                         <TableCell className="text-center">
@@ -475,7 +476,7 @@ export const StockAdjustments = ({storeId}:{storeId:string}) => {
               </div>
 
               <div className="flex items-center gap-2 rounded-lg border bg-muted/30 px-4 py-3 text-xs text-muted-foreground">
-                <span>Items with <strong className="text-foreground">returnable</strong> reasons will be routed to <em>Reduce Inventory [Returnable]</em>, others to <em>Reduce Inventory [Non-Returnable]</em>.</span>
+                <span>Damaged, expired, and recalled items follow their saved Returnable setting: returnable items go to Reduce Inventory (Returnable), others to Shrinkage &amp; Waste. Theft, spoilage, and counting errors go to Shrinkage &amp; Waste.</span>
               </div>
             </div>
 
@@ -574,8 +575,13 @@ export const StockAdjustments = ({storeId}:{storeId:string}) => {
 
       {/* Filter Options */}
       <Card>
-        <CardHeader className="pb-4">
+        <CardHeader className="pb-4 flex flex-row items-center justify-between gap-3">
           <CardTitle className="text-base">Filters</CardTitle>
+          <Button type="button" variant="outline" size="sm"
+            disabled={!scanCode&&!department.length&&taxType==='All Tax Types'&&!vendor.length&&sortBy==='item-name'}
+            onClick={()=>{setScanCode('');setDepartment([]);setTaxType('All Tax Types');setVendor([]);setSortBy('item-name');goToPage(1);}}>
+            Clear Filters
+          </Button>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -735,7 +741,9 @@ export const StockAdjustments = ({storeId}:{storeId:string}) => {
                   const isEditing = editingId === item.id;
                   const isSelected = selectedIds.has(item.id);
                   return (
-                    <TableRow key={item.id} className={isEditing ? "bg-muted/30" : isSelected ? "bg-muted/20" : ""}>
+                    <TableRow key={item.id} className={`${isEditing ? "bg-muted/30" : isSelected ? "bg-muted/20" : ""} ${isEditMode&&!isEditing?"cursor-pointer":""}`} aria-selected={isEditMode?isSelected:undefined} tabIndex={isEditMode&&!isEditing?0:undefined}
+                      onClick={e=>{if(isEditMode&&!isEditing&&!(e.target as HTMLElement).closest('button,input,select,textarea,a,label,[role="checkbox"],[role="combobox"]'))toggleSelectItem(item.id);}}
+                      onKeyDown={e=>{if(isEditMode&&!isEditing&&e.target===e.currentTarget&&(e.key===' '||e.key==='Enter')){e.preventDefault();toggleSelectItem(item.id);}}}>
                       {isEditMode && (
                         <TableCell className="text-center">
                           <Checkbox
